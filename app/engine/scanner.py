@@ -1,6 +1,6 @@
 import asyncio
 import MetaTrader5 as mt5
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 from app.mt5_client.client import mt5_client
 from app.mt5_client.symbol_resolver import SymbolResolver
@@ -99,8 +99,21 @@ async def scan_loop():
                                 else:
                                     score = calculate_score(htf['strength'], mtf_zone['quality'], ltf_trigger['strength'], True)
                                     if score >= int(cfg.get("signal_threshold", 65)):
-                                        status = "FIRED"
-                                        reason_full["msg"] = f"Accepted! Score: {score}"
+                                        cooldown_mins = int(cfg.get("signal_cooldown_minutes", 30))
+                                        cutoff = datetime.now(pytz.utc) - timedelta(minutes=cooldown_mins)
+                                        
+                                        async with AsyncSessionLocal() as db:
+                                            recent = await db.execute(select(Signal).where(
+                                                Signal.symbol == resolved,
+                                                Signal.direction == bias,
+                                                Signal.created_at >= cutoff
+                                            ))
+                                            if recent.scalars().first():
+                                                status = "COOLDOWN"
+                                                reason_full["msg"] = f"Triggered but skipped (Cooldown active for {cooldown_mins}m)"
+                                            else:
+                                                status = "FIRED"
+                                                reason_full["msg"] = f"Accepted! Score: {score}"
                                     else:
                                         reason_full["msg"] = f"Triggered but Low Score ({score} < threshold)"
 

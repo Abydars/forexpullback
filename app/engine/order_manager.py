@@ -54,9 +54,21 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict):
             return
         
         risk_pct = float(cfg.get("risk_percent", 1.0))
-        sl_points = abs(actual_price - sig.sl) / info.point if info.point else 1
+        risk_amount = balance * risk_pct / 100
         
-        lot = (balance * risk_pct / 100) / (sl_points * info.trade_tick_value) if info.trade_tick_value else info.volume_min
+        def _calc_profit():
+            action_type = mt5.ORDER_TYPE_BUY if bias == 'bullish' else mt5.ORDER_TYPE_SELL
+            return mt5.order_calc_profit(action_type, resolved, 1.0, actual_price, sig.sl)
+            
+        profit_1_lot = await asyncio.to_thread(_calc_profit)
+        
+        if profit_1_lot is not None and profit_1_lot != 0:
+            loss_for_1_lot = abs(profit_1_lot)
+            lot = risk_amount / loss_for_1_lot
+        else:
+            # Fallback for when order_calc_profit fails
+            sl_points = abs(actual_price - sig.sl) / info.point if info.point else 1
+            lot = risk_amount / (sl_points * info.trade_tick_value) if info.trade_tick_value else info.volume_min
         
         # precise volume calculation to prevent MT5 invalid volume errors
         steps = round(lot / info.volume_step)
@@ -91,9 +103,47 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict):
             "type_filling": filling_type,
         }
         
+        # 1. Check Broker Stop Levels
+        stops_level_points = info.trade_stops_level * info.point
+        if abs(actual_price - sig.sl) <= stops_level_points:
+            async with AsyncSessionLocal() as db:
+                err_msg = f"Order {resolved} rejected: SL distance is closer than broker stops_level ({info.trade_stops_level} points)"
+                e = Event(level="WARN", component="order_manager", message=err_msg)
+                db.add(e)
+                await db.commit()
+                await broadcast({"type": "log.event", "level": "WARN", "component": "order_manager", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+            return
+            
+        # 2. Dry-run Order Check
+        def _check_order():
+            return mt5.order_check(request)
+            
+        check_result = await asyncio.to_thread(_check_order)
+        if check_result is None or check_result.retcode != mt5.TRADE_RETCODE_DONE:
+            async with AsyncSessionLocal() as db:
+                comment = check_result.comment if check_result else 'Unknown Error'
+                code = check_result.retcode if check_result else 'None'
+                err_msg = f"Order {resolved} failed dry-run: {comment} (Code {code})"
+                e = Event(level="WARN", component="order_manager", message=err_msg)
+                db.add(e)
+                await db.commit()
+                await broadcast({"type": "log.event", "level": "WARN", "component": "order_manager", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+            return
+        
         res = await mt5_client.order_send(request)
         if res.get('retcode') == mt5.TRADE_RETCODE_DONE:
-            ticket = res.get('order')
+            order_ticket = res.get('order')
+            deal_ticket = res.get('deal')
+            
+            def _get_pos_id():
+                if deal_ticket:
+                    deals = mt5.history_deals_get(ticket=deal_ticket)
+                    if deals and len(deals) > 0:
+                        return deals[0].position_id
+                return order_ticket
+                
+            ticket = await asyncio.to_thread(_get_pos_id)
+            
             async with AsyncSessionLocal() as db:
                 t = Trade(signal_id=sig.id, ticket=ticket, symbol=resolved, direction=bias,
                          lot=lot, entry_price=res.get('price'), sl=sig.sl, tp=sig.tp,

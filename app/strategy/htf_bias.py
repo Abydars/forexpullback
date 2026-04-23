@@ -8,10 +8,11 @@ def calculate_htf_bias(df: pd.DataFrame) -> dict:
     df['ema50'] = df['close'].ewm(span=50, adjust=False).mean()
     df['ema200'] = df['close'].ewm(span=200, adjust=False).mean()
     
-    close = df['close'].iloc[-1]
-    ema200 = df['ema200'].iloc[-1]
-    ema50_now = df['ema50'].iloc[-1]
-    ema50_past = df['ema50'].iloc[-10]
+    # Use iloc[-2] to rely on the last completely closed 4H candle and prevent repainting
+    close = df['close'].iloc[-2]
+    ema200 = df['ema200'].iloc[-2]
+    ema50_now = df['ema50'].iloc[-2]
+    ema50_past = df['ema50'].iloc[-11]
     
     bias = "neutral"
     strength = 0
