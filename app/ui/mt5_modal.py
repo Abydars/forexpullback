@@ -29,8 +29,9 @@ def open_mt5_modal():
                     ui.button('Reconnect', on_click=lambda a=acc: reconnect(a, dialog)).props('size=sm')
             ui.separator().classes('my-2 border-slate-700')
 
-        server = ui.input('Server').classes('w-full').props(f'list=servers')
-        ui.html(f'<datalist id="servers">{"".join(f"<option value=\\"{s}\\">" for s in COMMON_EXNESS_SERVERS)}</datalist>')
+        server = ui.input('Server').classes('w-full').props('list=servers')
+        options_html = "".join(f'<option value="{s}">' for s in COMMON_EXNESS_SERVERS)
+        ui.html(f'<datalist id="servers">{options_html}</datalist>')
         login = ui.number('Login', format='%d').classes('w-full')
         password = ui.input('Password', password=True, password_toggle_button=True).classes('w-full')
         path = ui.input('Terminal path (optional)').classes('w-full')
