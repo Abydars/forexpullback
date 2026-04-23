@@ -51,18 +51,27 @@ async def scan_loop():
                 if not resolved:
                     continue
                     
-                df_4h = await mt5_client.get_rates(resolved, mt5.TIMEFRAME_H4, 200)
-                df_15m = await mt5_client.get_rates(resolved, mt5.TIMEFRAME_M15, 300)
-                df_5m = await mt5_client.get_rates(resolved, mt5.TIMEFRAME_M5, 500)
-                
                 reason_full = {"htf": None, "zone": None, "trigger": None, "msg": ""}
                 status = "REJECTED"
                 score = 0
                 bias = "neutral"
                 
-                if df_4h.empty or df_15m.empty or df_5m.empty: 
-                    reason_full["msg"] = "Not enough data (need more bars)"
+                info = mt5.symbol_info(resolved)
+                tick = mt5.symbol_info_tick(resolved)
+                current_time = datetime.now().timestamp()
+                
+                if not info or info.trade_mode != mt5.SYMBOL_TRADE_MODE_FULL:
+                    reason_full["msg"] = "Market is CLOSED (Trading Disabled)"
+                elif not tick or (current_time - tick.time) > 300:
+                    reason_full["msg"] = "Market is CLOSED (Stale tick data)"
                 else:
+                    df_4h = await mt5_client.get_rates(resolved, mt5.TIMEFRAME_H4, 200)
+                    df_15m = await mt5_client.get_rates(resolved, mt5.TIMEFRAME_M15, 300)
+                    df_5m = await mt5_client.get_rates(resolved, mt5.TIMEFRAME_M5, 500)
+                    
+                    if df_4h.empty or df_15m.empty or df_5m.empty: 
+                        reason_full["msg"] = "Not enough data (need more bars)"
+                    else:
                     htf = calculate_htf_bias(df_4h)
                     reason_full["htf"] = htf
                     bias = htf['bias']
