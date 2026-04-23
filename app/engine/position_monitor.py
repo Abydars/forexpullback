@@ -8,6 +8,29 @@ from app.ws.manager import broadcast
 from datetime import datetime
 import pytz
 
+async def evaluate_smart_exit(p: dict, symbol: str) -> str | None:
+    if p['profit'] <= 0:
+        return None
+        
+    df = await mt5_client.get_rates(symbol, mt5.TIMEFRAME_M5, 5)
+    if df.empty or len(df) < 3: return None
+    
+    last = df.iloc[-2]
+    prev = df.iloc[-3]
+    
+    if p['type'] == mt5.ORDER_TYPE_BUY:
+        # Strong Bearish Reversal (Engulfing)
+        if last['close'] < last['open'] and prev['close'] > prev['open']:
+            if last['close'] <= prev['open']:
+                return "Smart TP: Bearish Reversal Detected"
+    else:
+        # Strong Bullish Reversal (Engulfing)
+        if last['close'] > last['open'] and prev['close'] < prev['open']:
+            if last['close'] >= prev['open']:
+                return "Smart TP: Bullish Reversal Detected"
+                
+    return None
+
 async def monitor_loop():
     while True:
         from app.core.state import state
@@ -58,6 +81,18 @@ async def monitor_loop():
                             })
                     else:
                         p = pos_dict[t.ticket]
+                        
+                        exit_reason = await evaluate_smart_exit(p, t.symbol)
+                        if exit_reason:
+                            res = await mt5_client.position_close(t.ticket)
+                            if res and res.get('retcode') == mt5.TRADE_RETCODE_DONE:
+                                from app.db.models import Event
+                                e = Event(level="INFO", component="smart_tp", message=f"Closed {t.ticket} ({t.symbol}): {exit_reason} at +${p['profit']:.2f}")
+                                db.add(e)
+                                await db.commit()
+                                await broadcast({"type": "log.event", "level": "INFO", "component": "smart_tp", "message": e.message, "created_at": datetime.now(pytz.utc).isoformat()})
+                                continue
+                                
                         await broadcast({
                             "type": "trade.updated",
                             "trade": {
