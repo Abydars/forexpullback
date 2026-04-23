@@ -35,7 +35,7 @@ async def monitor_loop():
     while True:
         from app.core.state import state
         if not state.engine_running or not mt5_client.is_connected():
-            await asyncio.sleep(2)
+            await asyncio.sleep(0.5)
             continue
             
         try:
@@ -104,4 +104,4 @@ async def monitor_loop():
         except Exception as e:
             print("Monitor error:", e)
             
-        await asyncio.sleep(2)
+        await asyncio.sleep(0.2)
