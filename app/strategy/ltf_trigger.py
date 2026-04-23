@@ -3,7 +3,7 @@ import pandas as pd
 def find_ltf_trigger(df: pd.DataFrame, zone: dict, bias: str, point: float, reward_ratio: float = 2.0) -> dict | None:
     if len(df) < 5: return None
     
-    last = df.iloc[-1]
+    last = df.iloc[-2]
     
     in_zone = (last['low'] <= zone['zone_high']) and (last['high'] >= zone['zone_low'])
     if not in_zone:
