@@ -129,7 +129,16 @@ async def monitor_loop():
                                 info = mt5.symbol_info(t.symbol)
                                 if info:
                                     trail_pips = float(cfg.get("trailing_distance_pips", 10.0))
-                                    dist_points = trail_pips * (10 * info.point if str(info.point).endswith('1') else info.point)
+                                    
+                                    digits = info.digits
+                                    if "JPY" in t.symbol:
+                                        pip_size = 0.01
+                                    elif digits in [3, 5]:
+                                        pip_size = info.point * 10
+                                    else:
+                                        pip_size = info.point
+                                        
+                                    dist_points = trail_pips * pip_size
                                     
                                     new_sl = None
                                     if p['type'] == mt5.ORDER_TYPE_BUY:

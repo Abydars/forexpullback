@@ -32,8 +32,29 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict):
         info = mt5.symbol_info(resolved)
         if not info: return
         
+        tick = mt5.symbol_info_tick(resolved)
+        if not tick: return
+        actual_price = tick.ask if bias == 'bullish' else tick.bid
+        
+        # Spread check (Dynamic Percentage of Stop Loss)
+        spread = tick.ask - tick.bid
+        sl_distance = abs(actual_price - sig.sl)
+        
+        # Calculate what percentage of the risk (SL distance) is eaten by the spread
+        spread_pct = (spread / sl_distance) * 100 if sl_distance > 0 else 100
+        max_spread_pct = float(cfg.get("max_spread_pct", 20.0))
+        
+        if spread_pct > max_spread_pct:
+            async with AsyncSessionLocal() as db:
+                err_msg = f"Order {resolved} rejected: Spread is {spread_pct:.1f}% of SL distance (Max allowed: {max_spread_pct}%)"
+                e = Event(level="WARN", component="order_manager", message=err_msg)
+                db.add(e)
+                await db.commit()
+                await broadcast({"type": "log.event", "level": "WARN", "component": "order_manager", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+            return
+        
         risk_pct = float(cfg.get("risk_percent", 1.0))
-        sl_points = abs(sig.entry - sig.sl) / info.point if info.point else 1
+        sl_points = abs(actual_price - sig.sl) / info.point if info.point else 1
         
         lot = (balance * risk_pct / 100) / (sl_points * info.trade_tick_value) if info.trade_tick_value else info.volume_min
         
@@ -60,7 +81,7 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict):
             "symbol": resolved,
             "volume": float(lot),
             "type": type_,
-            "price": mt5.symbol_info_tick(resolved).ask if type_ == mt5.ORDER_TYPE_BUY else mt5.symbol_info_tick(resolved).bid,
+            "price": actual_price,
             "sl": sig.sl,
             "tp": sig.tp,
             "deviation": 20,

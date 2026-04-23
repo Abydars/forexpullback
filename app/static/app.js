@@ -304,6 +304,7 @@ async function loadConfig() {
     document.getElementById('c-max_open_positions').value = cfg.max_open_positions || 5;
     document.getElementById('c-max_per_symbol').value = cfg.max_per_symbol || 1;
     document.getElementById('c-max_per_direction').value = cfg.max_per_direction || 3;
+    document.getElementById('c-max_spread_pct').value = cfg.max_spread_pct || 20.0;
     document.getElementById('c-signal_threshold').value = cfg.signal_threshold || 65;
     document.getElementById('c-risk_percent').value = cfg.risk_percent || 1.0;
     document.getElementById('c-scan_interval_seconds').value = cfg.scan_interval_seconds || 10;
@@ -393,6 +394,7 @@ function collectConfigInputs() {
     max_open_positions: parseInt(document.getElementById('c-max_open_positions').value),
     max_per_symbol: parseInt(document.getElementById('c-max_per_symbol').value),
     max_per_direction: parseInt(document.getElementById('c-max_per_direction').value),
+    max_spread_pct: parseFloat(document.getElementById('c-max_spread_pct').value),
     signal_threshold: parseInt(document.getElementById('c-signal_threshold').value),
     risk_percent: parseFloat(document.getElementById('c-risk_percent').value),
     scan_interval_seconds: parseInt(document.getElementById('c-scan_interval_seconds').value),
