@@ -16,7 +16,7 @@ def build_action_buttons():
     with ui.row().classes('items-center gap-2'):
         # MT5 Dot
         mt5_dot = ui.icon('circle', size='xs').classes('text-red-500')
-        mt5_dot.bind_class_from(state, 'mt5_connected', lambda c: 'text-green-500' if c else 'text-red-500')
+        ui.timer(2.0, lambda: mt5_dot.classes(replace='text-green-500' if state.mt5_connected else 'text-red-500'))
         
         ui.button('Connect', on_click=open_mt5_modal).props('size=sm').classes('bg-slate-700')
         ui.button('Settings', on_click=open_config_modal, icon='settings').props('size=sm').classes('bg-slate-700')
