@@ -215,18 +215,18 @@ function renderScannerStatus() {
     const esc = (str) => String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     const rawReason = esc(JSON.stringify(s.reason));
     
-    return \`
+    return `
     <tr>
-      <td>\${s.symbol} <span style="color:var(--muted); font-size:10px;">(\${s.resolved})</span></td>
-      <td><span class="pill \${s.bias === 'bullish' ? 'g' : s.bias === 'bearish' ? 'r' : ''}">\${s.bias}</span></td>
-      <td>\${s.score}</td>
-      <td><span class="pill \${s.status === 'FIRED' ? 'g' : 'amber'}">\${s.status}</span></td>
-      <td style="max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="\${rawReason}">
-        \${esc(reasonText)}
+      <td>${s.symbol} <span style="color:var(--muted); font-size:10px;">(${s.resolved})</span></td>
+      <td><span class="pill ${s.bias === 'bullish' ? 'g' : s.bias === 'bearish' ? 'r' : ''}">${s.bias}</span></td>
+      <td>${s.score}</td>
+      <td><span class="pill ${s.status === 'FIRED' ? 'g' : 'amber'}">${s.status}</span></td>
+      <td style="max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${rawReason}">
+        ${esc(reasonText)}
       </td>
-      <td>\${new Date(s.updated_at).toLocaleTimeString()}</td>
+      <td>${new Date(s.updated_at).toLocaleTimeString()}</td>
     </tr>
-    \`;
+    `;
   }).join('');
 }
 
