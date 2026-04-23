@@ -55,47 +55,79 @@ async def scan_loop():
                 df_15m = await mt5_client.get_rates(resolved, mt5.TIMEFRAME_M15, 300)
                 df_5m = await mt5_client.get_rates(resolved, mt5.TIMEFRAME_M5, 500)
                 
-                if df_4h.empty or df_15m.empty or df_5m.empty: continue
+                reason_full = {"htf": None, "zone": None, "trigger": None, "msg": ""}
+                status = "REJECTED"
+                score = 0
+                bias = "neutral"
                 
-                htf = calculate_htf_bias(df_4h)
-                bias = htf['bias']
-                if bias == 'neutral': continue
-                
-                mtf_zone = find_mtf_zone(df_15m, bias)
-                if not mtf_zone: continue
-                
-                point = 0.0001
-                try:
-                    info = mt5.symbol_info(resolved)
-                    if info: point = info.point
-                except: pass
+                if df_4h.empty or df_15m.empty or df_5m.empty: 
+                    reason_full["msg"] = "Not enough data (need more bars)"
+                else:
+                    htf = calculate_htf_bias(df_4h)
+                    reason_full["htf"] = htf
+                    bias = htf['bias']
                     
-                ltf_trigger = find_ltf_trigger(df_5m, mtf_zone, bias, point, float(cfg.get("reward_ratio", 2.0)))
-                if not ltf_trigger: continue
-                
-                score = calculate_score(htf['strength'], mtf_zone['quality'], ltf_trigger['strength'], True)
-                
-                status = 'FIRED' if score >= int(cfg.get("signal_threshold", 65)) else 'REJECTED'
-                
-                async with AsyncSessionLocal() as db:
-                    sig = Signal(symbol=resolved, direction=bias, score=score, htf_bias=bias, 
-                                entry=ltf_trigger['entry'], sl=ltf_trigger['sl'], tp=ltf_trigger['tp'],
-                                reason={"htf": htf, "zone": mtf_zone, "trigger": ltf_trigger}, status=status)
-                    db.add(sig)
-                    await db.commit()
-                    await db.refresh(sig)
-                    
-                    await broadcast({
-                        "type": "signal.new",
-                        "signal": {
-                            "id": sig.id, "symbol": generic, "direction": bias, "score": score,
-                            "status": status, "reason": sig.reason, "created_at": sig.created_at.isoformat()
-                        }
-                    })
-                    
+                    if bias == 'neutral':
+                        reason_full["msg"] = "Neutral HTF Bias (EMA not aligned / No BOS)"
+                    else:
+                        mtf_zone = find_mtf_zone(df_15m, bias)
+                        reason_full["zone"] = mtf_zone
+                        
+                        if not mtf_zone:
+                            reason_full["msg"] = f"No 15M Zone or RSI not cooling off"
+                        else:
+                            point = 0.0001
+                            try:
+                                info = mt5.symbol_info(resolved)
+                                if info: point = info.point
+                            except: pass
+                                
+                            ltf_trigger = find_ltf_trigger(df_5m, mtf_zone, bias, point, float(cfg.get("reward_ratio", 2.0)))
+                            reason_full["trigger"] = ltf_trigger
+                            
+                            if not ltf_trigger:
+                                reason_full["msg"] = "Price in 15M Zone, waiting for 5M Trigger"
+                            else:
+                                score = calculate_score(htf['strength'], mtf_zone['quality'], ltf_trigger['strength'], True)
+                                if score >= int(cfg.get("signal_threshold", 65)):
+                                    status = "FIRED"
+                                    reason_full["msg"] = f"Accepted! Score: {score}"
+                                else:
+                                    reason_full["msg"] = f"Triggered but Low Score ({score} < threshold)"
+
+                await broadcast({
+                    "type": "scan.update",
+                    "data": {
+                        "symbol": generic,
+                        "resolved": resolved,
+                        "bias": bias,
+                        "score": score,
+                        "status": status,
+                        "reason": reason_full,
+                        "updated_at": datetime.now(pytz.utc).isoformat()
+                    }
+                })
+
                 if status == 'FIRED':
+                    async with AsyncSessionLocal() as db:
+                        sig = Signal(symbol=resolved, direction=bias, score=score, htf_bias=bias, 
+                                    entry=ltf_trigger['entry'], sl=ltf_trigger['sl'], tp=ltf_trigger['tp'],
+                                    reason=reason_full, status=status)
+                        db.add(sig)
+                        await db.commit()
+                        await db.refresh(sig)
+                        
+                        await broadcast({
+                            "type": "signal.new",
+                            "signal": {
+                                "id": sig.id, "symbol": generic, "direction": bias, "score": score,
+                                "status": status, "reason": sig.reason, "created_at": sig.created_at.isoformat()
+                            }
+                        })
+                        
                     from app.engine.order_manager import send_order
                     await send_order(sig, resolved, bias, cfg)
+
                     
             await asyncio.sleep(interval)
         except Exception as e:

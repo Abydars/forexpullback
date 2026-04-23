@@ -12,6 +12,7 @@ const state = {
   config: {},
   sessions: [],
   symbols: [],
+  scanner_status: {},
 };
 
 // ---- WS ----
@@ -26,7 +27,8 @@ function connectWS() {
 function handleEvent(msg) {
   switch (msg.type) {
     case 'mt5.connection':  state.mt5_connected = msg.state === 'connected'; renderTopbar(); break;
-    case 'account.tick':    state.account = msg; pushEquityPoint(msg); renderTopbar(); renderStats(); renderEquity(); break;
+    case 'account.tick':    state.account = msg; renderTopbar(); renderStats(); break;
+    case 'scan.update':     updateScanStatus(msg.data); break;
     case 'signal.new':      state.recent_signals.unshift(msg.signal); state.all_signals.unshift(msg.signal); renderSignals(); break;
     case 'trade.opened':    state.open_positions.push(msg.trade); renderPositions(); renderStats(); break;
     case 'trade.updated':   replaceTrade(msg.trade); renderPositions(); break;
@@ -34,11 +36,6 @@ function handleEvent(msg) {
     case 'log.event':       state.events.unshift(msg); renderLogs(); break;
     case 'engine.status':   state.engine_running = msg.state === 'active'; renderEngineBtn(); break;
   }
-}
-
-function pushEquityPoint(msg) {
-  state.equity_series.push({ time: Date.now(), equity: msg.equity });
-  if (state.equity_series.length > 100) state.equity_series.shift();
 }
 
 function replaceTrade(trade) {
@@ -84,21 +81,6 @@ document.querySelectorAll('.sub-tab').forEach(t => t.onclick = () => {
   renderTrades();
 });
 
-
-// ---- Equity chart (inline SVG, no library) ----
-function renderEquity() {
-  const svg = document.getElementById('equity-chart');
-  if (state.equity_series.length < 2) return;
-  const w = 800, h = 200;
-  const vals = state.equity_series.map(p => p.equity);
-  const min = Math.min(...vals), max = Math.max(...vals);
-  const pts = state.equity_series.map((p, i) => {
-    const x = (i / (state.equity_series.length - 1)) * w;
-    const y = h - ((p.equity - min) / (max - min || 1)) * h;
-    return `${x},${y}`;
-  }).join(' ');
-  svg.innerHTML = `<polyline points="${pts}" fill="none" stroke="#4dd0e1" stroke-width="1.5"/>`;
-}
 
 // ---- Renderers (each idempotent, rebuild target) ----
 function renderTopbar() {
@@ -210,6 +192,42 @@ function renderLogs() {
       <td>${e.message}</td>
     </tr>
   `).join('');
+}
+
+function updateScanStatus(data) {
+  state.scanner_status[data.symbol] = data;
+  renderScannerStatus();
+}
+
+function renderScannerStatus() {
+  const tbody = document.getElementById('scan-status-body');
+  const items = Object.values(state.scanner_status);
+  if (!items.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty">WAITING FOR SCAN...</td></tr>';
+    return;
+  }
+  
+  tbody.innerHTML = items.map(s => {
+    let reasonText = s.reason.msg || '';
+    if (s.status === 'FIRED') reasonText = 'Signal Triggered!';
+    
+    // Clean up reason text safely
+    const esc = (str) => String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    const rawReason = esc(JSON.stringify(s.reason));
+    
+    return \`
+    <tr>
+      <td>\${s.symbol} <span style="color:var(--muted); font-size:10px;">(\${s.resolved})</span></td>
+      <td><span class="pill \${s.bias === 'bullish' ? 'g' : s.bias === 'bearish' ? 'r' : ''}">\${s.bias}</span></td>
+      <td>\${s.score}</td>
+      <td><span class="pill \${s.status === 'FIRED' ? 'g' : 'amber'}">\${s.status}</span></td>
+      <td style="max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="\${rawReason}">
+        \${esc(reasonText)}
+      </td>
+      <td>\${new Date(s.updated_at).toLocaleTimeString()}</td>
+    </tr>
+    \`;
+  }).join('');
 }
 
 // ---- Actions ----

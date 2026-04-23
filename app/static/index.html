@@ -42,8 +42,11 @@
         <div class="stat-card"><div class="stat-label">OPEN POSITIONS</div><div class="stat-value" id="s-open">0</div></div>
       </div>
       <div class="panel">
-        <div class="panel-title">EQUITY</div>
-        <svg id="equity-chart" viewBox="0 0 800 200" preserveAspectRatio="none"></svg>
+        <div class="panel-title">LIVE SCANNER STATUS</div>
+        <table class="data-table">
+          <thead><tr><th>SYMBOL</th><th>BIAS</th><th>SCORE</th><th>STATUS</th><th>REASON / REJECTION</th><th>LAST UPDATE</th></tr></thead>
+          <tbody id="scan-status-body"><tr><td colspan="6" class="empty">WAITING FOR SCAN...</td></tr></tbody>
+        </table>
       </div>
       <div class="grid-2">
         <div class="panel">
