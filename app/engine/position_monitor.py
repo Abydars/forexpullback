@@ -175,6 +175,7 @@ async def monitor_loop():
                                         if res_sl and res_sl.get('retcode') == mt5.TRADE_RETCODE_DONE:
                                             t.sl = new_sl
                                             await db.commit()
+        except Exception as e:
             print("Monitor error:", e)
             
         await asyncio.sleep(0.2)
