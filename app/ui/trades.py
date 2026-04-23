@@ -5,36 +5,42 @@ from app.db.models import TradeRecord
 @ui.refreshable
 def trades_table():
     db = SessionLocal()
-    trades = db.query(TradeRecord).filter(TradeRecord.closed_at.isnot(None)).order_by(TradeRecord.opened_at.desc()).limit(100).all()
+    trades = db.query(TradeRecord).filter(TradeRecord.closed_at.isnot(None)).order_by(TradeRecord.opened_at.desc()).limit(50).all()
     rows = []
     for t in trades:
+        pnl_val = t.pnl or 0.0
+        pnl_str = f"{pnl_val:+.2f}"
         rows.append({
             'ticket': t.ticket,
             'symbol': t.symbol,
-            'direction': 'LONG' if t.direction == 'bullish' else 'SHORT',
+            'direction': 'LONG' if t.direction == 'bullish' else 'SHRT',
             'lot': f"{t.lot:.2f}",
-            'entry': f"{t.entry_price:.5f}",
-            'exit': f"{t.exit_price:.5f}" if t.exit_price else "",
-            'pnl': f"{t.pnl:.2f}" if t.pnl else "0.00",
-            'opened': t.opened_at.strftime('%m-%d %H:%M') if t.opened_at else '',
-            'closed': t.closed_at.strftime('%m-%d %H:%M') if t.closed_at else ''
+            'pnl': pnl_str,
+            'pnl_color': 'text-green-500' if pnl_val >= 0 else 'text-red-500',
+            'closed': t.closed_at.strftime('%H:%M:%S') if t.closed_at else ''
         })
     db.close()
     
-    cols = [
-        {'name': 'ticket', 'label': 'ID', 'field': 'ticket', 'align': 'left'},
-        {'name': 'symbol', 'label': 'SYM', 'field': 'symbol', 'align': 'left'},
-        {'name': 'direction', 'label': 'DIR', 'field': 'direction', 'align': 'left'},
-        {'name': 'lot', 'label': 'LOT', 'field': 'lot', 'align': 'right'},
-        {'name': 'entry', 'label': 'ENTRY', 'field': 'entry', 'align': 'right'},
-        {'name': 'exit', 'label': 'EXIT', 'field': 'exit', 'align': 'right'},
-        {'name': 'pnl', 'label': 'PNL', 'field': 'pnl', 'align': 'right'},
-        {'name': 'opened', 'label': 'OPENED', 'field': 'opened', 'align': 'right'},
-        {'name': 'closed', 'label': 'CLOSED', 'field': 'closed', 'align': 'right'},
-    ]
-    ui.table(columns=cols, rows=rows, row_key='ticket').props('dense flat bordered square dark').classes('w-full bg-[#0a0a0a] text-neutral-300 font-mono text-[10px]')
+    with ui.column().classes('w-full gap-0 text-[9px] font-mono'):
+        # Header
+        with ui.row().classes('w-full items-center justify-between px-2 py-1 text-neutral-500 border-b border-[#1a1a1a]'):
+            ui.label('SYM').classes('w-10')
+            ui.label('DIR').classes('w-8')
+            ui.label('LOT').classes('w-8 text-right')
+            ui.label('PNL').classes('w-10 text-right')
+            ui.label('TIME').classes('w-12 text-right')
+            
+        # Rows
+        for r in rows:
+            with ui.row().classes('w-full items-center justify-between px-2 py-1 border-b border-[#111] hover:bg-[#111]'):
+                ui.label(r['symbol']).classes('w-10 text-neutral-300 font-bold')
+                col = 'text-green-500' if r['direction'] == 'LONG' else 'text-red-500'
+                ui.label(r['direction']).classes(f'w-8 {col}')
+                ui.label(r['lot']).classes('w-8 text-right text-neutral-400')
+                ui.label(r['pnl']).classes(f"w-10 text-right font-bold {r['pnl_color']}")
+                ui.label(r['closed']).classes('w-12 text-right text-neutral-600')
 
-def render():
-    ui.label('TRADE_HISTORY').classes('text-[10px] text-neutral-500 uppercase tracking-widest font-sans mb-2')
-    trades_table()
+def render_trades():
+    with ui.element('div').classes('flex-grow overflow-auto bg-transparent'):
+        trades_table()
     ui.timer(5.0, lambda: trades_table.refresh())

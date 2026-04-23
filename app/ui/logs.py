@@ -9,22 +9,21 @@ def logs_table():
     rows = []
     for e in events:
         rows.append({
-            'time': e.created_at.strftime('%y-%m-%d %H:%M:%S'),
+            'time': e.created_at.strftime('%H:%M:%S'),
             'level': e.level,
-            'component': e.component,
-            'message': e.message
+            'msg': e.message
         })
     db.close()
     
-    cols = [
-        {'name': 'time', 'label': 'TIME', 'field': 'time', 'align': 'left'},
-        {'name': 'level', 'label': 'LVL', 'field': 'level', 'align': 'left'},
-        {'name': 'component', 'label': 'COMP', 'field': 'component', 'align': 'left'},
-        {'name': 'message', 'label': 'MSG', 'field': 'message', 'align': 'left'},
-    ]
-    ui.table(columns=cols, rows=rows, row_key='time').props('dense flat bordered square dark').classes('w-full bg-[#0a0a0a] text-neutral-300 font-mono text-[10px]')
+    with ui.column().classes('w-full gap-0 text-[9px] font-mono'):
+        for r in rows:
+            col = 'text-red-400' if r['level'] in ['ERROR', 'CRITICAL'] else ('text-yellow-400' if r['level'] == 'WARNING' else 'text-neutral-500')
+            with ui.row().classes('w-full gap-2 px-2 py-0.5 border-b border-[#111]'):
+                ui.label(r['time']).classes('text-neutral-600')
+                ui.label(r['level'][:4]).classes(col)
+                ui.label(r['msg']).classes('text-neutral-400 truncate flex-grow')
 
-def render():
-    ui.label('SYSTEM_LOGS').classes('text-[10px] text-neutral-500 uppercase tracking-widest font-sans mb-2')
-    logs_table()
+def render_logs():
+    with ui.element('div').classes('flex-grow overflow-auto bg-transparent'):
+        logs_table()
     ui.timer(5.0, lambda: logs_table.refresh())

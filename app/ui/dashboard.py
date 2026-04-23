@@ -2,38 +2,40 @@ from nicegui import ui
 from app.ui.state import state
 
 @ui.refreshable
-def stat_cards():
-    with ui.row().classes('w-full gap-2 mb-2'):
-        acc = state.account or {}
+def account_summary():
+    acc = state.account or {}
+    with ui.row().classes('absolute top-2 left-2 z-10 gap-2'):
+        def badge(lbl, val, col='text-neutral-200'):
+            with ui.column().classes('bg-[#050505] border border-[#222] px-2 py-1 gap-0'):
+                ui.label(lbl).classes('text-[8px] text-neutral-500 uppercase')
+                ui.label(val).classes(f'text-sm font-bold {col}')
         
-        def card(title, value, color='text-neutral-200'):
-            with ui.column().classes('flex-1 bg-[#0a0a0a] border border-[#222] p-2 gap-0'):
-                ui.label(title).classes('text-[10px] text-neutral-500 uppercase tracking-widest font-sans')
-                ui.label(value).classes(f'text-lg font-mono {color}')
-                
-        card('BALANCE', f"{acc.get('balance', 0):.2f}")
-        card('EQUITY', f"{acc.get('equity', 0):.2f}")
-        
-        pnl_color = 'text-green-500' if state.today_pnl >= 0 else 'text-red-500'
-        card('TODAY PNL', f"{state.today_pnl:+.2f}", pnl_color)
-        
-        card('OPEN POS', str(len(state.open_positions)))
+        badge('BALANCE', f"{acc.get('balance', 0):.2f}")
+        badge('EQUITY', f"{acc.get('equity', 0):.2f}")
+        pnl_col = 'text-green-500' if state.today_pnl >= 0 else 'text-red-500'
+        badge('TODAY PNL', f"{state.today_pnl:+.2f}", pnl_col)
 
 @ui.refreshable
 def equity_chart():
     opts = {
         'grid': {'top': 10, 'right': 10, 'bottom': 20, 'left': 50},
-        'xAxis': {'type': 'time', 'splitLine': {'show': True, 'lineStyle': {'color': '#111'}}, 'axisLabel': {'color': '#555', 'fontSize': 10}},
-        'yAxis': {'type': 'value', 'scale': True, 'splitLine': {'show': True, 'lineStyle': {'color': '#111'}}, 'axisLabel': {'color': '#555', 'fontSize': 10}},
-        'series': [{'type': 'line', 'data': state.equity_series, 'showSymbol': False, 'lineStyle': {'color': '#4ade80', 'width': 1}}],
+        'xAxis': {'type': 'time', 'splitLine': {'show': True, 'lineStyle': {'color': '#111'}}, 'axisLabel': {'color': '#555', 'fontSize': 9}},
+        'yAxis': {'type': 'value', 'scale': True, 'splitLine': {'show': True, 'lineStyle': {'color': '#111'}}, 'axisLabel': {'color': '#555', 'fontSize': 9}},
+        'series': [{'type': 'line', 'data': state.equity_series, 'showSymbol': False, 'lineStyle': {'color': '#3b82f6', 'width': 1.5}}],
         'backgroundColor': 'transparent',
     }
-    ui.echart(opts).classes('w-full h-48 bg-[#0a0a0a] border border-[#222]')
+    ui.echart(opts).classes('w-full h-full')
+
+def render_chart():
+    with ui.element('div').classes('relative w-full h-full'):
+        account_summary()
+        equity_chart()
+    ui.timer(2.0, lambda: (account_summary.refresh(), equity_chart.refresh()))
 
 @ui.refreshable
 def positions_table():
     cols = [
-        {'name': 'ticket', 'label': 'TICKET', 'field': 'ticket', 'align': 'left'},
+        {'name': 'ticket', 'label': 'ID', 'field': 'ticket', 'align': 'left'},
         {'name': 'symbol', 'label': 'SYM', 'field': 'symbol', 'align': 'left'},
         {'name': 'type_str', 'label': 'DIR', 'field': 'type_str', 'align': 'left'},
         {'name': 'volume', 'label': 'LOT', 'field': 'volume', 'align': 'right'},
@@ -44,28 +46,10 @@ def positions_table():
     ]
     rows = [{**p, 'type_str': 'BUY' if p.get('type') == 0 else 'SELL'} for p in state.open_positions]
     
-    ui.table(columns=cols, rows=rows, row_key='ticket').props('dense flat bordered square dark').classes('w-full bg-[#0a0a0a] text-neutral-300 font-mono text-[10px] mt-2')
+    ui.table(columns=cols, rows=rows, row_key='ticket').props('dense flat bordered square dark hide-pagination').classes('w-full bg-transparent text-neutral-300 text-[10px]')
 
-@ui.refreshable
-def signals_feed():
-    with ui.column().classes('w-full h-48 bg-[#0a0a0a] border border-[#222] p-2 overflow-y-auto gap-1'):
-        ui.label('LIVE SIGNALS').classes('text-[10px] text-neutral-500 uppercase tracking-widest font-sans mb-1')
-        for sig in state.recent_signals[:20]:
-            color = 'text-green-500' if sig['direction'] == 'bullish' else 'text-red-500'
-            dir_short = 'LONG ' if sig['direction'] == 'bullish' else 'SHORT'
-            with ui.row().classes('w-full justify-between items-center text-[10px] font-mono border-b border-[#111] pb-1'):
-                with ui.row().classes('gap-2 items-center'):
-                    ui.label(sig['symbol']).classes('text-neutral-300')
-                    ui.label(dir_short).classes(color)
-                ui.label(f"[{sig['score']}]").classes('text-neutral-500')
-
-def render():
-    stat_cards()
-    with ui.row().classes('w-full gap-2 flex-nowrap'):
-        with ui.column().classes('flex-grow gap-0'):
-            equity_chart()
-        with ui.column().classes('w-80 gap-0 shrink-0'):
-            signals_feed()
-    positions_table()
-    ui.timer(2.0, lambda: (stat_cards.refresh(), equity_chart.refresh(),
-                           positions_table.refresh(), signals_feed.refresh()))
+def render_positions():
+    ui.label('OPEN PORTFOLIO').classes('text-[9px] text-neutral-500 bg-[#111] px-2 py-1 border-b border-[#222] w-full tracking-widest')
+    with ui.element('div').classes('flex-grow overflow-auto'):
+        positions_table()
+    ui.timer(2.0, lambda: positions_table.refresh())
