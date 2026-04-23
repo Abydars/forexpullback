@@ -42,7 +42,7 @@ async def execute_trade(signal, db):
         "sl": signal.sl,
         "tp": signal.tp,
         "deviation": 20,
-        "magic": 123456,
+        "magic": int(cfg.get('magic_number', 123456)),
         "comment": f"Sig_{signal.id}",
         "type_time": mt5.ORDER_TIME_GTC,
         "type_filling": mt5.ORDER_FILLING_IOC,

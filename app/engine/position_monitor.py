@@ -6,6 +6,7 @@ from app.mt5_client.client import mt5_client
 from app.db.session import SessionLocal
 from app.db.models import TradeRecord, SessionRecord
 from app.core.sessions import active_sessions
+from app.core.config import cfg
 
 async def position_monitor_loop():
     while True:
@@ -30,8 +31,10 @@ async def position_monitor_loop():
             if len(state.equity_series) > 1000:
                 state.equity_series = state.equity_series[-1000:]
                 
-            # Update open positions
-            positions = await mt5_client.get_positions()
+            # Update open positions (filter by our magic number)
+            bot_magic = int(cfg.get('magic_number', 123456))
+            all_positions = await mt5_client.get_positions()
+            positions = [p for p in all_positions if p.get('magic') == bot_magic]
             state.open_positions = positions
             
             # Check for closed positions to update trades DB
