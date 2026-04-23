@@ -114,10 +114,12 @@
         <option value="Exness-MT5Real5"><option value="Exness-MT5Trial"><option value="Exness-MT5Trial5">
         <option value="Exness-MT5Trial9"><option value="Exness-MT5Trial15">
       </datalist>
-      <label>SERVER <input id="m-server" list="exness-servers" autocomplete="off"></label>
-      <label>LOGIN <input id="m-login" type="number"></label>
-      <label>PASSWORD <input id="m-password" type="password"></label>
-      <label>TERMINAL PATH (OPTIONAL) <input id="m-path"></label>
+      <div class="form-grid single">
+        <label>SERVER <input id="m-server" list="exness-servers" autocomplete="off"></label>
+        <label>LOGIN <input id="m-login" type="number"></label>
+        <label>PASSWORD <input id="m-password" type="password"></label>
+        <label>TERMINAL PATH (OPTIONAL) <input id="m-path"></label>
+      </div>
       <div id="m-status"></div>
       <div id="m-preview" class="hidden"></div>
       <div class="modal-actions">
@@ -139,7 +141,7 @@
         <button type="button" class="m-tab" data-mtab="risk">RISK</button>
       </nav>
 
-      <div class="m-panel active" data-mpanel="general">
+      <div class="m-panel active form-grid" data-mpanel="general">
         <label>MAX OPEN POSITIONS <input type="number" id="c-max_open_positions" value="5"></label>
         <label>MAX PER SYMBOL <input type="number" id="c-max_per_symbol" value="1"></label>
         <label>MAX PER DIRECTION <input type="number" id="c-max_per_direction" value="3"></label>
@@ -163,7 +165,7 @@
         <button type="button" class="btn" onclick="addSessionRow()" style="margin-top:12px;">+ ADD SESSION</button>
       </div>
 
-      <div class="m-panel" data-mpanel="risk">
+      <div class="m-panel form-grid" data-mpanel="risk">
         <label>SL MODE 
           <select id="c-sl_mode">
             <option value="structural">Structural</option>

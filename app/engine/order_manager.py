@@ -32,10 +32,24 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict):
         sl_points = abs(sig.entry - sig.sl) / info.point if info.point else 1
         
         lot = (balance * risk_pct / 100) / (sl_points * info.trade_tick_value) if info.trade_tick_value else info.volume_min
-        lot = max(info.volume_min, min(info.volume_max, round(lot / info.volume_step) * info.volume_step))
+        
+        # precise volume calculation to prevent MT5 invalid volume errors
+        steps = round(lot / info.volume_step)
+        lot = steps * info.volume_step
+        lot = max(info.volume_min, min(info.volume_max, lot))
+        lot = float(f"{lot:.8f}".rstrip('0').rstrip('.')) if '.' in f"{lot:.8f}" else float(lot)
         
         action = mt5.TRADE_ACTION_DEAL
         type_ = mt5.ORDER_TYPE_BUY if bias == 'bullish' else mt5.ORDER_TYPE_SELL
+        
+        # dynamically determine correct filling mode based on broker/symbol limits
+        filling_type = mt5.ORDER_FILLING_IOC
+        if info.filling_mode & mt5.SYMBOL_FILLING_FOK:
+            filling_type = mt5.ORDER_FILLING_FOK
+        elif info.filling_mode & mt5.SYMBOL_FILLING_IOC:
+            filling_type = mt5.ORDER_FILLING_IOC
+        else:
+            filling_type = mt5.ORDER_FILLING_RETURN
         
         request = {
             "action": action,
@@ -49,7 +63,7 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict):
             "magic": 123456,
             "comment": f"Sig {sig.id}",
             "type_time": mt5.ORDER_TIME_GTC,
-            "type_filling": mt5.ORDER_FILLING_IOC,
+            "type_filling": filling_type,
         }
         
         res = await mt5_client.order_send(request)
@@ -73,8 +87,23 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict):
                 })
         else:
             async with AsyncSessionLocal() as db:
-                e = Event(level="ERROR", component="order_manager", message=f"Order failed: {res.get('comment', 'Unknown')}")
+                err_msg = f"Order rejected (Retcode {res.get('retcode')}): {res.get('comment', 'Unknown')}"
+                e = Event(level="ERROR", component="order_manager", message=err_msg)
                 db.add(e)
                 await db.commit()
+                await broadcast({
+                    "type": "log.event", "level": "ERROR", "component": "order_manager", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()
+                })
     except Exception as e:
         print("Order manager error:", e)
+        err_msg = f"Order exception: {str(e)}"
+        try:
+            async with AsyncSessionLocal() as db:
+                ev = Event(level="ERROR", component="order_manager", message=err_msg)
+                db.add(ev)
+                await db.commit()
+                await broadcast({
+                    "type": "log.event", "level": "ERROR", "component": "order_manager", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()
+                })
+        except:
+            pass
