@@ -1,76 +1,80 @@
 import asyncio
 import MetaTrader5 as mt5
-import logging
-from datetime import datetime
-from app.core.config import cfg
 from app.mt5_client.client import mt5_client
-from app.db.models import TradeRecord
+from app.db.session import AsyncSessionLocal
+from app.db.models import Trade, Event
+from datetime import datetime
+from app.ws.manager import broadcast
+import pytz
 
-logger = logging.getLogger("order_manager")
-
-async def execute_trade(signal, db):
-    if not mt5_client.is_connected():
-        return
-        
-    symbol = signal.symbol
-    info = await asyncio.to_thread(mt5.symbol_info, symbol)
-    if not info: return
-    
-    account_info = await mt5_client.account_info()
-    balance = account_info['balance']
-    
-    sl_pips = abs(signal.entry - signal.sl) / info.point
-    pip_value = info.trade_tick_value / info.trade_tick_size * info.point
-    
-    if sl_pips == 0 or pip_value == 0: return
-    
-    risk_amount = balance * (cfg.risk_percent / 100)
-    lot_size = risk_amount / (sl_pips * pip_value)
-    
-    # clamp lot size
-    lot = max(info.volume_min, min(info.volume_max, round(lot_size / info.volume_step) * info.volume_step))
-    
-    order_type = mt5.ORDER_TYPE_BUY if signal.direction == 'bullish' else mt5.ORDER_TYPE_SELL
-    price = info.ask if order_type == mt5.ORDER_TYPE_BUY else info.bid
-    
-    request = {
-        "action": mt5.TRADE_ACTION_DEAL,
-        "symbol": symbol,
-        "volume": float(lot),
-        "type": order_type,
-        "price": price,
-        "sl": signal.sl,
-        "tp": signal.tp,
-        "deviation": 20,
-        "magic": int(cfg.get('magic_number', 123456)),
-        "comment": f"Sig_{signal.id}",
-        "type_time": mt5.ORDER_TIME_GTC,
-        "type_filling": mt5.ORDER_FILLING_IOC,
-    }
-    
+async def send_order(sig, resolved: str, bias: str, cfg: dict):
     try:
-        result = await mt5_client.order_send(request)
-        if result['retcode'] == mt5.TRADE_RETCODE_DONE:
-            logger.info(f"Order executed: {result['order']}")
-            trade = TradeRecord(
-                signal_id=signal.id,
-                ticket=result['order'],
-                symbol=symbol,
-                direction=signal.direction,
-                lot=lot,
-                entry_price=result['price'],
-                sl=signal.sl,
-                tp=signal.tp,
-                opened_at=datetime.utcnow()
-            )
-            db.add(trade)
-            db.commit()
-            signal.status = 'executed'
+        positions = await mt5_client.get_positions()
+        if len(positions) >= int(cfg.get("max_open_positions", 5)):
+            return
+            
+        sym_pos = [p for p in positions if p['symbol'] == resolved]
+        if len(sym_pos) >= int(cfg.get("max_per_symbol", 1)):
+            return
+            
+        dir_type = 0 if bias == 'bullish' else 1
+        sym_dir_pos = [p for p in sym_pos if p['type'] == dir_type]
+        if len(sym_dir_pos) >= int(cfg.get("max_per_direction", 3)):
+            return
+            
+        acc = await mt5_client.account_info()
+        balance = acc['balance']
+        
+        info = mt5.symbol_info(resolved)
+        if not info: return
+        
+        risk_pct = float(cfg.get("risk_percent", 1.0))
+        sl_points = abs(sig.entry - sig.sl) / info.point if info.point else 1
+        
+        lot = (balance * risk_pct / 100) / (sl_points * info.trade_tick_value) if info.trade_tick_value else info.volume_min
+        lot = max(info.volume_min, min(info.volume_max, round(lot / info.volume_step) * info.volume_step))
+        
+        action = mt5.TRADE_ACTION_DEAL
+        type_ = mt5.ORDER_TYPE_BUY if bias == 'bullish' else mt5.ORDER_TYPE_SELL
+        
+        request = {
+            "action": action,
+            "symbol": resolved,
+            "volume": float(lot),
+            "type": type_,
+            "price": mt5.symbol_info_tick(resolved).ask if type_ == mt5.ORDER_TYPE_BUY else mt5.symbol_info_tick(resolved).bid,
+            "sl": sig.sl,
+            "tp": sig.tp,
+            "deviation": 20,
+            "magic": 123456,
+            "comment": f"Sig {sig.id}",
+            "type_time": mt5.ORDER_TIME_GTC,
+            "type_filling": mt5.ORDER_FILLING_IOC,
+        }
+        
+        res = await mt5_client.order_send(request)
+        if res.get('retcode') == mt5.TRADE_RETCODE_DONE:
+            ticket = res.get('order')
+            async with AsyncSessionLocal() as db:
+                t = Trade(signal_id=sig.id, ticket=ticket, symbol=resolved, direction=bias,
+                         lot=lot, entry_price=res.get('price'), sl=sig.sl, tp=sig.tp,
+                         opened_at=datetime.now(pytz.utc))
+                db.add(t)
+                await db.commit()
+                await db.refresh(t)
+                
+                await broadcast({
+                    "type": "trade.opened",
+                    "trade": {
+                        "ticket": ticket, "symbol": resolved, "direction": bias,
+                        "lot": lot, "entry_price": t.entry_price, "sl": t.sl, "tp": t.tp,
+                        "pnl": 0.0, "opened_at": t.opened_at.isoformat()
+                    }
+                })
         else:
-            logger.error(f"Order failed: {result}")
-            signal.status = 'failed'
-            db.commit()
+            async with AsyncSessionLocal() as db:
+                e = Event(level="ERROR", component="order_manager", message=f"Order failed: {res.get('comment', 'Unknown')}")
+                db.add(e)
+                await db.commit()
     except Exception as e:
-        logger.error(f"Order send exception: {e}")
-        signal.status = 'failed'
-        db.commit()
+        print("Order manager error:", e)

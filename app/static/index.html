@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Forex Pullback Bot</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="brand">FOREX PULLBACK BOT</div>
+    <div class="status-strip">
+      <span class="dot" id="mt5-dot"></span>
+      <span id="mt5-info">Not connected</span>
+      <span class="sep">|</span>
+      <span>SESSIONS: <span class="c" id="active-sessions">0</span></span>
+      <span class="sep">|</span>
+      <span>PNL TODAY: <span id="today-pnl">$0.00</span></span>
+    </div>
+    <div class="actions">
+      <button class="btn" onclick="openMt5Modal()">MT5 LINK</button>
+      <button class="btn" onclick="openConfigModal()">CONFIG</button>
+      <button class="btn" id="engine-toggle" onclick="toggleEngine()">START</button>
+    </div>
+  </header>
+
+  <!-- TABS -->
+  <nav class="tabs">
+    <button class="tab active" data-tab="dashboard">DASHBOARD</button>
+    <button class="tab" data-tab="trades">TRADES</button>
+    <button class="tab" data-tab="signals">SIGNALS</button>
+    <button class="tab" data-tab="logs">LOGS</button>
+  </nav>
+
+  <!-- PANELS -->
+  <main>
+    <section class="tab-panel active" data-panel="dashboard">
+      <div class="stat-row">
+        <div class="stat-card"><div class="stat-label">BALANCE</div><div class="stat-value" id="s-balance">—</div></div>
+        <div class="stat-card"><div class="stat-label">EQUITY</div><div class="stat-value c" id="s-equity">—</div></div>
+        <div class="stat-card"><div class="stat-label">TODAY PNL</div><div class="stat-value" id="s-today">—</div></div>
+        <div class="stat-card"><div class="stat-label">OPEN POSITIONS</div><div class="stat-value" id="s-open">0</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">EQUITY</div>
+        <svg id="equity-chart" viewBox="0 0 800 200" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-title">OPEN POSITIONS</div>
+          <table class="data-table">
+            <thead><tr><th>SYMBOL</th><th>DIR</th><th>LOT</th><th>ENTRY</th><th>CUR</th><th>PNL</th><th>SL</th><th>TP</th></tr></thead>
+            <tbody id="open-pos-body"><tr><td colspan="8" class="empty">NO OPEN POSITIONS</td></tr></tbody>
+          </table>
+        </div>
+        <div class="panel">
+          <div class="panel-title">RECENT SIGNALS</div>
+          <div id="signals-feed" class="feed"><div class="empty">NO SIGNALS YET</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab-panel" data-panel="trades">
+      <div class="panel">
+        <div class="sub-tabs">
+          <button class="sub-tab active" data-sub="open">OPEN</button>
+          <button class="sub-tab" data-sub="closed">CLOSED</button>
+        </div>
+        <div class="filters">
+          <select id="f-symbol"><option value="">ALL SYMBOLS</option></select>
+          <input type="date" id="f-from"> <input type="date" id="f-to">
+        </div>
+        <table class="data-table" id="trades-table">
+          <thead><tr><th>TIME</th><th>SYMBOL</th><th>DIR</th><th>LOT</th><th>ENTRY</th><th>SL</th><th>TP</th><th>EXIT</th><th>PNL</th><th>NOTE</th><th></th></tr></thead>
+          <tbody id="trades-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="tab-panel" data-panel="signals">
+      <div class="panel">
+        <div class="panel-title">ALL SIGNALS</div>
+        <table class="data-table">
+          <thead><tr><th>TIME</th><th>SYMBOL</th><th>DIR</th><th>SCORE</th><th>STATUS</th><th>REASON</th></tr></thead>
+          <tbody id="signals-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="tab-panel" data-panel="logs">
+      <div class="panel">
+        <div class="filters">
+          <select id="f-level"><option value="">ALL LEVELS</option><option>INFO</option><option>WARN</option><option>ERROR</option></select>
+          <select id="f-component"><option value="">ALL COMPONENTS</option></select>
+        </div>
+        <table class="data-table">
+          <thead><tr><th>TIME</th><th>LEVEL</th><th>COMPONENT</th><th>MESSAGE</th></tr></thead>
+          <tbody id="logs-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- MT5 LINK MODAL -->
+  <dialog id="mt5-modal">
+    <form method="dialog" class="modal-body">
+      <div class="modal-title">MT5 LINK</div>
+      <div id="saved-accounts"></div>
+      <datalist id="exness-servers">
+        <option value="Exness-MT5Real"><option value="Exness-MT5Real2"><option value="Exness-MT5Real3">
+        <option value="Exness-MT5Real5"><option value="Exness-MT5Trial"><option value="Exness-MT5Trial5">
+        <option value="Exness-MT5Trial9"><option value="Exness-MT5Trial15">
+      </datalist>
+      <label>SERVER <input id="m-server" list="exness-servers" autocomplete="off"></label>
+      <label>LOGIN <input id="m-login" type="number"></label>
+      <label>PASSWORD <input id="m-password" type="password"></label>
+      <label>TERMINAL PATH (OPTIONAL) <input id="m-path"></label>
+      <div id="m-status"></div>
+      <div id="m-preview" class="hidden"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn" onclick="testMt5()">TEST CONNECTION</button>
+        <button type="button" class="btn primary" id="m-save" onclick="saveMt5()" disabled>SAVE & USE</button>
+        <button type="button" class="btn" onclick="closeMt5Modal()">CANCEL</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- CONFIG MODAL -->
+  <dialog id="config-modal">
+    <form method="dialog" class="modal-body wide">
+      <div class="modal-title">CONFIGURATION</div>
+      <nav class="modal-tabs">
+        <button type="button" class="m-tab active" data-mtab="general">GENERAL</button>
+        <button type="button" class="m-tab" data-mtab="symbols">SYMBOLS</button>
+        <button type="button" class="m-tab" data-mtab="sessions">SESSIONS</button>
+        <button type="button" class="m-tab" data-mtab="risk">RISK</button>
+      </nav>
+
+      <div class="m-panel active" data-mpanel="general">
+        <label>MAX OPEN POSITIONS <input type="number" id="c-max_open_positions" value="5"></label>
+        <label>MAX PER SYMBOL <input type="number" id="c-max_per_symbol" value="1"></label>
+        <label>MAX PER DIRECTION <input type="number" id="c-max_per_direction" value="3"></label>
+        <label>SIGNAL THRESHOLD (0-100) <input type="range" id="c-signal_threshold" min="0" max="100" value="65"></label>
+        <label>RISK PERCENT (%) <input type="number" step="0.1" id="c-risk_percent" value="1.0"></label>
+        <label>SCAN INTERVAL (SEC) <input type="number" id="c-scan_interval_seconds" value="10"></label>
+        <label>REWARD RATIO <input type="number" step="0.1" id="c-reward_ratio" value="2.0"></label>
+      </div>
+
+      <div class="m-panel" data-mpanel="symbols">
+        <div class="row" style="display:flex;gap:8px;align-items:center;">
+          <input id="sym-input" placeholder="XAUUSD, EURUSD, ...">
+          <button type="button" class="btn" onclick="addSymbols()">ADD</button>
+          <button type="button" class="btn" onclick="resolveAllSymbols()">RESOLVE ALL</button>
+        </div>
+        <div id="sym-chips" class="chips-wrap" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="m-panel" data-mpanel="sessions">
+        <div id="sessions-list"></div>
+        <button type="button" class="btn" onclick="addSessionRow()" style="margin-top:12px;">+ ADD SESSION</button>
+      </div>
+
+      <div class="m-panel" data-mpanel="risk">
+        <label>SL MODE 
+          <select id="c-sl_mode">
+            <option value="structural">Structural</option>
+            <option value="atr">ATR</option>
+          </select>
+        </label>
+        <label>ATR MULTIPLIER <input type="number" step="0.1" id="c-atr_multiplier" value="1.5"></label>
+        <label>TP MODE 
+          <select id="c-tp_mode">
+            <option value="r_multiple">R Multiple</option>
+            <option value="liquidity">Liquidity</option>
+          </select>
+        </label>
+        <label>BREAKEVEN TRIGGER (R) <input type="number" step="0.1" id="c-breakeven_trigger_r" value="1.0"></label>
+        <label>TRAILING STOP <input type="checkbox" id="c-trailing" checked></label>
+        <label>TRAILING DISTANCE (PIPS) <input type="number" step="0.1" id="c-trailing_distance_pips" value="15.0"></label>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn primary" onclick="saveConfig()">SAVE</button>
+        <button type="button" class="btn" onclick="closeConfigModal()">CANCEL</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

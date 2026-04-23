@@ -1,15 +1,6 @@
-from nicegui import ui, app
+import uvicorn
 from app.db.migrations import init_db
 
-init_db()
-
-from app.engine.lifecycle import start_engine, stop_engine
-from app.ui import build_layout
-
-@ui.page('/')
-def index():
-    build_layout()
-
-app.on_startup(start_engine)
-app.on_shutdown(stop_engine)
-ui.run(title='Forex Pullback Bot', port=8080, reload=False, show=False, dark=True)
+if __name__ == '__main__':
+    init_db()
+    uvicorn.run('app.server:app', host='0.0.0.0', port=8080, reload=False)

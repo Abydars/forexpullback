@@ -1,15 +1,4 @@
-import sqlite3
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
-DATABASE_URL = "sqlite:///forex_pullback.db"
-
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+engine = create_async_engine("sqlite+aiosqlite:///app.db", echo=False)
+AsyncSessionLocal = async_sessionmaker(bind=engine, autoflush=False, autocommit=False)

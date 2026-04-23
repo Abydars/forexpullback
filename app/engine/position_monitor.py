@@ -1,72 +1,72 @@
 import asyncio
-from datetime import datetime, timezone
 import MetaTrader5 as mt5
-from app.ui.state import state
 from app.mt5_client.client import mt5_client
-from app.db.session import SessionLocal
-from app.db.models import TradeRecord, SessionRecord
-from app.core.sessions import active_sessions
-from app.core.config import cfg
+from app.db.session import AsyncSessionLocal
+from app.db.models import Trade
+from sqlalchemy import select
+from app.ws.manager import broadcast
+from datetime import datetime
+import pytz
 
-async def position_monitor_loop():
+async def monitor_loop():
     while True:
-        await asyncio.sleep(2.0)
-        
-        # Update active sessions in state
-        db = SessionLocal()
-        sessions = db.query(SessionRecord).all()
-        db.close()
-        
-        active = active_sessions(sessions, datetime.now(timezone.utc))
-        state.active_sessions = [s.name for s in active]
-        
-        if not mt5_client.is_connected():
+        from app.core.state import state
+        if not state.engine_running or not mt5_client.is_connected():
+            await asyncio.sleep(2)
             continue
             
         try:
-            # Update account info
+            positions = await mt5_client.get_positions()
             acc = await mt5_client.account_info()
-            state.account = acc
-            state.equity_series.append((datetime.now().timestamp() * 1000, acc['equity']))
-            if len(state.equity_series) > 1000:
-                state.equity_series = state.equity_series[-1000:]
+            if acc:
+                await broadcast({
+                    "type": "account.tick",
+                    "balance": acc['balance'],
+                    "equity": acc['equity'],
+                    "margin": acc['margin'],
+                    "currency": acc['currency']
+                })
+            
+            pos_dict = {p['ticket']: p for p in positions}
+            
+            async with AsyncSessionLocal() as db:
+                result = await db.execute(select(Trade).where(Trade.closed_at == None))
+                open_trades = result.scalars().all()
                 
-            # Update open positions (filter by our magic number)
-            bot_magic = int(cfg.get('magic_number', 123456))
-            all_positions = await mt5_client.get_positions()
-            positions = [p for p in all_positions if p.get('magic') == bot_magic]
-            state.open_positions = positions
-            
-            # Check for closed positions to update trades DB
-            # We compare DB open trades with current MT5 positions
-            db = SessionLocal()
-            open_db_trades = db.query(TradeRecord).filter_by(closed_at=None).all()
-            pos_tickets = {p['ticket'] for p in positions}
-            
-            today_pnl = 0.0
-            
-            for t in open_db_trades:
-                if t.ticket not in pos_tickets:
-                    # Trade closed! Look up history in MT5
-                    history = await asyncio.to_thread(mt5.history_deals_get, position=t.ticket)
-                    if history:
-                        close_deal = history[-1] # Usually the last deal is the close
-                        t.closed_at = datetime.utcnow()
-                        t.exit_price = close_deal.price
-                        t.pnl = close_deal.profit
-                        t.commission = close_deal.commission
-                        t.swap = close_deal.swap
-                        db.commit()
-                        
-            # Calc today's pnl roughly
-            midnight = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-            today_trades = db.query(TradeRecord).filter(TradeRecord.closed_at >= midnight).all()
-            today_pnl = sum(t.pnl or 0 for t in today_trades)
-            
-            # Add floating PnL
-            floating_pnl = sum(p['profit'] for p in positions)
-            state.today_pnl = today_pnl + floating_pnl
-            
-            db.close()
+                for t in open_trades:
+                    if t.ticket not in pos_dict:
+                        def _get_hist():
+                            return mt5.history_deals_get(position=t.ticket)
+                        history = await asyncio.to_thread(_get_hist)
+                        if history:
+                            exit_deal = history[-1]
+                            t.closed_at = datetime.now(pytz.utc)
+                            t.exit_price = exit_deal.price
+                            t.pnl = exit_deal.profit
+                            t.commission = exit_deal.commission
+                            t.swap = exit_deal.swap
+                            
+                            await db.commit()
+                            
+                            await broadcast({
+                                "type": "trade.closed",
+                                "trade": {
+                                    "ticket": t.ticket, "symbol": t.symbol, "direction": t.direction,
+                                    "lot": t.lot, "entry_price": t.entry_price, "exit_price": t.exit_price,
+                                    "pnl": t.pnl, "sl": t.sl, "tp": t.tp
+                                }
+                            })
+                    else:
+                        p = pos_dict[t.ticket]
+                        await broadcast({
+                            "type": "trade.updated",
+                            "trade": {
+                                "ticket": t.ticket, "symbol": t.symbol, "direction": t.direction,
+                                "lot": t.lot, "entry_price": t.entry_price, "current_price": p['price_current'],
+                                "pnl": p['profit'], "sl": t.sl, "tp": t.tp
+                            }
+                        })
         except Exception as e:
-            state.last_error = str(e)
+            print("Monitor error:", e)
+            
+        await asyncio.sleep(2)

@@ -1,102 +1,100 @@
 import asyncio
 import MetaTrader5 as mt5
 import pandas as pd
-import logging
-
-logger = logging.getLogger("mt5_client")
+from datetime import datetime
 
 class MT5Client:
-    def __init__(self):
-        self._connected = False
-        self._last_error = None
-
-    async def connect(self, server: str, login: int, password: str, path: str | None = None) -> dict:
-        kwargs = {
-            "server": server,
-            "login": login,
-            "password": password
-        }
-        if path:
-            kwargs["path"] = path
-
-        success = await asyncio.to_thread(mt5.initialize, **kwargs)
-        if not success:
-            err = mt5.last_error()
-            self._last_error = err
-            logger.error(f"MT5 initialize failed: {err}")
-            raise Exception(f"MT5 initialize failed: {err}")
+    async def connect(self, server, login, password, path=None) -> dict:
+        def _connect():
+            if path:
+                if not mt5.initialize(path=path, login=login, password=password, server=server):
+                    return False
+            else:
+                if not mt5.initialize(login=login, password=password, server=server):
+                    return False
+            return mt5.login(login=login, password=password, server=server)
         
-        success = await asyncio.to_thread(mt5.login, **kwargs)
+        success = await asyncio.to_thread(_connect)
         if not success:
-            err = mt5.last_error()
-            self._last_error = err
-            logger.error(f"MT5 login failed: {err}")
-            raise Exception(f"MT5 login failed: {err}")
-            
-        self._connected = True
+            error = mt5.last_error()
+            raise Exception(f"MT5 Connect failed: {error}")
         return await self.account_info()
 
     async def disconnect(self) -> None:
         await asyncio.to_thread(mt5.shutdown)
-        self._connected = False
 
     def is_connected(self) -> bool:
-        return self._connected
+        try:
+            return mt5.terminal_info() is not None
+        except:
+            return False
 
     async def account_info(self) -> dict:
-        info = await asyncio.to_thread(mt5.account_info)
-        if info is None:
-            raise Exception(f"Failed to get account info: {mt5.last_error()}")
-        return info._asdict()
+        def _info():
+            acc = mt5.account_info()
+            if acc is None:
+                return None
+            return acc._asdict()
+        acc = await asyncio.to_thread(_info)
+        if not acc:
+            raise Exception("Failed to get account info")
+        return acc
 
-    async def get_rates(self, symbol: str, timeframe: int, count: int) -> pd.DataFrame:
-        rates = await asyncio.to_thread(mt5.copy_rates_from_pos, symbol, timeframe, 0, count)
-        if rates is None or len(rates) == 0:
-            return pd.DataFrame()
-        df = pd.DataFrame(rates)
-        df['time'] = pd.to_datetime(df['time'], unit='s')
-        return df
+    async def get_rates(self, symbol, timeframe, count) -> pd.DataFrame:
+        def _rates():
+            rates = mt5.copy_rates_from_pos(symbol, timeframe, 0, count)
+            if rates is None:
+                return pd.DataFrame()
+            df = pd.DataFrame(rates)
+            df['time'] = pd.to_datetime(df['time'], unit='s')
+            return df
+        return await asyncio.to_thread(_rates)
 
-    async def get_positions(self, symbol: str | None = None) -> list[dict]:
-        if symbol:
-            positions = await asyncio.to_thread(mt5.positions_get, symbol=symbol)
-        else:
-            positions = await asyncio.to_thread(mt5.positions_get)
-            
-        if positions is None:
-            return []
-        return [p._asdict() for p in positions]
+    async def get_positions(self, symbol=None) -> list[dict]:
+        def _pos():
+            if symbol:
+                pos = mt5.positions_get(symbol=symbol)
+            else:
+                pos = mt5.positions_get()
+            if pos is None:
+                return []
+            return [p._asdict() for p in pos]
+        return await asyncio.to_thread(_pos)
 
     async def order_send(self, request: dict) -> dict:
-        result = await asyncio.to_thread(mt5.order_send, request)
-        if result is None:
+        def _send():
+            return mt5.order_send(request)
+        res = await asyncio.to_thread(_send)
+        if res is None:
             raise Exception(f"Order send failed: {mt5.last_error()}")
-        return result._asdict()
+        return res._asdict()
 
     async def position_close(self, ticket: int) -> dict:
-        # Closing is an order_send with opposite type
-        positions = await asyncio.to_thread(mt5.positions_get, ticket=ticket)
-        if not positions:
-            raise Exception("Position not found")
-        position = positions[0]
+        def _close():
+            pos = mt5.positions_get(ticket=ticket)
+            if pos is None or len(pos) == 0:
+                return None
+            p = pos[0]
+            action = mt5.TRADE_ACTION_DEAL
+            type = mt5.ORDER_TYPE_SELL if p.type == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY
+            price = mt5.symbol_info_tick(p.symbol).bid if type == mt5.ORDER_TYPE_SELL else mt5.symbol_info_tick(p.symbol).ask
+            request = {
+                "action": action,
+                "symbol": p.symbol,
+                "volume": p.volume,
+                "type": type,
+                "position": ticket,
+                "price": price,
+                "deviation": 20,
+                "magic": p.magic,
+                "comment": "Close position",
+                "type_time": mt5.ORDER_TIME_GTC,
+                "type_filling": mt5.ORDER_FILLING_IOC,
+            }
+            return mt5.order_send(request)
+        res = await asyncio.to_thread(_close)
+        if res is None:
+            raise Exception(f"Position close failed: {mt5.last_error()}")
+        return res._asdict()
         
-        tick = await asyncio.to_thread(mt5.symbol_info_tick, position.symbol)
-        type_dict = {mt5.ORDER_TYPE_BUY: mt5.ORDER_TYPE_SELL, mt5.ORDER_TYPE_SELL: mt5.ORDER_TYPE_BUY}
-        price_dict = {mt5.ORDER_TYPE_BUY: tick.bid, mt5.ORDER_TYPE_SELL: tick.ask}
-        
-        request = {
-            "action": mt5.TRADE_ACTION_DEAL,
-            "position": ticket,
-            "symbol": position.symbol,
-            "volume": position.volume,
-            "type": type_dict[position.type],
-            "price": price_dict[position.type],
-            "deviation": 20,
-            "magic": position.magic,
-            "comment": "Close via Bot",
-            "type_time": mt5.ORDER_TIME_GTC,
-            "type_filling": mt5.ORDER_FILLING_IOC,
-        }
-        return await self.order_send(request)
-
 mt5_client = MT5Client()

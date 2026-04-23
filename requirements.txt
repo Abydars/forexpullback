@@ -1,4 +1,5 @@
-nicegui>=1.4
+fastapi
+uvicorn[standard]
 MetaTrader5
 SQLAlchemy>=2.0
 aiosqlite
@@ -6,5 +7,6 @@ cryptography
 pandas
 numpy
 pytz
+pydantic>=2
 pytest
 pytest-asyncio

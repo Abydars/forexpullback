@@ -8,8 +8,8 @@ class Session:
     name: str
     start_time: time
     end_time: time
-    timezone: str       # IANA, e.g. "Europe/London"
-    days_mask: int      # bit 0 = Mon ... bit 6 = Sun
+    timezone: str
+    days_mask: int
     enabled: bool
 
 def any_active(sessions: list[Session], now_utc: datetime) -> bool:
@@ -23,20 +23,20 @@ def active_sessions(sessions: list[Session], now_utc: datetime) -> list[Session]
             
         tz = pytz.timezone(s.timezone)
         now_local = now_utc.astimezone(tz)
-        current_time = now_local.time()
-        current_day = now_local.weekday() # 0 = Mon, 6 = Sun
+        day_bit = 1 << now_local.weekday()
+        t = now_local.time()
         
-        # Check day mask
-        if not (s.days_mask & (1 << current_day)):
-            continue
-            
-        # Check time window (handles midnight crossing)
         if s.start_time <= s.end_time:
-            if s.start_time <= current_time <= s.end_time:
+            in_window = s.start_time <= t <= s.end_time
+            if in_window and (s.days_mask & day_bit):
                 active.append(s)
         else:
-            # Midnight crossing
-            if current_time >= s.start_time or current_time <= s.end_time:
-                active.append(s)
-                
+            if t >= s.start_time:
+                if (s.days_mask & day_bit):
+                    active.append(s)
+            elif t <= s.end_time:
+                prev_day_bit = 1 << ((now_local.weekday() - 1) % 7)
+                if (s.days_mask & prev_day_bit):
+                    active.append(s)
+                    
     return active
