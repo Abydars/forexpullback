@@ -1,7 +1,7 @@
 from nicegui import ui
 from app.db.session import SessionLocal
 from app.db.models import SessionRecord
-from app.ui.config_modal import IANA_TIMEZONES
+import pytz
 
 def load_sessions():
     db = SessionLocal()
@@ -40,7 +40,7 @@ def render_sessions_tab():
                 row_state['name'] = ui.input('Name', value=session.name if session else '').classes('w-24')
                 row_state['start'] = ui.time(value=session.start_time if session else '08:00')
                 row_state['end'] = ui.time(value=session.end_time if session else '12:00')
-                row_state['tz'] = ui.select(IANA_TIMEZONES, value=session.tz if session else 'UTC', with_input=True).classes('w-48')
+                row_state['tz'] = ui.select(pytz.all_timezones, value=session.tz if session else 'UTC', with_input=True).classes('w-48')
                 
                 days_mask = session.days_mask if session else 0b0011111 # Mon-Fri default
                 days_cbs = []

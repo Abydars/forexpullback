@@ -1,8 +1,5 @@
 from nicegui import ui
 from app.ui.state import state
-from app.ui.mt5_modal import open_mt5_modal
-from app.ui.config_modal import open_config_modal
-from app.engine.lifecycle import start_engine, stop_engine
 import asyncio
 
 def build_status_strip():
@@ -12,6 +9,10 @@ def build_status_strip():
         ui.label().bind_text_from(state, 'today_pnl', lambda p: f"PnL: {p:.2f}").classes('text-sm px-2 py-1 bg-slate-800 rounded font-mono text-slate-300')
 
 def build_action_buttons():
+    from app.ui.mt5_modal import open_mt5_modal
+    from app.ui.config_modal import open_config_modal
+    from app.engine.lifecycle import start_engine, stop_engine
+
     with ui.row().classes('items-center gap-2'):
         # MT5 Dot
         mt5_dot = ui.icon('circle', size='xs').classes('text-red-500')
