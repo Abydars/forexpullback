@@ -1,13 +1,10 @@
-fastapi>=0.100.0
-uvicorn>=0.23.0
-websockets>=11.0.3
-MetaTrader5>=5.0.43; sys_platform == 'win32'
-SQLAlchemy>=2.0.20
-cryptography>=41.0.3
-apscheduler>=3.10.1
-pandas>=2.0.3
-numpy>=1.25.2
-pytz>=2023.3
-pydantic>=2.0.0
-pydantic-settings>=2.0.0
-jinja2>=3.1.2
+nicegui>=1.4
+MetaTrader5
+SQLAlchemy>=2.0
+aiosqlite
+cryptography
+pandas
+numpy
+pytz
+pytest
+pytest-asyncio

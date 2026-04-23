@@ -1,50 +1,35 @@
 # Forex Pullback Trading System
 
-A production-grade MT5 trading system with a FastAPI backend and a React/Vite frontend.
+A pure Python 3.11+ automated trading system using MetaTrader5 and NiceGUI.
 
 ## Architecture
 
-```text
-┌────────────────────────────────────────────────────────────┐
-│                    Web UI (React + Vite)                   │
-│  Dashboard · Trades · PnL · Signals · Config · MT5 Modal   │
-└──────────────────┬─────────────────────────────────────────┘
-                   │ REST + WebSocket
-┌──────────────────▼─────────────────────────────────────────┐
-│                   FastAPI Backend                          │
-│  ┌─────────────┬──────────────┬──────────────────────────┐ │
-│  │  API Layer  │  WS Manager  │  Background Scheduler    │ │
-│  └─────────────┴──────────────┴──────────────────────────┘ │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │          Core Engine (asyncio loop)                 │   │
-│  │  Scanner → Signal Engine → Order Manager → Monitor  │   │
-│  └─────────────────────────────────────────────────────┘   │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │   MT5 Client · Symbol Resolver · Session Manager    │   │
-│  └─────────────────────────────────────────────────────┘   │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │          SQLite (config, trades, signals)           │   │
-│  └─────────────────────────────────────────────────────┘   │
-└──────────────────┬─────────────────────────────────────────┘
-                   │ MT5 Python API (polling)
-            ┌──────▼──────┐
-            │ MT5 Terminal│  ← Exness (or any broker)
-            └─────────────┘
-```
+Single-process application. NiceGUI runs the UI via FastAPI, and the core engine runs as `asyncio` background tasks. All states are reactive via NiceGUI decorators.
 
 ## Setup
 
-1. **Backend**:
-   - `python3 -m venv venv`
-   - `source venv/bin/activate`
-   - `pip install -r requirements.txt`
+1. **Install Python 3.11+**
+2. **Install requirements**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. **Environment**:
+   Copy `.env.example` to `.env` and configure `MT5_SECRET` or allow the bot to auto-generate a `.mt5_secret` file on first run.
+4. **Run**:
+   ```bash
+   python main.py
+   ```
+5. **Open Browser**: `http://localhost:8080`
 
-2. **Frontend**:
-   - `cd frontend`
-   - `npm install`
+## Features
 
-3. **Run**:
-   - `./run.sh`
+- **Reactive UI**: Built purely in Python with NiceGUI.
+- **Symbol Resolver**: Generalized symbols (`XAUUSD`) automatically resolve to broker specific ones (`XAUUSDm`, etc.).
+- **Session Management**: Full timezone aware trading windows (e.g. London, NY).
+- **Automated Pullback Strategy**: Multi-timeframe analysis (4H, 15M, 5M).
 
-## Environment Variables
-- `MT5_SECRET`: Used to encrypt MT5 passwords in the local SQLite database. Will be generated automatically if missing.
+## Testing
+
+```bash
+pytest
+```
