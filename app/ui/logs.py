@@ -9,7 +9,7 @@ def logs_table():
     rows = []
     for e in events:
         rows.append({
-            'time': str(e.created_at),
+            'time': e.created_at.strftime('%y-%m-%d %H:%M:%S'),
             'level': e.level,
             'component': e.component,
             'message': e.message
@@ -17,14 +17,14 @@ def logs_table():
     db.close()
     
     cols = [
-        {'name': 'time', 'label': 'Time', 'field': 'time', 'align': 'left'},
-        {'name': 'level', 'label': 'Level', 'field': 'level', 'align': 'left'},
-        {'name': 'component', 'label': 'Component', 'field': 'component', 'align': 'left'},
-        {'name': 'message', 'label': 'Message', 'field': 'message', 'align': 'left'},
+        {'name': 'time', 'label': 'TIME', 'field': 'time', 'align': 'left'},
+        {'name': 'level', 'label': 'LVL', 'field': 'level', 'align': 'left'},
+        {'name': 'component', 'label': 'COMP', 'field': 'component', 'align': 'left'},
+        {'name': 'message', 'label': 'MSG', 'field': 'message', 'align': 'left'},
     ]
-    ui.table(columns=cols, rows=rows, row_key='time').classes('w-full bg-slate-900 mt-4')
+    ui.table(columns=cols, rows=rows, row_key='time').props('dense flat bordered square dark').classes('w-full bg-[#0a0a0a] text-neutral-300 font-mono text-[10px]')
 
 def render():
-    ui.label('System Logs').classes('text-2xl font-bold mb-4')
+    ui.label('SYSTEM_LOGS').classes('text-[10px] text-neutral-500 uppercase tracking-widest font-sans mb-2')
     logs_table()
     ui.timer(5.0, lambda: logs_table.refresh())
