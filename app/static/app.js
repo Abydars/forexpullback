@@ -39,13 +39,13 @@ function handleEvent(msg) {
 }
 
 function replaceTrade(trade) {
-  const i = state.open_positions.findIndex(t => t.ticket === trade.ticket);
+  const i = state.open_positions.findIndex(t => t.ticket == trade.ticket);
   if (i > -1) state.open_positions[i] = trade;
   else state.open_positions.push(trade);
 }
 
 function moveToClosed(trade) {
-  state.open_positions = state.open_positions.filter(t => t.ticket !== trade.ticket);
+  state.open_positions = state.open_positions.filter(t => t.ticket != trade.ticket);
   state.closed_trades.unshift(trade);
   state.today_pnl += trade.pnl || 0;
 }
