@@ -72,37 +72,37 @@ async def scan_loop():
                     if df_4h.empty or df_15m.empty or df_5m.empty: 
                         reason_full["msg"] = "Not enough data (need more bars)"
                     else:
-                    htf = calculate_htf_bias(df_4h)
-                    reason_full["htf"] = htf
-                    bias = htf['bias']
-                    
-                    if bias == 'neutral':
-                        reason_full["msg"] = "Neutral HTF Bias (EMA not aligned / No BOS)"
-                    else:
-                        mtf_zone = find_mtf_zone(df_15m, bias)
-                        reason_full["zone"] = mtf_zone
+                        htf = calculate_htf_bias(df_4h)
+                        reason_full["htf"] = htf
+                        bias = htf['bias']
                         
-                        if not mtf_zone:
-                            reason_full["msg"] = f"No 15M Zone or RSI not cooling off"
+                        if bias == 'neutral':
+                            reason_full["msg"] = "Neutral HTF Bias (EMA not aligned / No BOS)"
                         else:
-                            point = 0.0001
-                            try:
-                                info = mt5.symbol_info(resolved)
-                                if info: point = info.point
-                            except: pass
-                                
-                            ltf_trigger = find_ltf_trigger(df_5m, mtf_zone, bias, point, float(cfg.get("reward_ratio", 2.0)))
-                            reason_full["trigger"] = ltf_trigger
+                            mtf_zone = find_mtf_zone(df_15m, bias)
+                            reason_full["zone"] = mtf_zone
                             
-                            if not ltf_trigger:
-                                reason_full["msg"] = "Price in 15M Zone, waiting for 5M Trigger"
+                            if not mtf_zone:
+                                reason_full["msg"] = f"No 15M Zone or RSI not cooling off"
                             else:
-                                score = calculate_score(htf['strength'], mtf_zone['quality'], ltf_trigger['strength'], True)
-                                if score >= int(cfg.get("signal_threshold", 65)):
-                                    status = "FIRED"
-                                    reason_full["msg"] = f"Accepted! Score: {score}"
+                                point = 0.0001
+                                try:
+                                    info = mt5.symbol_info(resolved)
+                                    if info: point = info.point
+                                except: pass
+                                    
+                                ltf_trigger = find_ltf_trigger(df_5m, mtf_zone, bias, point, float(cfg.get("reward_ratio", 2.0)))
+                                reason_full["trigger"] = ltf_trigger
+                                
+                                if not ltf_trigger:
+                                    reason_full["msg"] = "Price in 15M Zone, waiting for 5M Trigger"
                                 else:
-                                    reason_full["msg"] = f"Triggered but Low Score ({score} < threshold)"
+                                    score = calculate_score(htf['strength'], mtf_zone['quality'], ltf_trigger['strength'], True)
+                                    if score >= int(cfg.get("signal_threshold", 65)):
+                                        status = "FIRED"
+                                        reason_full["msg"] = f"Accepted! Score: {score}"
+                                    else:
+                                        reason_full["msg"] = f"Triggered but Low Score ({score} < threshold)"
 
                 await broadcast({
                     "type": "scan.update",
