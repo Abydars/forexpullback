@@ -78,6 +78,11 @@ async def monitor_loop():
             
             pos_dict = {p['ticket']: p for p in positions}
             
+            await broadcast({
+                "type": "positions.update",
+                "positions": positions
+            })
+            
             async with AsyncSessionLocal() as db:
                 result = await db.execute(select(Trade).where(Trade.closed_at == None))
                 open_trades = result.scalars().all()
@@ -170,16 +175,6 @@ async def monitor_loop():
                                         if res_sl and res_sl.get('retcode') == mt5.TRADE_RETCODE_DONE:
                                             t.sl = new_sl
                                             await db.commit()
-                                
-                        await broadcast({
-                            "type": "trade.updated",
-                            "trade": {
-                                "ticket": t.ticket, "symbol": t.symbol, "direction": t.direction,
-                                "lot": t.lot, "entry_price": t.entry_price, "current_price": p['price_current'],
-                                "pnl": p['profit'], "sl": t.sl, "tp": t.tp
-                            }
-                        })
-        except Exception as e:
             print("Monitor error:", e)
             
         await asyncio.sleep(0.2)

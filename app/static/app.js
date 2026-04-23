@@ -30,22 +30,33 @@ function handleEvent(msg) {
     case 'account.tick':    state.account = msg; renderTopbar(); renderStats(); break;
     case 'scan.update':     updateScanStatus(msg.data); break;
     case 'signal.new':      state.recent_signals.unshift(msg.signal); state.all_signals.unshift(msg.signal); renderSignals(); break;
-    case 'trade.opened':    state.open_positions.push(msg.trade); renderPositions(); renderStats(); break;
-    case 'trade.updated':   replaceTrade(msg.trade); renderPositions(); break;
-    case 'trade.closed':    moveToClosed(msg.trade); renderPositions(); renderTrades(); renderStats(); break;
+    case 'trade.opened':    renderStats(); break;
+    case 'trade.closed':    moveToClosed(msg.trade); renderTrades(); renderStats(); break;
+    case 'positions.update':
+        state.open_positions = msg.positions.map(p => ({
+            ticket: p.ticket,
+            symbol: p.symbol,
+            direction: p.type === 0 ? 'buy' : 'sell',
+            lot: p.volume,
+            entry_price: p.price_open,
+            current_price: p.price_current,
+            pnl: p.profit,
+            sl: p.sl,
+            tp: p.tp
+        }));
+        renderPositions();
+        renderStats();
+        break;
     case 'log.event':       state.events.unshift(msg); renderLogs(); break;
     case 'engine.status':   state.engine_running = msg.state === 'active'; renderEngineBtn(); break;
   }
 }
 
 function replaceTrade(trade) {
-  const i = state.open_positions.findIndex(t => t.ticket == trade.ticket);
-  if (i > -1) state.open_positions[i] = trade;
-  else state.open_positions.push(trade);
+  // Deprecated
 }
 
 function moveToClosed(trade) {
-  state.open_positions = state.open_positions.filter(t => t.ticket != trade.ticket);
   state.closed_trades.unshift(trade);
   state.today_pnl += trade.pnl || 0;
 }
