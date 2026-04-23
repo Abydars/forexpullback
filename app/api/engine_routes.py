@@ -24,3 +24,35 @@ async def stop_e():
     state.engine_running = False
     await broadcast({"type": "engine.status", "state": "stopped"})
     return {"status": "stopped"}
+
+@router.get("/initial_data")
+async def get_initial_data():
+    from app.db.session import AsyncSessionLocal
+    from app.db.models import Trade, Signal, Event
+    from sqlalchemy import select
+    
+    async with AsyncSessionLocal() as db:
+        trades_res = await db.execute(select(Trade).order_by(Trade.opened_at.desc()).limit(100))
+        trades = trades_res.scalars().all()
+        
+        signals_res = await db.execute(select(Signal).order_by(Signal.created_at.desc()).limit(50))
+        signals = signals_res.scalars().all()
+        
+        events_res = await db.execute(select(Event).order_by(Event.created_at.desc()).limit(50))
+        events = events_res.scalars().all()
+        
+        return {
+            "trades": [
+                {"ticket": t.ticket, "symbol": t.symbol, "direction": t.direction, "lot": t.lot, 
+                 "entry_price": t.entry_price, "exit_price": t.exit_price, "pnl": t.pnl, 
+                 "sl": t.sl, "tp": t.tp, "opened_at": t.opened_at.isoformat(), 
+                 "closed_at": t.closed_at.isoformat() if t.closed_at else None} for t in trades
+            ],
+            "signals": [
+                {"id": s.id, "symbol": s.symbol, "direction": s.direction, "score": s.score, 
+                 "status": s.status, "reason": s.reason, "created_at": s.created_at.isoformat()} for s in signals
+            ],
+            "events": [
+                {"level": e.level, "component": e.component, "message": e.message, "created_at": e.created_at.isoformat()} for e in events
+            ]
+        }

@@ -41,6 +41,7 @@ function handleEvent(msg) {
 function replaceTrade(trade) {
   const i = state.open_positions.findIndex(t => t.ticket === trade.ticket);
   if (i > -1) state.open_positions[i] = trade;
+  else state.open_positions.push(trade);
 }
 
 function moveToClosed(trade) {
@@ -438,9 +439,27 @@ async function saveConfig() {
 async function init() {
   connectWS();
   try {
-    const status = await api('GET', '/api/status');
+    const [status, initData] = await Promise.all([
+      api('GET', '/api/status'),
+      api('GET', '/api/initial_data').catch(() => null)
+    ]);
     Object.assign(state, status);
-  } catch (err) {}
+    
+    if (initData) {
+      state.open_positions = initData.trades.filter(t => !t.closed_at);
+      state.closed_trades = initData.trades.filter(t => t.closed_at);
+      state.all_signals = initData.signals;
+      state.recent_signals = initData.signals.slice(0, 5);
+      state.events = initData.events;
+      
+      const todayStr = new Date().toISOString().split('T')[0];
+      state.today_pnl = state.closed_trades
+        .filter(t => t.closed_at && t.closed_at.startsWith(todayStr))
+        .reduce((sum, t) => sum + (t.pnl || 0), 0);
+    }
+  } catch (err) { console.error("Init Error:", err); }
+  
   renderTopbar(); renderStats(); renderEngineBtn();
+  renderPositions(); renderTrades(); renderSignals(); renderLogs();
 }
 init();
