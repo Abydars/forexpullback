@@ -9,11 +9,15 @@ import pytz
 
 async def send_order(sig, resolved: str, bias: str, cfg: dict):
     try:
+        magic = int(cfg.get("magic_number", 123456))
         positions = await mt5_client.get_positions()
-        if len(positions) >= int(cfg.get("max_open_positions", 5)):
+        
+        bot_positions = [p for p in positions if p.get('magic') == magic]
+        
+        if len(bot_positions) >= int(cfg.get("max_open_positions", 5)):
             return
             
-        sym_pos = [p for p in positions if p['symbol'] == resolved]
+        sym_pos = [p for p in bot_positions if p['symbol'] == resolved]
         if len(sym_pos) >= int(cfg.get("max_per_symbol", 1)):
             return
             
@@ -44,9 +48,9 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict):
         
         # dynamically determine correct filling mode based on broker/symbol limits
         filling_type = mt5.ORDER_FILLING_IOC
-        if info.filling_mode & mt5.SYMBOL_FILLING_FOK:
+        if info.filling_mode & 1:
             filling_type = mt5.ORDER_FILLING_FOK
-        elif info.filling_mode & mt5.SYMBOL_FILLING_IOC:
+        elif info.filling_mode & 2:
             filling_type = mt5.ORDER_FILLING_IOC
         else:
             filling_type = mt5.ORDER_FILLING_RETURN
@@ -60,7 +64,7 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict):
             "sl": sig.sl,
             "tp": sig.tp,
             "deviation": 20,
-            "magic": 123456,
+            "magic": magic,
             "comment": f"Sig {sig.id}",
             "type_time": mt5.ORDER_TIME_GTC,
             "type_filling": filling_type,

@@ -119,6 +119,7 @@ dialog::backdrop { background: rgba(0,0,0,0.7); }
 .m-tab.active { color: var(--text-strong); border-bottom-color: var(--cyan); }
 .m-panel { display: none; padding-top: 12px; }
 .m-panel.active { display: block; }
+.m-panel:not(.active) { display: none !important; }
 
 .form-grid {
   display: grid;
