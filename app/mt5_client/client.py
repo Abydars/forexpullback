@@ -78,6 +78,16 @@ class MT5Client:
             action = mt5.TRADE_ACTION_DEAL
             type = mt5.ORDER_TYPE_SELL if p.type == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY
             price = mt5.symbol_info_tick(p.symbol).bid if type == mt5.ORDER_TYPE_SELL else mt5.symbol_info_tick(p.symbol).ask
+            info = mt5.symbol_info(p.symbol)
+            filling_type = mt5.ORDER_FILLING_IOC
+            if info:
+                if info.filling_mode & 1:
+                    filling_type = mt5.ORDER_FILLING_FOK
+                elif info.filling_mode & 2:
+                    filling_type = mt5.ORDER_FILLING_IOC
+                else:
+                    filling_type = mt5.ORDER_FILLING_RETURN
+                    
             request = {
                 "action": action,
                 "symbol": p.symbol,
@@ -89,7 +99,7 @@ class MT5Client:
                 "magic": p.magic,
                 "comment": "Close position",
                 "type_time": mt5.ORDER_TIME_GTC,
-                "type_filling": mt5.ORDER_FILLING_IOC,
+                "type_filling": filling_type,
             }
             return mt5.order_send(request)
         res = await asyncio.to_thread(_close)
