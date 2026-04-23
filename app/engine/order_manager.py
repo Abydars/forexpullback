@@ -119,7 +119,8 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict):
             return mt5.order_check(request)
             
         check_result = await asyncio.to_thread(_check_order)
-        if check_result is None or check_result.retcode != mt5.TRADE_RETCODE_DONE:
+        # order_check() returns 0 on success, NOT TRADE_RETCODE_DONE (10009)
+        if check_result is None or check_result.retcode != 0:
             async with AsyncSessionLocal() as db:
                 comment = check_result.comment if check_result else 'Unknown Error'
                 code = check_result.retcode if check_result else 'None'

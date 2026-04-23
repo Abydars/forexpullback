@@ -157,11 +157,11 @@ async def monitor_loop():
                                     if p['type'] == mt5.ORDER_TYPE_BUY:
                                         pot_sl = p['price_current'] - dist_points
                                         if pot_sl > t.entry_price and (not t.sl or pot_sl > t.sl):
-                                            new_sl = float(f"{pot_sl:.5f}")
+                                            new_sl = round(pot_sl, digits)
                                     else:
                                         pot_sl = p['price_current'] + dist_points
                                         if pot_sl < t.entry_price and (not t.sl or pot_sl < t.sl):
-                                            new_sl = float(f"{pot_sl:.5f}")
+                                            new_sl = round(pot_sl, digits)
                                             
                                     if new_sl:
                                         req = {
