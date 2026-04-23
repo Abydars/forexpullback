@@ -37,3 +37,7 @@ async def stop_engine():
     global _tasks
     for t in _tasks:
         t.cancel()
+        
+    if _tasks:
+        await asyncio.gather(*_tasks, return_exceptions=True)
+        _tasks.clear()

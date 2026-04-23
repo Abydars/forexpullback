@@ -21,7 +21,10 @@ function connectWS() {
   ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
   ws.onopen = () => { setInterval(() => ws.readyState === 1 && ws.send('{"type":"ping"}'), 20000); };
   ws.onmessage = (e) => handleEvent(JSON.parse(e.data));
-  ws.onclose = () => setTimeout(connectWS, 2000);
+  ws.onclose = (e) => {
+      if (e.code === 1008) window.location.href = '/login';
+      else setTimeout(connectWS, 2000);
+  };
 }
 
 function handleEvent(msg) {
@@ -68,7 +71,10 @@ async function api(method, path, body) {
     headers: body ? {'Content-Type': 'application/json'} : {},
     body: body ? JSON.stringify(body) : undefined,
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    if (res.status === 401) window.location.href = '/login';
+    throw new Error(await res.text());
+  }
   return res.json();
 }
 
@@ -333,6 +339,7 @@ async function loadConfig() {
     document.getElementById('c-risk_percent').value = cfg.risk_percent || 1.0;
     document.getElementById('c-scan_interval_seconds').value = cfg.scan_interval_seconds || 10;
     document.getElementById('c-reward_ratio').value = cfg.reward_ratio || 2.0;
+    document.getElementById('c-dashboard_password').value = cfg.dashboard_password || 'admin';
 
     document.getElementById('c-sl_mode').value = cfg.sl_mode || 'structural';
     document.getElementById('c-atr_multiplier').value = cfg.atr_multiplier || 1.5;
@@ -423,6 +430,7 @@ function collectConfigInputs() {
     risk_percent: parseFloat(document.getElementById('c-risk_percent').value),
     scan_interval_seconds: parseInt(document.getElementById('c-scan_interval_seconds').value),
     reward_ratio: parseFloat(document.getElementById('c-reward_ratio').value),
+    dashboard_password: document.getElementById('c-dashboard_password').value,
     sl_mode: document.getElementById('c-sl_mode').value,
     atr_multiplier: parseFloat(document.getElementById('c-atr_multiplier').value),
     tp_mode: document.getElementById('c-tp_mode').value,

@@ -30,6 +30,11 @@ async def broadcast(event: dict):
 
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    token = websocket.cookies.get("auth_token")
+    if token != "authenticated":
+        await websocket.close(code=1008)
+        return
+        
     await manager.connect(websocket)
     try:
         while True:

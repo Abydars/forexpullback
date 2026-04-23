@@ -1,10 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse, JSONResponse
 from contextlib import asynccontextmanager
 from app.engine.lifecycle import start_engine, stop_engine
 from app.api import (mt5_routes, config_routes, sessions_routes,
-                     signals_routes, trades_routes, engine_routes, events_routes)
+                     signals_routes, trades_routes, engine_routes, events_routes, auth_routes)
 from app.ws.manager import router as ws_router
 
 @asynccontextmanager
@@ -14,13 +14,39 @@ async def lifespan(app: FastAPI):
     await stop_engine()
 
 app = FastAPI(lifespan=lifespan)
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    path = request.url.path
+    
+    # Allow public access to static files and login endpoints
+    if path.startswith("/static/") or path == "/login" or path == "/api/auth/login":
+        return await call_next(request)
+        
+    # Check cookie for authentication
+    token = request.cookies.get("auth_token")
+    if token != "authenticated":
+        if path.startswith("/api/"):
+            return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+        elif path == "/ws":
+            # WebSockets are handled in their own route, but middleware catches upgrade requests
+            pass
+        else:
+            return RedirectResponse(url="/login")
+            
+    return await call_next(request)
+
 app.mount('/static', StaticFiles(directory='app/static'), name='static')
+
+@app.get('/login')
+async def login_page():
+    return FileResponse('app/static/login.html')
 
 @app.get('/')
 async def index():
     return FileResponse('app/static/index.html')
 
-for r in [mt5_routes.router, config_routes.router, sessions_routes.router,
+for r in [auth_routes.router, mt5_routes.router, config_routes.router, sessions_routes.router,
           signals_routes.router, trades_routes.router, engine_routes.router,
           events_routes.router, ws_router]:
     app.include_router(r)
