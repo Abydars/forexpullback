@@ -36,14 +36,15 @@ def positions_table():
     cols = [
         {'name': 'ticket', 'label': 'Ticket', 'field': 'ticket'},
         {'name': 'symbol', 'label': 'Symbol', 'field': 'symbol'},
-        {'name': 'type', 'label': 'Type', 'field': lambda r: 'Buy' if r['type'] == 0 else 'Sell'},
+        {'name': 'type_str', 'label': 'Type', 'field': 'type_str'},
         {'name': 'volume', 'label': 'Lot', 'field': 'volume'},
         {'name': 'price_open', 'label': 'Entry', 'field': 'price_open'},
         {'name': 'sl', 'label': 'SL', 'field': 'sl'},
         {'name': 'tp', 'label': 'TP', 'field': 'tp'},
         {'name': 'profit', 'label': 'Profit', 'field': 'profit'},
     ]
-    ui.table(columns=cols, rows=state.open_positions, row_key='ticket').classes('w-full bg-slate-900 mt-4')
+    rows = [{**p, 'type_str': 'Buy' if p.get('type') == 0 else 'Sell'} for p in state.open_positions]
+    ui.table(columns=cols, rows=rows, row_key='ticket').classes('w-full bg-slate-900 mt-4')
 
 @ui.refreshable
 def signals_feed():
