@@ -38,8 +38,19 @@
       <div class="stat-row">
         <div class="stat-card"><div class="stat-label">BALANCE</div><div class="stat-value" id="s-balance">—</div></div>
         <div class="stat-card"><div class="stat-label">EQUITY</div><div class="stat-value c" id="s-equity">—</div></div>
+        <div class="stat-card"><div class="stat-label">UNREALIZED PNL</div><div class="stat-value" id="s-unrealized">—</div></div>
         <div class="stat-card"><div class="stat-label">TODAY PNL</div><div class="stat-value" id="s-today">—</div></div>
         <div class="stat-card"><div class="stat-label">OPEN POSITIONS</div><div class="stat-value" id="s-open">0</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
+          <span>OPEN POSITIONS</span>
+          <button class="btn" onclick="closeAllPositions()" style="padding:4px 8px; font-size:11px; border-color:var(--text); color:var(--text);">CLOSE ALL</button>
+        </div>
+        <table class="data-table">
+          <thead><tr><th>SYMBOL</th><th>DIR</th><th>LOT</th><th>ENTRY</th><th>CUR</th><th>PNL</th><th>SL</th><th>TP</th><th>ACTION</th></tr></thead>
+          <tbody id="open-pos-body"><tr><td colspan="9" class="empty">NO OPEN POSITIONS</td></tr></tbody>
+        </table>
       </div>
       <div class="panel">
         <div class="panel-title">LIVE SCANNER STATUS</div>
@@ -47,19 +58,6 @@
           <thead><tr><th>SYMBOL</th><th>BIAS</th><th>SCORE</th><th>STATUS</th><th>REASON / REJECTION</th><th>LAST UPDATE</th></tr></thead>
           <tbody id="scan-status-body"><tr><td colspan="6" class="empty">WAITING FOR SCAN...</td></tr></tbody>
         </table>
-      </div>
-      <div class="grid-2">
-        <div class="panel">
-          <div class="panel-title">OPEN POSITIONS</div>
-          <table class="data-table">
-            <thead><tr><th>SYMBOL</th><th>DIR</th><th>LOT</th><th>ENTRY</th><th>CUR</th><th>PNL</th><th>SL</th><th>TP</th></tr></thead>
-            <tbody id="open-pos-body"><tr><td colspan="8" class="empty">NO OPEN POSITIONS</td></tr></tbody>
-          </table>
-        </div>
-        <div class="panel">
-          <div class="panel-title">RECENT SIGNALS</div>
-          <div id="signals-feed" class="feed"><div class="empty">NO SIGNALS YET</div></div>
-        </div>
       </div>
     </section>
 

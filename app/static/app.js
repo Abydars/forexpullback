@@ -101,6 +101,14 @@ function renderEngineBtn() {
 function renderStats() {
   document.getElementById('s-balance').innerText = state.account ? `$${state.account.balance.toFixed(2)}` : '—';
   document.getElementById('s-equity').innerText = state.account ? `$${state.account.equity.toFixed(2)}` : '—';
+  
+  const unrealized = state.open_positions.reduce((sum, t) => sum + (t.pnl || 0), 0);
+  const unEl = document.getElementById('s-unrealized');
+  if (unEl) {
+      unEl.innerText = `$${unrealized.toFixed(2)}`;
+      unEl.className = `stat-value ${unrealized >= 0 ? 'g' : 'r'}`;
+  }
+  
   document.getElementById('s-today').innerText = `$${state.today_pnl.toFixed(2)}`;
   document.getElementById('s-open').innerText = state.open_positions.length;
 }
@@ -108,7 +116,7 @@ function renderStats() {
 function renderPositions() {
   const tbody = document.getElementById('open-pos-body');
   if (!state.open_positions.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="empty">NO OPEN POSITIONS</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="empty">NO OPEN POSITIONS</td></tr>';
     return;
   }
   tbody.innerHTML = state.open_positions.map(t => `
@@ -121,6 +129,7 @@ function renderPositions() {
       <td class="${t.pnl >= 0 ? 'g' : 'r'}">${t.pnl?.toFixed(2) || '0.00'}</td>
       <td>${t.sl || '-'}</td>
       <td>${t.tp || '-'}</td>
+      <td><button class="btn" style="padding:2px 8px; font-size:10px;" onclick="closeTrade(${t.ticket})">CLOSE</button></td>
     </tr>
   `).join('');
 }
@@ -153,15 +162,6 @@ function renderTrades() {
 }
 
 function renderSignals() {
-  document.getElementById('signals-feed').innerHTML = state.recent_signals.slice(0, 5).map(s => `
-    <div style="padding: 8px 0; border-bottom: 1px solid var(--border);">
-      <div style="display:flex; justify-content:space-between;">
-        <span>${s.symbol} <span class="${s.direction === 'buy' ? 'g' : 'r'}">${s.direction.toUpperCase()}</span></span>
-        <span>${s.score}</span>
-      </div>
-    </div>
-  `).join('') || '<div class="empty">NO SIGNALS YET</div>';
-
   const tbody = document.getElementById('signals-body');
   if (!state.all_signals.length) {
     tbody.innerHTML = '<tr><td colspan="6" class="empty">NO SIGNALS</td></tr>';
@@ -253,6 +253,19 @@ async function closeTrade(ticket) {
       await api('POST', `/api/trades/${ticket}/close`);
     } catch (err) {
       console.error(err);
+    }
+  }
+}
+
+async function closeAllPositions() {
+  if (state.open_positions.length === 0) return;
+  if (confirm(`Close all ${state.open_positions.length} open positions?`)) {
+    for (const t of state.open_positions) {
+      try {
+        await api('POST', `/api/trades/${t.ticket}/close`);
+      } catch (e) {
+        console.error("Error closing", t.ticket, e);
+      }
     }
   }
 }
