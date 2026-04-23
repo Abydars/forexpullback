@@ -1,5 +1,4 @@
 @echo off
-echo Starting Forex...
-start "Forex Backend" cmd /k "venv\Scripts\python.exe -m backend.main"
-start "Forex Frontend" cmd /k "cd frontend && npm run dev"
+echo Starting Forex Pullback Trading System...
+venv\Scripts\python.exe -m backend.main
 pause

@@ -11,6 +11,9 @@ from backend.ws.manager import ws_manager
 from backend.engine.scheduler import start_scheduler, stop_scheduler
 from backend.core.state import engine_state
 
+from fastapi.templating import Jinja2Templates
+from fastapi import Request
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -21,6 +24,11 @@ async def lifespan(app: FastAPI):
     stop_scheduler()
 
 app = FastAPI(title="Forex Pullback System", lifespan=lifespan)
+templates = Jinja2Templates(directory="backend/templates")
+
+@app.get("/")
+def read_root(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
 app.add_middleware(
     CORSMiddleware,

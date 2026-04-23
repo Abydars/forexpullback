@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
 set -e
-(cd backend && PYTHONPATH=.. ../venv/bin/python main.py) &
-(cd frontend && npm run dev) &
-wait
+echo "Starting Forex Pullback Trading System..."
+PYTHONPATH=. ./venv/bin/python -m backend.main
