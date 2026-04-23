@@ -7,8 +7,9 @@ from sqlalchemy import select
 from app.ws.manager import broadcast
 from datetime import datetime
 import pytz
+from app.core.config import get_config
 
-async def evaluate_smart_exit(p: dict, symbol: str) -> str | None:
+async def evaluate_smart_exit(p: dict, t, symbol: str) -> str | None:
     if p['profit'] <= 0:
         return None
         
@@ -18,16 +19,41 @@ async def evaluate_smart_exit(p: dict, symbol: str) -> str | None:
     last = df.iloc[-2]
     prev = df.iloc[-3]
     
+    entry = t.entry_price
+    tp = t.tp
+    
     if p['type'] == mt5.ORDER_TYPE_BUY:
-        # Strong Bearish Reversal (Engulfing)
-        if last['close'] < last['open'] and prev['close'] > prev['open']:
-            if last['close'] <= prev['open']:
-                return "Smart TP: Bearish Reversal Detected"
+        if tp and tp > entry:
+            tp_dist = tp - entry
+            max_reached = max(last['high'], prev['high'], p['price_current']) - entry
+            
+            if max_reached >= tp_dist * 0.8:
+                # 1. LIVE Exit: If price drops back to 60% after reaching 80%, exit instantly!
+                if p['price_current'] - entry <= tp_dist * 0.6:
+                    return "Smart TP: Live Rejection (Retraced from 80% to 60% of TP)"
+                    
+                # 2. Candle Close Exit: If it holds above 60% but closes red, exit on close.
+                if last['close'] < last['open']:
+                    return "Smart TP: Momentum lost near TP (80%+ reached)"
+                    
+        # Bearish Reversal (Closed below previous candle's lowest point)
+        if last['close'] < last['open'] and last['close'] < prev['low']:
+            return "Smart TP: Bearish Reversal Detected"
     else:
-        # Strong Bullish Reversal (Engulfing)
-        if last['close'] > last['open'] and prev['close'] < prev['open']:
-            if last['close'] >= prev['open']:
-                return "Smart TP: Bullish Reversal Detected"
+        if tp and tp < entry:
+            tp_dist = entry - tp
+            max_reached = entry - min(last['low'], prev['low'], p['price_current'])
+            
+            if max_reached >= tp_dist * 0.8:
+                if entry - p['price_current'] <= tp_dist * 0.6:
+                    return "Smart TP: Live Rejection (Retraced from 80% to 60% of TP)"
+                    
+                if last['close'] > last['open']:
+                    return "Smart TP: Momentum lost near TP (80%+ reached)"
+                    
+        # Bullish Reversal (Closed above previous candle's highest point)
+        if last['close'] > last['open'] and last['close'] > prev['high']:
+            return "Smart TP: Bullish Reversal Detected"
                 
     return None
 
@@ -82,7 +108,7 @@ async def monitor_loop():
                     else:
                         p = pos_dict[t.ticket]
                         
-                        exit_reason = await evaluate_smart_exit(p, t.symbol)
+                        exit_reason = await evaluate_smart_exit(p, t, t.symbol)
                         if exit_reason:
                             res = await mt5_client.position_close(t.ticket)
                             if res and res.get('retcode') == mt5.TRADE_RETCODE_DONE:
@@ -92,6 +118,41 @@ async def monitor_loop():
                                 await db.commit()
                                 await broadcast({"type": "log.event", "level": "INFO", "component": "smart_tp", "message": e.message, "created_at": datetime.now(pytz.utc).isoformat()})
                                 continue
+                                
+                        # Trailing Stop (Starts at 50% of TP)
+                        cfg = await get_config()
+                        if cfg.get("trailing", True) and t.tp:
+                            tp_dist = abs(t.tp - t.entry_price)
+                            current_dist = p['price_current'] - t.entry_price if p['type'] == mt5.ORDER_TYPE_BUY else t.entry_price - p['price_current']
+                            
+                            if tp_dist > 0 and current_dist >= (tp_dist * 0.5):
+                                info = mt5.symbol_info(t.symbol)
+                                if info:
+                                    trail_pips = float(cfg.get("trailing_distance_pips", 10.0))
+                                    dist_points = trail_pips * (10 * info.point if str(info.point).endswith('1') else info.point)
+                                    
+                                    new_sl = None
+                                    if p['type'] == mt5.ORDER_TYPE_BUY:
+                                        pot_sl = p['price_current'] - dist_points
+                                        if pot_sl > t.entry_price and (not t.sl or pot_sl > t.sl):
+                                            new_sl = float(f"{pot_sl:.5f}")
+                                    else:
+                                        pot_sl = p['price_current'] + dist_points
+                                        if pot_sl < t.entry_price and (not t.sl or pot_sl < t.sl):
+                                            new_sl = float(f"{pot_sl:.5f}")
+                                            
+                                    if new_sl:
+                                        req = {
+                                            "action": mt5.TRADE_ACTION_SLTP,
+                                            "position": t.ticket,
+                                            "symbol": t.symbol,
+                                            "sl": new_sl,
+                                            "tp": t.tp
+                                        }
+                                        res_sl = await mt5_client.order_send(req)
+                                        if res_sl and res_sl.get('retcode') == mt5.TRADE_RETCODE_DONE:
+                                            t.sl = new_sl
+                                            await db.commit()
                                 
                         await broadcast({
                             "type": "trade.updated",
