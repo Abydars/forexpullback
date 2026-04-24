@@ -35,11 +35,26 @@ async def init_db_async():
             try: await c.execute(text("ALTER TABLE trades ADD COLUMN group_id VARCHAR"))
             except Exception: pass
 
+        async def v3(c):
+            columns_to_add = [
+                ("exchange", "VARCHAR DEFAULT 'binance'"),
+                ("order_id", "VARCHAR"),
+                ("client_order_id", "VARCHAR"),
+                ("position_side", "VARCHAR DEFAULT 'LONG'"),
+                ("sl_order_id", "VARCHAR"),
+                ("tp_order_id", "VARCHAR"),
+                ("commission", "FLOAT DEFAULT 0.0")
+            ]
+            for col_name, col_type in columns_to_add:
+                try: await c.execute(text(f"ALTER TABLE trades ADD COLUMN {col_name} {col_type}"))
+                except Exception: pass
+
         # Define migrations
         migrations = [
             # v1: Initial setup (handled by create_all)
             v1,
-            v2
+            v2,
+            v3
         ]
         
         target_version = len(migrations)

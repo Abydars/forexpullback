@@ -36,29 +36,8 @@ def calc_adx(df: pd.DataFrame, period=14):
 async def scan_loop():
     while True:
         try:
-            cfg = await get_config()
-            interval = cfg.get("scan_interval_seconds", 10)
-            
-            from app.core.state import state
-            if not state.engine_running or not binance_client.is_connected():
-                await asyncio.sleep(interval)
-                continue
-                
-            now_utc = datetime.now(pytz.utc)
-            async with AsyncSessionLocal() as db:
-                result = await db.execute(select(SessionModel))
-                session_models = result.scalars().all()
-                sessions = [Session(id=s.id, name=s.name, start_time=datetime.strptime(s.start_time, "%H:%M").time(),
-                                   end_time=datetime.strptime(s.end_time, "%H:%M").time(), timezone=s.tz,
-                                   days_mask=s.days_mask, enabled=s.enabled) for s in session_models]
-            
-            is_active = any_active(sessions, now_utc)
-            state.active_sessions_count = len(active_sessions(sessions, now_utc))
-            
-            if not is_active:
-                await asyncio.sleep(interval)
-                continue
-                
+            import time
+            scan_start = time.time()
             await symbol_resolver.refresh()
                 
             from app.engine.symbol_universe import symbol_universe
@@ -69,18 +48,23 @@ async def scan_loop():
             max_symbol = int(cfg.get("max_per_symbol", 1))
             max_dir = int(cfg.get("max_per_direction", 3))
             
-            bot_positions = []
+            raw_positions = await binance_client.get_positions()
+            active_symbols_sides = set((p['symbol'], p['positionSide']) for p in raw_positions if abs(float(p['positionAmt'])) > 0)
+            
             async with AsyncSessionLocal() as db:
                 res_pos = await db.execute(select(Trade).where(Trade.closed_at == None))
-                bot_positions = res_pos.scalars().all()
+                all_open_trades = res_pos.scalars().all()
+                bot_positions = [t for t in all_open_trades if (t.symbol, t.position_side) in active_symbols_sides]
                 
             candidates = []
             updates_to_broadcast = []
             
-            for generic in symbols:
+            async def scan_symbol(generic):
+                candidates_local = []
+                updates_local = []
                 resolved = symbol_resolver.resolve(generic)
                 if not resolved:
-                    continue
+                    return updates_local, candidates_local
                     
                 reason_full = {"htf": None, "zone": None, "trigger": None, "msg": ""}
                 status = "REJECTED"
@@ -304,7 +288,7 @@ async def scan_loop():
                                                 status = "FIRED"
                                                 reason_full["msg"] = f"Candidate Accepted! Score: {score} >= {base_threshold}"
                                                 
-                                                candidates.append({
+                                                candidates_local.append({
                                                     "generic": generic,
                                                     "resolved": resolved,
                                                     "bias": bias,
@@ -321,7 +305,7 @@ async def scan_loop():
                                             scanner_state[state_key] = {"time": now_utc, "status": "WATCHING"}
                                             
                                         if is_dca_candidate:
-                                            candidates.append({
+                                            candidates_local.append({
                                                 "generic": generic,
                                                 "resolved": resolved,
                                                 "bias": bias,
@@ -335,7 +319,7 @@ async def scan_loop():
                                             })
 
                 if status != "FIRED":
-                    updates_to_broadcast.append({
+                    updates_local.append({
                         "symbol": generic,
                         "resolved": resolved,
                         "bias": bias,
@@ -345,7 +329,27 @@ async def scan_loop():
                         "updated_at": datetime.now(pytz.utc).isoformat()
                     })
 
-            dca_candidates = [c for c in candidates if c.get("is_dca")]
+                return updates_local, candidates_local
+
+            max_concurrent = int(cfg.get("max_concurrent_symbol_scans", 5))
+            sem = asyncio.Semaphore(max_concurrent)
+            
+            async def bounded_scan(generic):
+                async with sem:
+                    try:
+                        return await scan_symbol(generic)
+                    except Exception as e:
+                        print(f"Error scanning {generic}: {e}")
+                        return [], []
+                        
+            scan_tasks = [bounded_scan(sym) for sym in symbols]
+            results = await asyncio.gather(*scan_tasks)
+            
+            for upd, cand in results:
+                updates_to_broadcast.extend(upd)
+                candidates.extend(cand)
+            
+            dca_candidates = dca_candidates = [c for c in candidates if c.get("is_dca")]
             normal_candidates = [c for c in candidates if not c.get("is_dca")]
             
             dca_candidates.sort(key=lambda x: x["score"], reverse=True)
@@ -378,6 +382,7 @@ async def scan_loop():
                     else:
                         reason_full["msg"] = f"Executed! Rank 1 (Score: {score})"
                     scanner_state[state_key] = {"time": now_utc, "status": status}
+                    signal_detected_at = time.time()
                     
                     updates_to_broadcast.append({
                         "symbol": generic, "resolved": res, "bias": bias, "score": score,
@@ -401,7 +406,12 @@ async def scan_loop():
                         })
                         
                         from app.engine.order_manager import send_order
-                        await send_order(sig, res, bias, c["cfg"], is_dca=is_dca, dca_data=ltf_trigger if is_dca else None)
+                        
+                        order_start = time.time()
+                        await send_order(sig, res, bias, c["cfg"], is_dca=is_dca, dca_data=ltf_trigger if is_dca else None, signal_detected_at=signal_detected_at)
+                        order_end = time.time()
+                        
+                        print(f"[LATENCY] Signal found for {res} at {time.time()-scan_start:.2f}s | Order executed in {order_end-order_start:.2f}s")
                 else:
                     is_dca = c.get("is_dca", False)
                     status = "DCA_SKIPPED" if is_dca else "SKIPPED"
@@ -415,6 +425,7 @@ async def scan_loop():
             for update in updates_to_broadcast:
                 await broadcast({"type": "scan.update", "data": update})
 
+            print(f"[LATENCY] Full scan cycle for {len(symbols)} symbols completed in {time.time()-scan_start:.2f}s")
             await asyncio.sleep(interval)
         except Exception as e:
             print("Scanner error:", e)

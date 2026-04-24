@@ -79,6 +79,55 @@ async def close_trade_binance(t: Trade):
             await binance_client.algo_order_cancel(t.symbol, order_id=t.tp_order_id)
         except: pass
 
+async def background_reconcile_trade(trade_id: int, symbol: str, default_entry: float):
+    # Try multiple times to fetch late-arriving Binance data
+    for attempt in range(6):
+        await asyncio.sleep(5 * (attempt + 1))
+        try:
+            inc_res = await binance_client.request('GET', '/fapi/v1/income', signed=True, params={'symbol': symbol, 'incomeType': 'REALIZED_PNL', 'limit': 3})
+            trade_res = await binance_client.request('GET', '/fapi/v1/userTrades', signed=True, params={'symbol': symbol, 'limit': 3})
+            
+            if inc_res and trade_res and len(inc_res) > 0 and len(trade_res) > 0:
+                async with AsyncSessionLocal() as db:
+                    t = await db.get(Trade, trade_id)
+                    if t:
+                        t.pnl = float(inc_res[-1].get('income', 0))
+                        t.exit_price = float(trade_res[-1].get('price', default_entry))
+                        t.commission = float(trade_res[-1].get('commission', 0))
+                        t.note = "RECONCILED"
+                        await db.commit()
+                        await db.refresh(t)
+                        
+                        await broadcast({
+                            "type": "trade.closed",
+                            "trade": {
+                                "id": t.id, "symbol": t.symbol, "direction": t.direction,
+                                "quantity": t.quantity, "entry_price": t.entry_price, "exit_price": t.exit_price,
+                                "pnl": t.pnl, "sl": t.sl, "tp": t.tp
+                            }
+                        })
+                return
+        except Exception as e:
+            print(f"Reconciliation attempt {attempt+1} failed for {symbol}: {e}")
+            
+    # Fallback to zero if all attempts fail
+    async with AsyncSessionLocal() as db:
+        t = await db.get(Trade, trade_id)
+        if t:
+            t.pnl = 0.0
+            t.exit_price = default_entry
+            t.note = "RECONCILE_FAILED"
+            await db.commit()
+            await db.refresh(t)
+            await broadcast({
+                "type": "trade.closed",
+                "trade": {
+                    "id": t.id, "symbol": t.symbol, "direction": t.direction,
+                    "quantity": t.quantity, "entry_price": t.entry_price, "exit_price": t.exit_price,
+                    "pnl": t.pnl, "sl": t.sl, "tp": t.tp
+                }
+            })
+
     # Market close
     req = {
         'symbol': t.symbol,
@@ -139,17 +188,18 @@ async def monitor_loop():
                     if not found:
                         # Position closed
                         t.closed_at = datetime.now(pytz.utc)
-                        # Here we could fetch exit price from trades history, but for simplicity:
-                        t.exit_price = t.entry_price # Default if we don't fetch trade history
-                        t.pnl = 0.0
-                        t.commission = 0.0
+                        t.note = "PENDING_RECONCILE"
+                        
+                        # Spawn background task to fetch exact PnL and exit price
+                        # This prevents zero-PnL bugs from delayed Binance history updates
+                        asyncio.create_task(background_reconcile_trade(t.id, t.symbol, t.entry_price))
                         
                         await broadcast({
                             "type": "trade.closed",
                             "trade": {
                                 "id": t.id, "symbol": t.symbol, "direction": t.direction,
                                 "quantity": t.quantity, "entry_price": t.entry_price, "exit_price": t.exit_price,
-                                "pnl": t.pnl, "sl": t.sl, "tp": t.tp
+                                "pnl": t.pnl, "sl": t.sl, "tp": t.tp, "note": "PENDING_RECONCILE"
                             }
                         })
                     else:
@@ -241,7 +291,7 @@ async def monitor_loop():
                 # Basket logic
                 enable_basket = cfg.get("enable_basket_trailing", False)
                 if enable_basket and len(bot_positions) > 0:
-                    total_unrealized_pnl = sum(p.get('profit', 0) for p in bot_positions)
+                    total_unrealized_pnl = sum(float(p.get('unRealizedProfit', 0)) for p in bot_positions)
                     start_usd = float(cfg.get("basket_trailing_start_usd", 5.0))
                     drawdown_usd = float(cfg.get("basket_trailing_drawdown_usd", 1.5))
                     min_close_usd = float(cfg.get("basket_trailing_min_close_usd", 5.0))

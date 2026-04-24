@@ -107,8 +107,10 @@ class SymbolUniverseBuilder:
                 trending = []
                 for t in vol_sorted:
                     sym = t['symbol']
-                    df_4h = await binance_client.get_rates(sym, 'H4', 250)
-                    df_1h = await binance_client.get_rates(sym, 'H1', 250)
+                    df_4h, df_1h = await asyncio.gather(
+                        binance_client.get_rates(sym, 'H4', 250),
+                        binance_client.get_rates(sym, 'H1', 250)
+                    )
                     if df_4h.empty or df_1h.empty: continue
                     htf = calculate_htf_bias(df_4h, df_1h)
                     if source_mode == "trending_up" and htf['bias'] == 'bullish':
@@ -124,18 +126,18 @@ class SymbolUniverseBuilder:
             # calculate dynamic ranking score
             filtered_tickers.sort(key=lambda x: x['quoteVolume'], reverse=True)
             for i, t in enumerate(filtered_tickers):
-                vol_rank_score = max(0, 100 - i * (100 / len(filtered_tickers)))
+                t['vol_rank_score'] = max(0, 100 - i * (100 / len(filtered_tickers)))
                 
             filtered_tickers.sort(key=lambda x: x['absChange'], reverse=True)
             for i, t in enumerate(filtered_tickers):
-                change_rank_score = max(0, 100 - i * (100 / len(filtered_tickers)))
+                t['change_rank_score'] = max(0, 100 - i * (100 / len(filtered_tickers)))
                 
             filtered_tickers.sort(key=lambda x: x['range_pct'], reverse=True)
             for i, t in enumerate(filtered_tickers):
-                volat_rank_score = max(0, 100 - i * (100 / len(filtered_tickers)))
+                t['volat_rank_score'] = max(0, 100 - i * (100 / len(filtered_tickers)))
                 
                 # Update total score based on weights
-                t['rank_score'] = (change_rank_score * 0.4) + (vol_rank_score * 0.4) + (volat_rank_score * 0.2)
+                t['rank_score'] = (t['change_rank_score'] * 0.4) + (t['vol_rank_score'] * 0.4) + (t['volat_rank_score'] * 0.2)
                 
             combined_pool = {}
             for src in combined_sources:

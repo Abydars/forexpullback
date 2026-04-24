@@ -11,8 +11,12 @@ import time
 
 resolver = SymbolResolver(binance_client)
 
-async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca_data=None):
+_leverage_cache = {}
+_margin_cache = {}
+
+async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca_data=None, signal_detected_at=None):
     try:
+        order_start = time.time()
         positions = await binance_client.get_positions()
         
         # We only track our bot's positions using DB, but we can also limit total open positions
@@ -77,11 +81,19 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
             
         # Optional: set leverage
         default_leverage = int(cfg.get("default_leverage", 10))
-        await binance_client.set_leverage(resolved, default_leverage)
+        if _leverage_cache.get(resolved) != default_leverage:
+            try:
+                await binance_client.set_leverage(resolved, default_leverage)
+                _leverage_cache[resolved] = default_leverage
+            except: pass
         
         # Optional: set margin type
         margin_type = cfg.get("margin_type", "ISOLATED").upper()
-        await binance_client.set_margin_type(resolved, margin_type)
+        if _margin_cache.get(resolved) != margin_type:
+            try:
+                await binance_client.set_margin_type(resolved, margin_type)
+                _margin_cache[resolved] = margin_type
+            except: pass
         
         side = 'BUY' if bias == 'bullish' else 'SELL'
         position_side = 'LONG' if bias == 'bullish' else 'SHORT'
@@ -101,6 +113,7 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
         }
         
         res = await binance_client.order_send(req)
+        entry_filled_at = time.time()
         order_id = str(res.get('orderId'))
         entry_price = float(res.get('avgPrice', res.get('price', actual_price)))
         if entry_price == 0: entry_price = actual_price
@@ -151,6 +164,20 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
             db.add(t)
             await db.commit()
             await db.refresh(t)
+            
+            sltp_done_at = time.time()
+            
+            # Latency Tracking
+            if signal_detected_at:
+                sig_to_ord = (order_start - signal_detected_at) * 1000
+                ord_to_ent = (entry_filled_at - order_start) * 1000
+                ent_to_sltp = (sltp_done_at - entry_filled_at) * 1000
+                total_ms = (sltp_done_at - signal_detected_at) * 1000
+                msg = f"{resolved} latency: signal→order {sig_to_ord:.0f}ms, entry {ord_to_ent:.0f}ms, SLTP {ent_to_sltp:.0f}ms, total {total_ms:.0f}ms"
+                
+                db.add(Event(level="INFO", component="latency", message=msg))
+                await db.commit()
+                await broadcast({"type": "log.event", "level": "INFO", "component": "latency", "message": msg, "created_at": datetime.now(pytz.utc).isoformat()})
             
             # Reanchor SL for existing DCA positions
             if is_dca and dca_data:
