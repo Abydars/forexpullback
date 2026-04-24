@@ -109,10 +109,29 @@ async def scan_loop():
                             if not mtf_zone:
                                 reason_full["msg"] = "No 15M Pullback Zone (Not near EMA or FVG)"
                             else:
+                                base_atr_mult = float(cfg.get("atr_buffer_multiplier", 0.2))
+                                
+                                # Dynamic Volatility (Spike) Factor instead of hardcoded symbols
+                                recent_tr = pd.concat([
+                                    df_15m['high'] - df_15m['low'],
+                                    abs(df_15m['high'] - df_15m['close'].shift(1)),
+                                    abs(df_15m['low'] - df_15m['close'].shift(1))
+                                ], axis=1).max(axis=1).iloc[-14:]
+                                
+                                local_atr = recent_tr.mean()
+                                max_tr = recent_tr.max()
+                                
+                                if local_atr > 0:
+                                    spike_factor = max_tr / local_atr
+                                    if spike_factor > 2.0:
+                                        # Scale multiplier based on how spiky the asset is (capped at 3x)
+                                        scale = min(spike_factor / 1.5, 3.0)
+                                        base_atr_mult *= scale
+                                        
                                 ltf_trigger = find_ltf_trigger(
                                     df_5m, df_15m, atr, mtf_zone, bias, point, 
                                     float(cfg.get("reward_ratio", 2.0)),
-                                    float(cfg.get("atr_buffer_multiplier", 0.2)),
+                                    base_atr_mult,
                                     cfg.get("use_liquidity_tp", True)
                                 )
                                 reason_full["trigger"] = ltf_trigger

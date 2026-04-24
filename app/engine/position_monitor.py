@@ -197,7 +197,13 @@ async def monitor_loop():
                                     # Fetch recent ATR for volatility-aware trailing distance
                                     df_trail = await mt5_client.get_rates(t.symbol, mt5.TIMEFRAME_M15, 14)
                                     if not df_trail.empty:
-                                        atr_trail = (df_trail['high'] - df_trail['low']).mean()
+                                        df_copy = df_trail.copy()
+                                        df_copy['tr'] = pd.concat([
+                                            df_copy['high'] - df_copy['low'],
+                                            abs(df_copy['high'] - df_copy['close'].shift(1)),
+                                            abs(df_copy['low'] - df_copy['close'].shift(1))
+                                        ], axis=1).max(axis=1)
+                                        atr_trail = df_copy['tr'].ewm(alpha=1/14, adjust=False).mean().iloc[-1]
                                         dist_points = atr_trail * 1.5
                                         
                                         if p['type'] == mt5.ORDER_TYPE_BUY:

@@ -72,7 +72,18 @@ def find_ltf_trigger(df: pd.DataFrame, df_15m: pd.DataFrame, atr_15m: float, zon
                 trigger_name += " + RSI Reclaim"
             
             atr_buffer = atr_15m * atr_buffer_multiplier
-            sl = float(min(last['low'], prev['low'], zone['zone_low']) - atr_buffer)
+            
+            # Use stronger M15 structure instead of M5
+            m15_swing_low = df_15m['low'].iloc[-5:].min()
+            structural_low = min(last['low'], prev['low'], m15_swing_low, zone['zone_low'])
+            
+            sl = float(structural_low - atr_buffer)
+            
+            # Ensure minimum SL distance (e.g. 50 points / 5 pips) to prevent wick hunting
+            min_sl_dist = point * 50
+            if (entry - sl) < min_sl_dist:
+                sl = entry - min_sl_dist
+                
             rr_tp = entry + (entry - sl) * reward_ratio
             
             tp = rr_tp
@@ -115,7 +126,18 @@ def find_ltf_trigger(df: pd.DataFrame, df_15m: pd.DataFrame, atr_15m: float, zon
                 trigger_name += " + RSI Reclaim"
                 
             atr_buffer = atr_15m * atr_buffer_multiplier
-            sl = float(max(last['high'], prev['high'], zone['zone_high']) + atr_buffer)
+            
+            # Use stronger M15 structure instead of M5
+            m15_swing_high = df_15m['high'].iloc[-5:].max()
+            structural_high = max(last['high'], prev['high'], m15_swing_high, zone['zone_high'])
+            
+            sl = float(structural_high + atr_buffer)
+            
+            # Ensure minimum SL distance
+            min_sl_dist = point * 50
+            if (sl - entry) < min_sl_dist:
+                sl = entry + min_sl_dist
+                
             rr_tp = entry - (sl - entry) * reward_ratio
             
             tp = rr_tp
