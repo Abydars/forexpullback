@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <title>Forex Pullback Bot</title>
   <link rel="stylesheet" href="/static/app.css">
 </head>
+
 <body>
   <!-- TOP BAR -->
   <header class="topbar">
@@ -36,27 +38,68 @@
   <main>
     <section class="tab-panel active" data-panel="dashboard">
       <div class="stat-row">
-        <div class="stat-card"><div class="stat-label">BALANCE</div><div class="stat-value" id="s-balance">—</div></div>
-        <div class="stat-card"><div class="stat-label">EQUITY</div><div class="stat-value c" id="s-equity">—</div></div>
-        <div class="stat-card"><div class="stat-label">UNREALIZED PNL</div><div class="stat-value" id="s-unrealized">—</div></div>
-        <div class="stat-card"><div class="stat-label">TODAY PNL</div><div class="stat-value" id="s-today">—</div></div>
-        <div class="stat-card"><div class="stat-label">OPEN POSITIONS</div><div class="stat-value" id="s-open">0</div></div>
+        <div class="stat-card">
+          <div class="stat-label">BALANCE</div>
+          <div class="stat-value" id="s-balance">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">EQUITY</div>
+          <div class="stat-value c" id="s-equity">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">UNREALIZED PNL</div>
+          <div class="stat-value" id="s-unrealized">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">OPEN POSITIONS</div>
+          <div class="stat-value" id="s-open">0</div>
+        </div>
       </div>
       <div class="panel">
         <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
           <span>OPEN POSITIONS</span>
-          <button class="btn" onclick="closeAllPositions()" style="padding:4px 8px; font-size:11px; border-color:var(--text); color:var(--text);">CLOSE ALL</button>
+          <button class="btn" onclick="closeAllPositions()"
+            style="padding:4px 8px; font-size:11px; border-color:var(--text); color:var(--text);">CLOSE ALL</button>
         </div>
         <table class="data-table">
-          <thead><tr><th>SYMBOL</th><th>DIR</th><th>LOT</th><th>ENTRY</th><th>CUR</th><th>PNL</th><th>SL</th><th>TP</th><th>ACTION</th></tr></thead>
-          <tbody id="open-pos-body"><tr><td colspan="9" class="empty">NO OPEN POSITIONS</td></tr></tbody>
+          <thead>
+            <tr>
+              <th>SYMBOL</th>
+              <th>DIR</th>
+              <th>LOT</th>
+              <th>ENTRY</th>
+              <th>CUR</th>
+              <th>PNL</th>
+              <th>SL</th>
+              <th>TP</th>
+              <th>ACTION</th>
+            </tr>
+          </thead>
+          <tbody id="open-pos-body">
+            <tr>
+              <td colspan="9" class="empty">NO OPEN POSITIONS</td>
+            </tr>
+          </tbody>
         </table>
       </div>
       <div class="panel">
         <div class="panel-title">LIVE SCANNER STATUS</div>
         <table class="data-table">
-          <thead><tr><th>SYMBOL</th><th>BIAS</th><th>SCORE</th><th>STATUS</th><th>REASON / REJECTION</th><th>LAST UPDATE</th></tr></thead>
-          <tbody id="scan-status-body"><tr><td colspan="6" class="empty">WAITING FOR SCAN...</td></tr></tbody>
+          <thead>
+            <tr>
+              <th>SYMBOL</th>
+              <th>BIAS</th>
+              <th>SCORE</th>
+              <th>STATUS</th>
+              <th>REASON / REJECTION</th>
+              <th>LAST UPDATE</th>
+            </tr>
+          </thead>
+          <tbody id="scan-status-body">
+            <tr>
+              <td colspan="6" class="empty">WAITING FOR SCAN...</td>
+            </tr>
+          </tbody>
         </table>
       </div>
     </section>
@@ -68,11 +111,27 @@
           <button class="sub-tab" data-sub="closed">CLOSED</button>
         </div>
         <div class="filters">
-          <select id="f-symbol"><option value="">ALL SYMBOLS</option></select>
+          <select id="f-symbol">
+            <option value="">ALL SYMBOLS</option>
+          </select>
           <input type="date" id="f-from"> <input type="date" id="f-to">
         </div>
         <table class="data-table" id="trades-table">
-          <thead><tr><th>TIME</th><th>SYMBOL</th><th>DIR</th><th>LOT</th><th>ENTRY</th><th>SL</th><th>TP</th><th>EXIT</th><th>PNL</th><th>NOTE</th><th></th></tr></thead>
+          <thead>
+            <tr>
+              <th>TIME</th>
+              <th>SYMBOL</th>
+              <th>DIR</th>
+              <th>LOT</th>
+              <th>ENTRY</th>
+              <th>SL</th>
+              <th>TP</th>
+              <th>EXIT</th>
+              <th>PNL</th>
+              <th>NOTE</th>
+              <th></th>
+            </tr>
+          </thead>
           <tbody id="trades-body"></tbody>
         </table>
       </div>
@@ -82,7 +141,16 @@
       <div class="panel">
         <div class="panel-title">ALL SIGNALS</div>
         <table class="data-table">
-          <thead><tr><th>TIME</th><th>SYMBOL</th><th>DIR</th><th>SCORE</th><th>STATUS</th><th>REASON</th></tr></thead>
+          <thead>
+            <tr>
+              <th>TIME</th>
+              <th>SYMBOL</th>
+              <th>DIR</th>
+              <th>SCORE</th>
+              <th>STATUS</th>
+              <th>REASON</th>
+            </tr>
+          </thead>
           <tbody id="signals-body"></tbody>
         </table>
       </div>
@@ -91,11 +159,25 @@
     <section class="tab-panel" data-panel="logs">
       <div class="panel">
         <div class="filters">
-          <select id="f-level"><option value="">ALL LEVELS</option><option>INFO</option><option>WARN</option><option>ERROR</option></select>
-          <select id="f-component"><option value="">ALL COMPONENTS</option></select>
+          <select id="f-level">
+            <option value="">ALL LEVELS</option>
+            <option>INFO</option>
+            <option>WARN</option>
+            <option>ERROR</option>
+          </select>
+          <select id="f-component">
+            <option value="">ALL COMPONENTS</option>
+          </select>
         </div>
         <table class="data-table">
-          <thead><tr><th>TIME</th><th>LEVEL</th><th>COMPONENT</th><th>MESSAGE</th></tr></thead>
+          <thead>
+            <tr>
+              <th>TIME</th>
+              <th>LEVEL</th>
+              <th>COMPONENT</th>
+              <th>MESSAGE</th>
+            </tr>
+          </thead>
           <tbody id="logs-body"></tbody>
         </table>
       </div>
@@ -108,9 +190,14 @@
       <div class="modal-title">MT5 LINK</div>
       <div id="saved-accounts"></div>
       <datalist id="exness-servers">
-        <option value="Exness-MT5Real"><option value="Exness-MT5Real2"><option value="Exness-MT5Real3">
-        <option value="Exness-MT5Real5"><option value="Exness-MT5Trial"><option value="Exness-MT5Trial5">
-        <option value="Exness-MT5Trial9"><option value="Exness-MT5Trial15">
+        <option value="Exness-MT5Real">
+        <option value="Exness-MT5Real2">
+        <option value="Exness-MT5Real3">
+        <option value="Exness-MT5Real5">
+        <option value="Exness-MT5Trial">
+        <option value="Exness-MT5Trial5">
+        <option value="Exness-MT5Trial9">
+        <option value="Exness-MT5Trial15">
       </datalist>
       <div class="form-grid single">
         <label>SERVER <input id="m-server" list="exness-servers" autocomplete="off"></label>
@@ -145,11 +232,13 @@
         <label>MAX PER SYMBOL <input type="number" id="c-max_per_symbol" value="1"></label>
         <label>MAX PER DIRECTION <input type="number" id="c-max_per_direction" value="3"></label>
         <label>MAX SPREAD (% OF SL) <input type="number" step="0.1" id="c-max_spread_pct" value="20.0"></label>
-        <label>SIGNAL THRESHOLD (0-100) <input type="range" id="c-signal_threshold" min="0" max="100" value="65"></label>
+        <label>SIGNAL THRESHOLD (0-100) <input type="range" id="c-signal_threshold" min="0" max="100"
+            value="65"></label>
         <label>RISK PERCENT (%) <input type="number" step="0.1" id="c-risk_percent" value="1.0"></label>
         <label>SCAN INTERVAL (SEC) <input type="number" id="c-scan_interval_seconds" value="10"></label>
         <label>REWARD RATIO <input type="number" step="0.1" id="c-reward_ratio" value="2.0"></label>
-        <label>DASHBOARD PASSWORD <input type="text" id="c-dashboard_password" value="admin" style="-webkit-text-security: disc;"></label>
+        <label>DASHBOARD PASSWORD <input type="text" id="c-dashboard_password" value="admin"
+            style="-webkit-text-security: disc;"></label>
       </div>
 
       <div class="m-panel" data-mpanel="symbols">
@@ -167,14 +256,14 @@
       </div>
 
       <div class="m-panel form-grid" data-mpanel="risk">
-        <label>SL MODE 
+        <label>SL MODE
           <select id="c-sl_mode">
             <option value="structural">Structural</option>
             <option value="atr">ATR</option>
           </select>
         </label>
         <label>ATR MULTIPLIER <input type="number" step="0.1" id="c-atr_multiplier" value="1.5"></label>
-        <label>TP MODE 
+        <label>TP MODE
           <select id="c-tp_mode">
             <option value="r_multiple">R Multiple</option>
             <option value="liquidity">Liquidity</option>
@@ -182,7 +271,8 @@
         </label>
         <label>BREAKEVEN TRIGGER (R) <input type="number" step="0.1" id="c-breakeven_trigger_r" value="1.0"></label>
         <label>TRAILING STOP <input type="checkbox" id="c-trailing" checked></label>
-        <label>TRAILING DISTANCE (PIPS) <input type="number" step="0.1" id="c-trailing_distance_pips" value="15.0"></label>
+        <label>TRAILING DISTANCE (PIPS) <input type="number" step="0.1" id="c-trailing_distance_pips"
+            value="15.0"></label>
       </div>
 
       <div class="modal-actions">
@@ -194,4 +284,5 @@
 
   <script src="/static/app.js"></script>
 </body>
+
 </html>
