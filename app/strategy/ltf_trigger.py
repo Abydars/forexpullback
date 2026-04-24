@@ -79,10 +79,10 @@ def find_ltf_trigger(df: pd.DataFrame, df_15m: pd.DataFrame, atr_15m: float, zon
             
             sl = float(structural_low - atr_buffer)
             
-            # Ensure minimum SL distance (e.g. 50 points / 5 pips) to prevent wick hunting
-            min_sl_dist = point * 50
+            # Ensure minimum SL distance based on ATR (e.g. 0.5 * ATR)
+            min_sl_dist = atr_15m * 0.5
             if (entry - sl) < min_sl_dist:
-                sl = entry - min_sl_dist
+                sl = float(entry - min_sl_dist)
                 
             rr_tp = entry + (entry - sl) * reward_ratio
             
@@ -133,10 +133,10 @@ def find_ltf_trigger(df: pd.DataFrame, df_15m: pd.DataFrame, atr_15m: float, zon
             
             sl = float(structural_high + atr_buffer)
             
-            # Ensure minimum SL distance
-            min_sl_dist = point * 50
+            # Ensure minimum SL distance based on ATR
+            min_sl_dist = atr_15m * 0.5
             if (sl - entry) < min_sl_dist:
-                sl = entry + min_sl_dist
+                sl = float(entry + min_sl_dist)
                 
             rr_tp = entry - (sl - entry) * reward_ratio
             
