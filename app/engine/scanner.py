@@ -190,35 +190,40 @@ async def scan_loop():
                                         
                                         state_key = f"{resolved}_{bias}"
                                         
-                                        open_positions_for_sym = [p for p in bot_positions if p.symbol == resolved]
-                                        sym_count = len(open_positions_for_sym)
+                                        # Binance Position as Source of Truth
+                                        binance_side = 'LONG' if bias == 'bullish' else 'SHORT'
+                                        binance_pos = next((p for p in raw_positions if p['symbol'] == resolved and p['positionSide'] == binance_side and abs(float(p['positionAmt'])) > 0), None)
+                                        
+                                        sym_count = len([p for p in raw_positions if p['symbol'] == resolved and abs(float(p['positionAmt'])) > 0])
                                         
                                         is_dca_allowed = False
                                         is_dca_candidate = False
                                         
                                         if sym_count > 0:
                                             enable_dca = cfg.get("enable_dca", False)
-                                            same_dir_positions = [p for p in open_positions_for_sym if p.direction == bias]
+                                            same_dir_db = [p for p in bot_positions if p.symbol == resolved and p.direction == bias]
                                             
-                                            if enable_dca and score >= base_threshold and len(same_dir_positions) > 0:
+                                            if enable_dca and score >= base_threshold and binance_pos and len(same_dir_db) > 0:
                                                 max_dca_entries = int(cfg.get("max_dca_entries", 1))
                                                 dca_trigger_sl_progress = float(cfg.get("dca_trigger_sl_progress", 0.5))
                                                 dca_max_total_risk_r = float(cfg.get("dca_max_total_risk_r", 2.0))
                                                 
-                                                same_dir_positions.sort(key=lambda x: x.opened_at.timestamp() if x.opened_at else 0)
-                                                base_trade = same_dir_positions[0]
-                                                base_entry = base_trade.entry_price
+                                                same_dir_db.sort(key=lambda x: x.opened_at.timestamp() if x.opened_at else 0)
+                                                base_trade = same_dir_db[0]
                                                 base_sl = base_trade.sl
+                                                
+                                                # Use exact Binance average entry price
+                                                base_entry = float(binance_pos['entryPrice'])
                                                 
                                                 if base_entry and base_sl and base_entry != base_sl:
                                                     current_price = tick['ask'] if bias == 'bullish' else tick['bid']
                                                     
                                                     if bias == 'bullish':
-                                                        progress = (base_entry - current_price) / (base_entry - base_sl)
+                                                        progress = (base_entry - current_price) / (base_entry - base_sl) if base_entry != base_sl else 0
                                                     else:
-                                                        progress = (current_price - base_entry) / (base_sl - base_entry)
+                                                        progress = (current_price - base_entry) / (base_sl - base_entry) if base_entry != base_sl else 0
                                                         
-                                                    dca_count = len(same_dir_positions) - 1
+                                                    dca_count = len(same_dir_db) - 1
                                                     
                                                     if dca_count >= max_dca_entries:
                                                         status = "DCA_SKIPPED"
