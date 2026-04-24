@@ -36,13 +36,15 @@ body {
 .actions { display: flex; gap: 8px; }
 
 .btn {
-  background: transparent; border: 1px solid var(--border-strong); color: var(--text);
-  padding: 6px 14px; font: inherit; font-size: 11px;
-  text-transform: uppercase; letter-spacing: 0.08em; cursor: pointer;
+  background: rgba(255,255,255,0.02); border: 1px solid var(--border-strong); color: var(--text);
+  padding: 8px 16px; font: inherit; font-size: 11px; font-weight: bold;
+  text-transform: uppercase; letter-spacing: 0.1em; cursor: pointer;
+  border-radius: 4px; transition: all 0.2s;
 }
-.btn:hover { border-color: var(--muted); background: rgba(255,255,255,0.02); }
-.btn.primary { border-color: var(--green); color: var(--green); }
-.btn.primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn:hover { border-color: var(--muted); background: rgba(255,255,255,0.06); }
+.btn.primary { background: var(--cyan); color: #000; border: none; box-shadow: 0 0 10px rgba(77,208,225,0.2); }
+.btn.primary:hover { filter: brightness(1.1); box-shadow: 0 0 15px rgba(77,208,225,0.4); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--panel); padding: 0 20px; }
 .tab {
@@ -99,50 +101,58 @@ main { padding: 20px; min-width: 0; }
 
 /* Modals */
 dialog {
-  background: var(--panel); border: 1px solid var(--border-strong); color: var(--text);
-  font: inherit; padding: 0; border-radius: 2px; min-width: 450px;
-  margin: auto;
+  background: rgba(10, 15, 28, 0.85); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(77, 208, 225, 0.2);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255,255,255,0.05) inset;
+  color: var(--text); font: inherit; padding: 0; border-radius: 6px; min-width: 450px; margin: auto; overflow: hidden;
 }
-dialog::backdrop { background: rgba(0,0,0,0.7); }
-.modal-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
-.modal-body.wide { min-width: 650px; }
+dialog::backdrop { background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.modal-body { padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+.modal-body.wide { min-width: 750px; }
 .modal-title {
-  text-transform: uppercase; letter-spacing: 0.1em; font-size: 11px;
-  color: var(--text-strong); margin-bottom: 4px; padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
+  text-transform: uppercase; letter-spacing: 0.15em; font-size: 13px; font-weight: bold;
+  color: var(--cyan); margin-bottom: 4px; padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 8px;
 }
-.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
-.modal-tabs { display: flex; border-bottom: 1px solid var(--border); }
+.modal-title::before { content: "■"; font-size: 10px; opacity: 0.8; }
+.modal-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.08); }
+.modal-tabs { display: flex; gap: 4px; background: rgba(0,0,0,0.4); padding: 4px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.03); }
 .m-tab {
   background: transparent; border: none; color: var(--muted);
-  padding: 8px 12px; font: inherit; font-size: 10px;
+  padding: 10px 16px; font: inherit; font-size: 10px; font-weight: bold;
   text-transform: uppercase; letter-spacing: 0.1em; cursor: pointer;
-  border-bottom: 2px solid transparent;
+  border-radius: 3px; flex: 1; transition: all 0.2s;
 }
-.m-tab.active { color: var(--text-strong); border-bottom-color: var(--cyan); }
-.m-panel { display: none; padding-top: 12px; }
+.m-tab:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+.m-tab.active { background: rgba(77, 208, 225, 0.1); color: var(--cyan); border: 1px solid rgba(77, 208, 225, 0.2); box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+.m-panel { display: none; padding-top: 20px; }
 .m-panel.active { display: block; }
 .m-panel:not(.active) { display: none !important; }
 
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px 24px;
+  gap: 16px 24px;
 }
 .form-grid.single {
   grid-template-columns: 1fr;
 }
 
 label { 
-  display: grid; grid-template-columns: 1fr 140px; gap: 12px; align-items: center; 
-  font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; 
+  display: grid; grid-template-columns: 1fr 140px; gap: 16px; align-items: center; 
+  font-size: 10px; color: var(--text); text-transform: uppercase; letter-spacing: 0.08em; 
+  padding: 8px 12px; background: rgba(0,0,0,0.15); border: 1px solid rgba(255,255,255,0.02);
+  border-radius: 4px; transition: background 0.2s;
 }
+label:hover { background: rgba(0,0,0,0.3); border-color: rgba(255,255,255,0.05); }
+
 input, select {
-  background: var(--bg); border: 1px solid var(--border-strong); color: var(--text);
-  padding: 6px 8px; font: inherit; font-size: 11px; width: 100%; box-sizing: border-box;
+  background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); color: var(--text-strong);
+  padding: 8px 12px; font: inherit; font-size: 11px; width: 100%; box-sizing: border-box;
+  border-radius: 3px; transition: all 0.2s;
 }
-input[type="checkbox"] { width: auto; }
-input:focus, select:focus { outline: none; border-color: var(--cyan); }
+input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--cyan); cursor: pointer; }
+input:focus, select:focus { outline: none; border-color: var(--cyan); box-shadow: 0 0 0 1px var(--cyan) inset, 0 0 8px rgba(77,208,225,0.15); }
 
 .chips-wrap { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px; border: 1px solid var(--border); min-height: 60px; }
 .chip {
