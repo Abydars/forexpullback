@@ -10,7 +10,7 @@ class LoginRequest(BaseModel):
     password: str
 
 @router.post("/login")
-async def login(req: LoginRequest, response: Response):
+async def login(req_body: LoginRequest, req: Request, response: Response):
     cfg = await get_config()
     
     # Environment variable has top priority, then DB config, then default "admin"
@@ -25,15 +25,16 @@ async def login(req: LoginRequest, response: Response):
         if len(expected_hashed) != 64:
             expected_hashed = hash_password(expected_hashed)
     
-    if verify_password(req.password, expected_hashed):
+    if verify_password(req_body.password, expected_hashed):
         token = create_access_token()
-        # Set HttpOnly, Secure, SameSite cookie
+        # Set HttpOnly, dynamic Secure, Lax SameSite cookie
+        is_secure = req.url.scheme == "https" or req.headers.get("x-forwarded-proto") == "https"
         response.set_cookie(
             key="auth_token", 
             value=token, 
             httponly=True, 
-            secure=True, 
-            samesite="strict", 
+            secure=is_secure, 
+            samesite="lax", 
             max_age=86400*30
         )
         return {"status": "ok"}
