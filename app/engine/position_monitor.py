@@ -7,6 +7,7 @@ from sqlalchemy import select
 from app.ws.manager import broadcast
 from datetime import datetime
 import pytz
+import pandas as pd
 from app.core.config import get_config
 
 async def evaluate_smart_exit(p: dict, t, symbol: str) -> str | None:
