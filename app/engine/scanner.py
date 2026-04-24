@@ -36,10 +36,29 @@ def calc_adx(df: pd.DataFrame, period=14):
 async def scan_loop():
     while True:
         try:
-            from app.api.config_routes import get_config
+            from app.core.config import get_config
             cfg = await get_config()
             interval = cfg.get("scan_interval_seconds", 10)
+            
+            from app.core.state import state
+            if not state.engine_running or not binance_client.is_connected():
+                await asyncio.sleep(interval)
+                continue
+                
             now_utc = datetime.now(pytz.utc)
+            async with AsyncSessionLocal() as db:
+                result = await db.execute(select(SessionModel))
+                session_models = result.scalars().all()
+                sessions = [Session(id=s.id, name=s.name, start_time=datetime.strptime(s.start_time, "%H:%M").time(),
+                                   end_time=datetime.strptime(s.end_time, "%H:%M").time(), timezone=s.tz,
+                                   days_mask=s.days_mask, enabled=s.enabled) for s in session_models]
+            
+            is_active = any_active(sessions, now_utc)
+            state.active_sessions_count = len(active_sessions(sessions, now_utc))
+            
+            if not is_active:
+                await asyncio.sleep(interval)
+                continue
             
             import time
             scan_start = time.time()
@@ -77,13 +96,9 @@ async def scan_loop():
                 bias = "neutral"
                 
                 info = binance_client.symbol_info(resolved)
-                tick = await binance_client.symbol_info_tick(resolved)
-                current_time = datetime.now().timestamp()
                 
                 if not info or info.get('status') != 'TRADING':
                     reason_full["msg"] = "Market is CLOSED (Trading Disabled)"
-                elif not tick or (current_time - tick['time']) > 300:
-                    reason_full["msg"] = "Market is CLOSED (Stale tick data)"
                 else:
                     tick, df_4h, df_1h, df_15m, df_5m = await asyncio.gather(
                         binance_client.symbol_info_tick(resolved),
@@ -93,7 +108,10 @@ async def scan_loop():
                         binance_client.get_rates(resolved, 'M5', 500)
                     )
                     
-                    if df_4h.empty or df_1h.empty or df_15m.empty or df_5m.empty: 
+                    current_time = datetime.now().timestamp()
+                    if not tick or (current_time - tick['time']) > 300:
+                        reason_full["msg"] = "Market is CLOSED (Stale tick data)"
+                    elif df_4h.empty or df_1h.empty or df_15m.empty or df_5m.empty: 
                         reason_full["msg"] = "Not enough data (need more bars)"
                     else:
                         adx, atr = calc_adx(df_15m, 14)
@@ -258,7 +276,7 @@ async def scan_loop():
                                                         
                                                         total_new_risk = _calc_risk(dca_lot, current_price, new_sl)
                                                         
-                                                        for p in same_dir_positions:
+                                                        for p in same_dir_db:
                                                             p_entry = p.entry_price
                                                             p_vol = p.quantity
                                                             p_risk = _calc_risk(p_vol, p_entry, new_sl)
