@@ -78,6 +78,21 @@ async def close_trade_binance(t: Trade):
         try:
             await binance_client.algo_order_cancel(t.symbol, order_id=t.tp_order_id)
         except: pass
+        
+    # Market close
+    req = {
+        'symbol': t.symbol,
+        'side': 'SELL' if t.direction == 'bullish' else 'BUY',
+        'positionSide': t.position_side,
+        'type': 'MARKET',
+        'quantity': t.quantity,
+    }
+    try:
+        await binance_client.order_send(req)
+        return True
+    except Exception as e:
+        print(f"Close error {t.symbol}: {e}")
+        return False
 
 async def background_reconcile_trade(trade_id: int, symbol: str, default_entry: float):
     # Try multiple times to fetch late-arriving Binance data
@@ -127,21 +142,6 @@ async def background_reconcile_trade(trade_id: int, symbol: str, default_entry: 
                     "pnl": t.pnl, "sl": t.sl, "tp": t.tp
                 }
             })
-
-    # Market close
-    req = {
-        'symbol': t.symbol,
-        'side': 'SELL' if t.direction == 'bullish' else 'BUY',
-        'positionSide': t.position_side,
-        'type': 'MARKET',
-        'quantity': t.quantity,
-    }
-    try:
-        await binance_client.order_send(req)
-        return True
-    except Exception as e:
-        print(f"Close error {t.symbol}: {e}")
-        return False
 
 basket_state = {"active": False, "peak_pnl": 0.0}
 
@@ -263,7 +263,10 @@ async def monitor_loop():
                         if new_sl:
                             try:
                                 if t.sl_order_id:
-                                    await binance_client.algo_order_cancel(t.symbol, order_id=t.sl_order_id)
+                                    try:
+                                        await binance_client.algo_order_cancel(t.symbol, order_id=t.sl_order_id)
+                                    except Exception as cancel_e:
+                                        pass # Order may already be filled or manually cancelled
                                     
                                 sl_side = 'SELL' if t.direction == 'bullish' else 'BUY'
                                 sl_req = {
