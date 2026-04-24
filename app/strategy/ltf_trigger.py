@@ -42,8 +42,9 @@ def find_ltf_trigger(df: pd.DataFrame, zone: dict, bias: str, point: float, rewa
         lower_wick = min(last['open'], last['close']) - last['low']
         upper_wick = last['high'] - max(last['open'], last['close'])
         is_pinbar = (lower_wick > body_size * 2) and (upper_wick < body_size)
-        # Break of previous high
-        is_break = last['close'] > prev['high']
+        # Break of previous high (Requires strong body > 35% of candle range)
+        candle_range = last['high'] - last['low']
+        is_break = (last['close'] > prev['high']) and (body_size > candle_range * 0.35)
         # Liquidity Sweep
         is_sweep = last['low'] < prev['low'] and last['close'] > prev['low']
         
@@ -74,8 +75,9 @@ def find_ltf_trigger(df: pd.DataFrame, zone: dict, bias: str, point: float, rewa
         lower_wick = min(last['open'], last['close']) - last['low']
         upper_wick = last['high'] - max(last['open'], last['close'])
         is_pinbar = (upper_wick > body_size * 2) and (lower_wick < body_size)
-        # Break of previous low
-        is_break = last['close'] < prev['low']
+        # Break of previous low (Requires strong body > 35% of candle range)
+        candle_range = last['high'] - last['low']
+        is_break = (last['close'] < prev['low']) and (body_size > candle_range * 0.35)
         # Liquidity Sweep
         is_sweep = last['high'] > prev['high'] and last['close'] < prev['high']
         

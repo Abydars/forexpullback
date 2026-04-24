@@ -96,27 +96,29 @@ async def scan_loop():
                         spread_points = (tick.ask - tick.bid) / point if tick else 0
                         atr_points = atr / point if point > 0 else 1
                         
-                        if adx < 15:
-                            reason_full["msg"] = f"Low Volatility (ADX={adx:.1f} < 15)"
-                        elif (spread_points / atr_points) > 0.5:
-                            reason_full["msg"] = f"Spread too high relative to ATR (Spread={spread_points:.1f}, ATR={atr_points:.1f})"
+                        htf = calculate_htf_bias(df_4h, df_1h)
+                        reason_full["htf"] = htf
+                        bias = htf['bias']
+                        
+                        if bias == 'neutral':
+                            reason_full["msg"] = "Neutral HTF Bias (4H EMA not aligned)"
                         else:
-                            htf = calculate_htf_bias(df_4h, df_1h)
-                            reason_full["htf"] = htf
-                            bias = htf['bias']
+                            mtf_zone = find_mtf_zone(df_15m, bias)
+                            reason_full["zone"] = mtf_zone
                             
-                            if bias == 'neutral':
-                                reason_full["msg"] = "Neutral HTF Bias (4H EMA not aligned)"
+                            if not mtf_zone:
+                                reason_full["msg"] = "No 15M Pullback Zone (Not near EMA or FVG)"
                             else:
-                                mtf_zone = find_mtf_zone(df_15m, bias)
-                                reason_full["zone"] = mtf_zone
+                                ltf_trigger = find_ltf_trigger(df_5m, mtf_zone, bias, point, float(cfg.get("reward_ratio", 2.0)))
+                                reason_full["trigger"] = ltf_trigger
                                 
-                                if not mtf_zone:
-                                    reason_full["msg"] = "No 15M Pullback Zone (Not near EMA or FVG)"
+                                is_strong_trigger = ltf_trigger and ltf_trigger['strength'] >= 80
+                                
+                                if (spread_points / atr_points) > 0.25:
+                                    reason_full["msg"] = f"Spread too high relative to ATR (Spread={spread_points:.1f}, ATR={atr_points:.1f})"
+                                elif adx < 15 and not is_strong_trigger:
+                                    reason_full["msg"] = f"Low Volatility (ADX={adx:.1f} < 15) and no strong trigger"
                                 else:
-                                    ltf_trigger = find_ltf_trigger(df_5m, mtf_zone, bias, point, float(cfg.get("reward_ratio", 2.0)))
-                                    reason_full["trigger"] = ltf_trigger
-                                    
                                     # Dynamic Threshold Logic
                                     base_threshold = int(cfg.get("signal_threshold", 65))
                                     current_hour = now_utc.hour
@@ -132,17 +134,30 @@ async def scan_loop():
                                     if not ltf_trigger:
                                         status = "WATCHING"
                                         reason_full["msg"] = f"Zone Valid, Waiting for Trigger (Thresh: {base_threshold})"
+                                        
+                                        state_key = f"{resolved}_{bias}"
+                                        scanner_state[state_key] = {"time": now_utc, "status": "WATCHING"}
                                     else:
                                         score = calculate_score(htf['strength'], mtf_zone['quality'], ltf_trigger['strength'], True)
                                         
                                         # Smart Cooldown
+                                        cooldown_mins = int(cfg.get("signal_cooldown_minutes", 30))
+                                        cutoff = now_utc - timedelta(minutes=cooldown_mins)
+                                        
+                                        async with AsyncSessionLocal() as db:
+                                            recent_fired = await db.execute(select(Signal).where(
+                                                Signal.symbol == resolved,
+                                                Signal.direction == bias,
+                                                Signal.status == "FIRED",
+                                                Signal.created_at >= cutoff
+                                            ))
+                                            has_recent_fired = recent_fired.scalars().first()
+                                        
                                         state_key = f"{resolved}_{bias}"
                                         last_sig = scanner_state.get(state_key, {"time": datetime.min.replace(tzinfo=pytz.utc), "status": ""})
                                         mins_since = (now_utc - last_sig["time"]).total_seconds() / 60
                                         
-                                        cooldown_mins = int(cfg.get("signal_cooldown_minutes", 30))
-                                        
-                                        if last_sig["status"] == "FIRED" and mins_since < cooldown_mins:
+                                        if has_recent_fired:
                                             status = "COOLDOWN"
                                             reason_full["msg"] = f"Fired recently, waiting {cooldown_mins}m"
                                         elif last_sig["status"] == "WATCHING" and mins_since < 5:

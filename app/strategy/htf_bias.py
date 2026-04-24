@@ -36,8 +36,8 @@ def calculate_htf_bias(df_4h: pd.DataFrame, df_1h: pd.DataFrame) -> dict:
     reason = {"4h": bias_4h, "1h": bias_1h}
     
     if bias_4h == "bullish":
-        strength = 80 if bias_1h == "bullish" else 40
+        strength = 80 if bias_1h == "bullish" else 60
     elif bias_4h == "bearish":
-        strength = 80 if bias_1h == "bearish" else 40
+        strength = 80 if bias_1h == "bearish" else 60
     
     return {"bias": bias, "strength": strength, "reason": reason}
