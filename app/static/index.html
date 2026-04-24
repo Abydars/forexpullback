@@ -83,6 +83,16 @@
         </div>
       </div>
       
+      <div class="bg-panel border border-border_light p-5 rounded-sm flex flex-col justify-center mt-6">
+        <div class="text-[10px] tracking-[0.15em] uppercase text-slate-500 mb-2 font-semibold flex justify-between items-center">
+           <span>CURRENT SCAN UNIVERSE</span>
+           <span id="scan-universe-meta" class="text-[9px] text-slate-400 bg-black/20 px-2 py-1 rounded border border-border_strong">Mode: Manual</span>
+        </div>
+        <div id="scan-universe-chips" class="flex flex-wrap gap-2 text-[10px] font-mono mt-2">
+           <span class="text-slate-500 italic">Waiting for scanner...</span>
+        </div>
+      </div>
+      
       <div class="bg-panel border border-border_light rounded-sm overflow-hidden flex flex-col">
         <div class="flex justify-between items-center px-5 py-4 border-b border-border_light bg-white/[0.02]">
           <span class="text-[10px] tracking-[0.15em] font-bold text-slate-400 uppercase">OPEN POSITIONS</span>
@@ -282,12 +292,71 @@
 
           <!-- Symbols -->
           <div class="m-panel space-y-4" data-mpanel="symbols">
-            <div class="flex gap-2 items-center">
-              <input id="sym-input" placeholder="XAUUSD, EURUSD, ..." class="flex-1 bg-black/20 border border-border_strong text-slate-200 text-xs px-4 py-2.5 rounded outline-none focus:border-cyan_neon transition-colors">
-              <button type="button" class="px-5 py-2.5 border border-border_strong text-slate-300 text-[10px] font-bold tracking-[0.1em] uppercase hover:bg-white/5 transition-colors rounded shrink-0" onclick="addSymbols()">ADD</button>
-              <button type="button" class="px-5 py-2.5 border border-border_strong text-slate-300 text-[10px] font-bold tracking-[0.1em] uppercase hover:bg-white/5 transition-colors rounded shrink-0" onclick="resolveAllSymbols()">RESOLVE ALL</button>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label class="flex flex-col gap-1.5 text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">SYMBOL SOURCE MODE
+                <select id="c-symbol_source_mode" onchange="toggleSymbolMode()" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon">
+                  <option value="manual">Manual</option>
+                  <option value="top_gainers_24h">Top Gainers 24h</option>
+                  <option value="top_losers_24h">Top Losers 24h</option>
+                  <option value="top_movers_24h">Top Movers 24h</option>
+                  <option value="top_volume_24h">Top Volume 24h</option>
+                  <option value="high_volatility">High Volatility</option>
+                  <option value="trending_up">Trending Up</option>
+                  <option value="trending_down">Trending Down</option>
+                  <option value="combined">Combined</option>
+                </select>
+              </label>
+
+              <label class="flex flex-col gap-1.5 text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">DYNAMIC SYMBOL LIMIT
+                <input type="number" id="c-dynamic_symbol_limit" value="10" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon">
+              </label>
+
+              <label class="flex flex-col gap-1.5 text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">MIN 24H VOLUME (USDT)
+                <input type="number" id="c-min_24h_quote_volume_usdt" value="50000000" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon">
+              </label>
+              
+              <label class="flex flex-col gap-1.5 text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">REFRESH MINUTES
+                <input type="number" id="c-refresh_dynamic_symbols_minutes" value="15" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon">
+              </label>
             </div>
-            <div id="sym-chips" class="flex flex-wrap gap-2 p-4 border border-border_light min-h-[100px] bg-black/10 rounded"></div>
+            
+            <div class="flex items-center gap-2 mt-2">
+              <label class="flex gap-2 items-center text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase cursor-pointer">
+                <input type="checkbox" id="c-use_only_usdt_perpetuals" checked class="accent-cyan_neon border-border_strong">
+                USE ONLY USDT PERPETUALS
+              </label>
+            </div>
+
+            <div id="combined_sources_container" class="hidden mt-4 space-y-2 border border-border_strong p-4 bg-black/20 rounded">
+              <div class="text-[10px] font-bold tracking-[0.1em] text-cyan_neon uppercase mb-2">Combined Sources</div>
+              <div class="grid grid-cols-2 gap-2 text-[10px] text-slate-400 font-bold uppercase tracking-[0.1em]">
+                <label class="flex items-center gap-2"><input type="checkbox" value="top_movers_24h" class="c-combined_sources accent-cyan_neon"> Top Movers 24h</label>
+                <label class="flex items-center gap-2"><input type="checkbox" value="top_volume_24h" class="c-combined_sources accent-cyan_neon"> Top Volume 24h</label>
+                <label class="flex items-center gap-2"><input type="checkbox" value="high_volatility" class="c-combined_sources accent-cyan_neon"> High Volatility</label>
+                <label class="flex items-center gap-2"><input type="checkbox" value="trending_up" class="c-combined_sources accent-cyan_neon"> Trending Up</label>
+                <label class="flex items-center gap-2"><input type="checkbox" value="trending_down" class="c-combined_sources accent-cyan_neon"> Trending Down</label>
+              </div>
+            </div>
+
+            <div id="manual_symbols_container" class="mt-4 space-y-2">
+              <label class="flex flex-col gap-1.5 text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">MANUAL SYMBOLS (Comma separated)
+                <textarea id="c-manual_symbols" rows="2" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon" placeholder="BTCUSDT, ETHUSDT"></textarea>
+              </label>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <label class="flex flex-col gap-1.5 text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">INCLUDE SYMBOLS (Comma separated)
+                <textarea id="c-include_symbols" rows="2" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon" placeholder="Always include these..."></textarea>
+              </label>
+              <label class="flex flex-col gap-1.5 text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">EXCLUDE SYMBOLS (Comma separated)
+                <textarea id="c-exclude_symbols" rows="2" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon" placeholder="Never include these..."></textarea>
+              </label>
+            </div>
+            
+            <div class="mt-4 border-t border-border_light pt-4">
+               <button type="button" class="px-5 py-2.5 bg-cyan_neon text-black font-bold text-[10px] tracking-[0.1em] uppercase shadow-[0_0_10px_rgba(34,211,238,0.2)] hover:brightness-110 rounded-sm" onclick="previewSymbols()">PREVIEW SCAN SYMBOLS</button>
+               <div id="preview_symbols_result" class="mt-4 max-h-[300px] overflow-y-auto"></div>
+            </div>
           </div>
 
           <!-- Sessions -->
@@ -298,6 +367,29 @@
 
           <!-- Risk & DCA -->
           <div class="m-panel grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-6" data-mpanel="risk">
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">ATR SL BUFFER (xATR)</label>
+              <input type="number" step="0.1" id="c-atr_buffer_multiplier" value="0.2" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors">
+              <div class="text-[9px] text-slate-500 font-normal normal-case">Extra buffer applied to SL using ATR value.</div>
+            <div class="col-span-1 md:col-span-2 mb-2 text-[11px] font-bold tracking-[0.15em] text-cyan_neon border-b border-border_light pb-3 uppercase flex items-center gap-2"><span class="opacity-70 text-[8px]">■</span> BINANCE FUTURES SETTINGS</div>
+            
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">DEFAULT LEVERAGE (X)</label>
+              <input type="number" id="c-default_leverage" value="10" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors">
+              <div class="text-[9px] text-slate-500 font-normal normal-case">Automatically sets leverage before trade entry.</div>
+            </div>
+
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">MARGIN TYPE</label>
+              <select id="c-margin_type" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2.5 rounded outline-none focus:border-cyan_neon transition-colors">
+                 <option value="ISOLATED">ISOLATED</option>
+                 <option value="CROSSED">CROSSED (CROSS)</option>
+              </select>
+              <div class="text-[9px] text-slate-500 font-normal normal-case">Account-level margin mode.</div>
+            </div>
+
+            <div class="col-span-1 md:col-span-2 mt-6 mb-2 text-[11px] font-bold tracking-[0.15em] text-cyan_neon border-b border-border_light pb-3 uppercase flex items-center gap-2"><span class="opacity-70 text-[8px]">■</span> STRATEGY SETTINGS</div>
+            
             <div class="flex flex-col gap-1.5">
               <label class="text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">ATR SL BUFFER (xATR)</label>
               <input type="number" step="0.1" id="c-atr_buffer_multiplier" value="0.2" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors">

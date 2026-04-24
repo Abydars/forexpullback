@@ -72,11 +72,11 @@ async def close_trade_binance(t: Trade):
     # Cancel SL/TP
     if t.sl_order_id:
         try:
-            await binance_client.order_cancel(t.symbol, order_id=t.sl_order_id)
+            await binance_client.algo_order_cancel(t.symbol, order_id=t.sl_order_id)
         except: pass
     if t.tp_order_id:
         try:
-            await binance_client.order_cancel(t.symbol, order_id=t.tp_order_id)
+            await binance_client.algo_order_cancel(t.symbol, order_id=t.tp_order_id)
         except: pass
 
     # Market close
@@ -120,26 +120,7 @@ async def monitor_loop():
                     "currency": "USDT"
                 })
             
-            # Normalize binance positions for broadcast matching old MT5 format
-            norm_positions = []
-            for p in positions:
-                sym = p['symbol']
-                qty = abs(float(p['positionAmt']))
-                side = 0 if p['positionSide'] == 'LONG' else 1
-                unrealized = float(p['unRealizedProfit'])
-                entry_price = float(p['entryPrice'])
-                mark_price = float(p['markPrice'])
-                
-                norm_positions.append({
-                    'symbol': sym,
-                    'type': side,
-                    'volume': qty,
-                    'price_open': entry_price,
-                    'price_current': mark_price,
-                    'profit': unrealized,
-                    'positionSide': p['positionSide']
-                })
-                
+
             cfg = await get_config()
             
             async with AsyncSessionLocal() as db:
@@ -150,11 +131,10 @@ async def monitor_loop():
                 for t in open_trades:
                     # Match with binance positions
                     found = False
-                    for np in norm_positions:
-                        if np['symbol'] == t.symbol and np['positionSide'] == t.position_side:
-                            bot_positions.append(np)
-                            found = True
-                            break
+                    p = next((x for x in positions if x['symbol'] == t.symbol and x['positionSide'] == t.position_side), None)
+                    if p:
+                        bot_positions.append(p)
+                        found = True
                             
                     if not found:
                         # Position closed
@@ -233,23 +213,30 @@ async def monitor_loop():
                         if new_sl:
                             try:
                                 if t.sl_order_id:
-                                    await binance_client.order_cancel(t.symbol, order_id=t.sl_order_id)
+                                    await binance_client.algo_order_cancel(t.symbol, order_id=t.sl_order_id)
                                     
                                 sl_side = 'SELL' if t.direction == 'bullish' else 'BUY'
                                 sl_req = {
+                                    'algoType': 'CONDITIONAL',
                                     'symbol': t.symbol,
                                     'side': sl_side,
                                     'positionSide': t.position_side,
                                     'type': 'STOP_MARKET',
-                                    'stopPrice': new_sl,
-                                    'closePosition': 'true',
-                                    'timeInForce': 'GTC'
+                                    'triggerPrice': new_sl,
+                                    'closePosition': 'TRUE'
                                 }
-                                nsl_res = await binance_client.order_send(sl_req)
-                                t.sl_order_id = str(nsl_res.get('orderId'))
+                                nsl_res = await binance_client.algo_order_send(sl_req)
+                                t.sl_order_id = str(nsl_res.get('algoId'))
                                 t.sl = new_sl
                             except Exception as e:
                                 print(f"Trailing SL update failed for {t.symbol}: {e}")
+                                
+                        # Calculate individual PNL
+                        if t.direction == 'bullish':
+                            t.pnl = (mark_price - t.entry_price) * t.quantity
+                        else:
+                            t.pnl = (t.entry_price - mark_price) * t.quantity
+                        t.current_price = mark_price
                 
                 # Basket logic
                 enable_basket = cfg.get("enable_basket_trailing", False)
@@ -289,15 +276,68 @@ async def monitor_loop():
                 else:
                     basket_state["active"] = False
                     basket_state["peak_pnl"] = 0.0
+
+
+                trade_updates = []
+            
+                # Map DB trades to symbol/side to track total volume tracked by bot
+                tracked_volumes = {}
+            
+                for t in open_trades:
+                    if t.closed_at: continue
+                    key = f"{t.symbol}_{t.position_side}"
+                    tracked_volumes[key] = tracked_volumes.get(key, 0.0) + t.quantity
+                
+                    trade_updates.append({
+                        "ticket": t.id,
+                        "symbol": t.symbol,
+                        "type": 0 if t.direction == 'bullish' else 1,
+                        "volume": t.quantity,
+                        "price_open": t.entry_price,
+                        "price_current": getattr(t, 'current_price', t.entry_price),
+                        "profit": getattr(t, 'pnl', 0.0),
+                        "sl": t.sl,
+                        "tp": t.tp
+                    })
+                
+                # Add untracked Binance positions (manual trades)
+                for p in positions:
+                    sym = p['symbol']
+                    side = p['positionSide']
+                    qty = abs(float(p['positionAmt']))
+                    if qty <= 0: continue
+                
+                    key = f"{sym}_{side}"
+                    untracked_qty = qty - tracked_volumes.get(key, 0.0)
+                
+                    # Buffer for floating point math
+                    if untracked_qty > 0.000001:
+                        entry_price = float(p['entryPrice'])
+                        mark_price = float(p['markPrice'])
+                        unrealized = float(p['unRealizedProfit'])
+                    
+                        # Estimate the untracked portion's PnL
+                        untracked_pnl = unrealized * (untracked_qty / qty)
+                    
+                        trade_updates.append({
+                            "ticket": f"ext_{sym}_{side}",
+                            "symbol": sym,
+                            "type": 0 if side == 'LONG' else 1,
+                            "volume": untracked_qty,
+                            "price_open": entry_price,
+                            "price_current": mark_price,
+                            "profit": untracked_pnl,
+                            "sl": None,
+                            "tp": None
+                        })
+
+                await broadcast({
+                    "type": "positions.update",
+                    "positions": trade_updates,
+                    "basket_state": basket_state
+                })
                 
                 await db.commit()
-
-            await broadcast({
-                "type": "positions.update",
-                "positions": norm_positions,
-                "basket_state": basket_state
-            })
-                
         except Exception as e:
             print("Monitor error:", e)
             

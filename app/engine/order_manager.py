@@ -108,29 +108,29 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
         # 2. SL Order
         sl_side = 'SELL' if bias == 'bullish' else 'BUY'
         sl_req = {
+            'algoType': 'CONDITIONAL',
             'symbol': resolved,
             'side': sl_side,
             'positionSide': position_side,
             'type': 'STOP_MARKET',
-            'stopPrice': resolver.round_price(resolved, sig.sl),
-            'closePosition': 'true',
-            'timeInForce': 'GTC'
+            'triggerPrice': resolver.round_price(resolved, sig.sl),
+            'closePosition': 'TRUE'
         }
-        sl_res = await binance_client.order_send(sl_req)
-        sl_order_id = str(sl_res.get('orderId'))
+        sl_res = await binance_client.algo_order_send(sl_req)
+        sl_order_id = str(sl_res.get('algoId'))
         
         # 3. TP Order
         tp_req = {
+            'algoType': 'CONDITIONAL',
             'symbol': resolved,
             'side': sl_side,
             'positionSide': position_side,
             'type': 'TAKE_PROFIT_MARKET',
-            'stopPrice': resolver.round_price(resolved, sig.tp),
-            'closePosition': 'true',
-            'timeInForce': 'GTC'
+            'triggerPrice': resolver.round_price(resolved, sig.tp),
+            'closePosition': 'TRUE'
         }
-        tp_res = await binance_client.order_send(tp_req)
-        tp_order_id = str(tp_res.get('orderId'))
+        tp_res = await binance_client.algo_order_send(tp_req)
+        tp_order_id = str(tp_res.get('algoId'))
         
         async with AsyncSessionLocal() as db:
             t = Trade(signal_id=sig.id, symbol=resolved, direction=bias,
@@ -167,25 +167,25 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
                         # Cancel old SL
                         if p.sl_order_id:
                             try:
-                                await binance_client.order_cancel(resolved, order_id=p.sl_order_id)
+                                await binance_client.algo_order_cancel(resolved, order_id=p.sl_order_id)
                             except:
                                 pass
                                 
                         # Cancel old TP
                         if p.tp_order_id:
                             try:
-                                await binance_client.order_cancel(resolved, order_id=p.tp_order_id)
+                                await binance_client.algo_order_cancel(resolved, order_id=p.tp_order_id)
                             except:
                                 pass
                         
                         # Place new SL/TP
                         try:
-                            nsl_res = await binance_client.order_send(sl_req)
-                            p.sl_order_id = str(nsl_res.get('orderId'))
+                            nsl_res = await binance_client.algo_order_send(sl_req)
+                            p.sl_order_id = str(nsl_res.get('algoId'))
                             p.sl = sig.sl
                             
-                            ntp_res = await binance_client.order_send(tp_req)
-                            p.tp_order_id = str(ntp_res.get('orderId'))
+                            ntp_res = await binance_client.algo_order_send(tp_req)
+                            p.tp_order_id = str(ntp_res.get('algoId'))
                             p.tp = sig.tp
                         except Exception as e:
                             print("Reanchor error:", e)

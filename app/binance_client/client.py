@@ -115,6 +115,10 @@ class BinanceClient:
             return None
         return self.symbols_cache.get(symbol)
         
+    async def get_24hr_tickers(self) -> list[dict]:
+        res = await self.request('GET', '/fapi/v1/ticker/24hr')
+        return res
+
     async def symbol_info_tick(self, symbol: str) -> dict:
         res = await self.request('GET', '/fapi/v1/ticker/bookTicker', params={'symbol': symbol})
         if isinstance(res, dict) and 'symbol' in res:
@@ -129,11 +133,22 @@ class BinanceClient:
         res = await self.request('POST', '/fapi/v1/order', signed=True, params=params)
         return res
 
+    async def algo_order_send(self, params: dict) -> dict:
+        res = await self.request('POST', '/fapi/v1/algoOrder', signed=True, params=params)
+        return res
+
     async def order_cancel(self, symbol: str, order_id: str = None, client_order_id: str = None) -> dict:
         params = {'symbol': symbol}
         if order_id: params['orderId'] = order_id
         if client_order_id: params['origClientOrderId'] = client_order_id
         res = await self.request('DELETE', '/fapi/v1/order', signed=True, params=params)
+        return res
+
+    async def algo_order_cancel(self, symbol: str, order_id: str = None, client_order_id: str = None) -> dict:
+        params = {'symbol': symbol}
+        if order_id: params['algoId'] = order_id # algo orders use algoId for cancellation
+        if client_order_id: params['clientAlgoId'] = client_order_id
+        res = await self.request('DELETE', '/fapi/v1/algoOrder', signed=True, params=params)
         return res
         
     async def cancel_all_orders(self, symbol: str) -> dict:

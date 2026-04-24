@@ -10,9 +10,13 @@ class SymbolResolver:
             await self.client._fetch_exchange_info()
             
     def resolve(self, generic: str) -> str:
-        # Generic could be "BTCUSDT" or "ETHUSDT"
-        # Binance symbol format is usually the same
-        return generic.upper()
+        g = generic.upper().strip()
+        if self.client.symbols_cache and g not in self.client.symbols_cache:
+            return None
+        return g
+        
+    def resolve_many(self, generics: list) -> dict:
+        return {g: self.resolve(g) for g in generics}
         
     def round_price(self, symbol: str, price: float) -> float:
         info = self.client.symbol_info(symbol)

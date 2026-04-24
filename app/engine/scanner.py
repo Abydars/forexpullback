@@ -61,7 +61,8 @@ async def scan_loop():
                 
             await symbol_resolver.refresh()
                 
-            symbols = cfg.get("symbols", [])
+            from app.engine.symbol_universe import symbol_universe
+            symbols = await symbol_universe.get_symbols(cfg)
             
             max_signals_per_scan = int(cfg.get("max_signals_per_scan", 1))
             max_open = int(cfg.get("max_open_positions", 5))

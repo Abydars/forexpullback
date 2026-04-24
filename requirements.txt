@@ -3,6 +3,7 @@ uvicorn[standard]
 httpx
 sqlalchemy
 aiosqlite
+greenlet
 cryptography
 pandas
 numpy

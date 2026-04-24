@@ -63,7 +63,28 @@ function handleEvent(msg) {
         break;
     case 'log.event':       state.events.unshift(msg); renderLogs(); break;
     case 'engine.status':   state.engine_running = msg.state === 'active'; renderEngineBtn(); break;
+    case 'symbols.dynamic_update': renderDynamicSymbols(msg.data); break;
   }
+}
+
+function renderDynamicSymbols(data) {
+  const { symbols, source_mode, updated_at, metadata } = data;
+  document.getElementById('scan-universe-meta').innerText = `Mode: ${source_mode.toUpperCase()} (Refreshed ${new Date(updated_at).toLocaleTimeString()})`;
+  document.getElementById('scan-universe-chips').innerHTML = symbols.map(s => {
+    let html = `<span class="px-2 py-1 bg-black/20 border border-border_strong rounded flex items-center gap-2">`;
+    html += `<span class="font-bold text-slate-200">${s}</span>`;
+    const m = metadata && metadata[s];
+    if (m) {
+        if (m.reason === 'manual_include') {
+           html += `<span class="text-[8px] text-cyan-500 uppercase">INCLUDED</span>`;
+        } else {
+           const dir = m.priceChangePercent >= 0 ? 'text-emerald-400' : 'text-rose-400';
+           html += `<span class="${dir}">${m.priceChangePercent > 0 ? '+' : ''}${m.priceChangePercent.toFixed(1)}%</span>`;
+        }
+    }
+    html += `</span>`;
+    return html;
+  }).join('');
 }
 
 function replaceTrade(trade) {
@@ -515,6 +536,9 @@ async function loadConfig() {
     document.getElementById('c-signal_cooldown_minutes').value = cfg.signal_cooldown_minutes || 30;
     document.getElementById('c-reward_ratio').value = cfg.reward_ratio || 2.0;
     document.getElementById('c-dashboard_password').value = cfg.dashboard_password || 'admin';
+    
+    document.getElementById('c-default_leverage').value = cfg.default_leverage || 10;
+    document.getElementById('c-margin_type').value = cfg.margin_type || 'ISOLATED';
 
     document.getElementById('c-atr_buffer_multiplier').value = cfg.atr_buffer_multiplier || 0.2;
     document.getElementById('c-use_liquidity_tp').checked = cfg.use_liquidity_tp !== false;
@@ -534,9 +558,21 @@ async function loadConfig() {
     document.getElementById('c-basket_trailing_drawdown_usd').value = cfg.basket_trailing_drawdown_usd || 1.5;
     document.getElementById('c-basket_trailing_min_close_usd').value = cfg.basket_trailing_min_close_usd || 5.0;
     
-    state.symbols = (cfg.symbols || []).map(s => ({generic: s, resolved: null, status: 'pending'}));
-    renderChips();
-    resolveAllSymbols();
+    document.getElementById('c-symbol_source_mode').value = cfg.symbol_source_mode || 'manual';
+    document.getElementById('c-manual_symbols').value = (cfg.manual_symbols || ['BTCUSDT', 'ETHUSDT']).join(', ');
+    document.getElementById('c-dynamic_symbol_limit').value = cfg.dynamic_symbol_limit || 10;
+    document.getElementById('c-min_24h_quote_volume_usdt').value = cfg.min_24h_quote_volume_usdt || 50000000;
+    document.getElementById('c-exclude_symbols').value = (cfg.exclude_symbols || []).join(', ');
+    document.getElementById('c-include_symbols').value = (cfg.include_symbols || []).join(', ');
+    document.getElementById('c-use_only_usdt_perpetuals').checked = cfg.use_only_usdt_perpetuals !== false;
+    document.getElementById('c-refresh_dynamic_symbols_minutes').value = cfg.refresh_dynamic_symbols_minutes || 15;
+    
+    const combined = cfg.combined_sources || ["top_movers_24h", "top_volume_24h"];
+    document.querySelectorAll('.c-combined_sources').forEach(cb => {
+      cb.checked = combined.includes(cb.value);
+    });
+    
+    toggleSymbolMode();
     
     const sessions = await api('GET', '/api/sessions');
     state.sessions = sessions;
@@ -548,43 +584,40 @@ async function loadConfig() {
 function openConfigModal() { loadConfig(); document.getElementById('config-modal').showModal(); }
 function closeConfigModal() { document.getElementById('config-modal').close(); }
 
-// Symbols chips
-function addSymbols() {
-  const raw = document.getElementById('sym-input').value;
-  const parts = raw.split(/[,\n]/).map(s => s.trim().toUpperCase()).filter(Boolean);
-  parts.forEach(p => {
-    if (!state.symbols.find(s => s.generic === p))
-      state.symbols.push({generic: p, resolved: null, status: 'pending'});
-  });
-  document.getElementById('sym-input').value = '';
-  renderChips();
-  resolveAllSymbols();
+function toggleSymbolMode() {
+  const mode = document.getElementById('c-symbol_source_mode').value;
+  document.getElementById('manual_symbols_container').style.display = (mode === 'manual') ? 'block' : 'none';
+  document.getElementById('combined_sources_container').style.display = (mode === 'combined') ? 'block' : 'none';
 }
 
-async function resolveAllSymbols() {
-  const generics = state.symbols.map(s => s.generic);
-  if (!generics.length) return;
+async function previewSymbols() {
+  const cfg = collectConfigInputs();
+  const res = document.getElementById('preview_symbols_result');
+  res.innerHTML = '<div class="text-[10px] text-slate-400">Loading...</div>';
   try {
-    const { map } = await api('POST', '/api/symbols/resolve', { generics });
-    state.symbols = state.symbols.map(s => ({
-      ...s, resolved: map[s.generic], status: map[s.generic] ? 'resolved' : 'unresolved'
-    }));
-    renderChips();
-  } catch(err) { console.error(err); }
-}
-
-function renderChips() {
-  document.getElementById('sym-chips').innerHTML = state.symbols.map(s => `
-    <span class="flex items-center gap-2 px-3 py-1 rounded bg-panel border ${s.status === 'resolved' ? 'border-emerald-500/30 text-emerald-400' : s.status === 'pending' ? 'border-amber-500/30 text-amber-400' : 'border-rose-500/30 text-rose-400'} text-xs font-mono">
-      ${s.generic}${s.resolved ? ' → ' + s.resolved + ' ✓' : ' ✗'}
-      <span class="cursor-pointer text-slate-500 hover:text-white px-1" onclick="removeSymbol('${s.generic}')">×</span>
-    </span>
-  `).join('');
-}
-
-function removeSymbol(generic) {
-  state.symbols = state.symbols.filter(s => s.generic !== generic);
-  renderChips();
+    const data = await api('POST', '/api/symbols/preview', cfg);
+    res.innerHTML = `
+      <table class="w-full text-left text-[10px] font-mono mt-2">
+        <thead class="text-cyan_neon uppercase border-b border-border_strong">
+          <tr><th>Symbol</th><th>24h %</th><th>Vol (USDT)</th><th>Range %</th><th>Score</th><th>Reason</th></tr>
+        </thead>
+        <tbody class="divide-y divide-border_strong/50 text-slate-300">
+          ${data.map(t => `
+            <tr>
+              <td class="py-1">${t.symbol}</td>
+              <td class="py-1 ${t.priceChangePercent > 0 ? 'text-emerald-400' : 'text-rose-400'}">${t.priceChangePercent.toFixed(2)}%</td>
+              <td class="py-1">${(t.quoteVolume / 1000000).toFixed(1)}M</td>
+              <td class="py-1">${t.range_pct.toFixed(2)}%</td>
+              <td class="py-1">${t.rank_score.toFixed(1)}</td>
+              <td class="py-1 text-slate-500">${t.reason || ''}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  } catch (err) {
+    res.innerHTML = '<div class="text-[10px] text-rose-500">Error loading preview</div>';
+  }
 }
 
 // Sessions repeater
@@ -636,6 +669,8 @@ function collectConfigInputs() {
     signal_cooldown_minutes: parseInt(document.getElementById('c-signal_cooldown_minutes').value),
     reward_ratio: parseFloat(document.getElementById('c-reward_ratio').value),
     dashboard_password: document.getElementById('c-dashboard_password').value,
+    default_leverage: parseInt(document.getElementById('c-default_leverage').value),
+    margin_type: document.getElementById('c-margin_type').value,
     atr_buffer_multiplier: parseFloat(document.getElementById('c-atr_buffer_multiplier').value),
     use_liquidity_tp: document.getElementById('c-use_liquidity_tp').checked,
     breakeven_trigger_r: parseFloat(document.getElementById('c-breakeven_trigger_r').value),
@@ -651,6 +686,16 @@ function collectConfigInputs() {
     basket_trailing_start_usd: parseFloat(document.getElementById('c-basket_trailing_start_usd').value),
     basket_trailing_drawdown_usd: parseFloat(document.getElementById('c-basket_trailing_drawdown_usd').value),
     basket_trailing_min_close_usd: parseFloat(document.getElementById('c-basket_trailing_min_close_usd').value),
+    
+    symbol_source_mode: document.getElementById('c-symbol_source_mode').value,
+    manual_symbols: document.getElementById('c-manual_symbols').value.split(',').map(s=>s.trim()).filter(Boolean),
+    dynamic_symbol_limit: parseInt(document.getElementById('c-dynamic_symbol_limit').value),
+    min_24h_quote_volume_usdt: parseFloat(document.getElementById('c-min_24h_quote_volume_usdt').value),
+    exclude_symbols: document.getElementById('c-exclude_symbols').value.split(',').map(s=>s.trim()).filter(Boolean),
+    include_symbols: document.getElementById('c-include_symbols').value.split(',').map(s=>s.trim()).filter(Boolean),
+    use_only_usdt_perpetuals: document.getElementById('c-use_only_usdt_perpetuals').checked,
+    refresh_dynamic_symbols_minutes: parseInt(document.getElementById('c-refresh_dynamic_symbols_minutes').value),
+    combined_sources: Array.from(document.querySelectorAll('.c-combined_sources:checked')).map(cb => cb.value),
   };
 }
 
@@ -678,7 +723,6 @@ async function syncSessions() {
 
 async function saveConfig() {
   await api('PATCH', '/api/config', collectConfigInputs());
-  await api('PATCH', '/api/config', { symbols: state.symbols.filter(s => s.status !== 'unresolved').map(s => s.generic) });
   await syncSessions();
   closeConfigModal();
 }
@@ -704,6 +748,10 @@ async function init() {
       state.today_pnl = state.closed_trades
         .filter(t => t.closed_at && t.closed_at.startsWith(todayStr))
         .reduce((sum, t) => sum + (t.pnl || 0), 0);
+        
+      if (initData.current_universe && initData.current_universe.symbols && initData.current_universe.symbols.length > 0) {
+        renderDynamicSymbols(initData.current_universe);
+      }
     }
   } catch (err) { console.error("Init Error:", err); }
   
