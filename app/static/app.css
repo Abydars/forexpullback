@@ -134,12 +134,12 @@ dialog::backdrop { background: rgba(0,0,0,0.7); }
 }
 
 label { 
-  display: flex; flex-direction: row; justify-content: space-between; align-items: center; 
+  display: grid; grid-template-columns: 1fr 140px; gap: 12px; align-items: center; 
   font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; 
 }
 input, select {
   background: var(--bg); border: 1px solid var(--border-strong); color: var(--text);
-  padding: 6px 8px; font: inherit; font-size: 11px; width: 180px;
+  padding: 6px 8px; font: inherit; font-size: 11px; width: 100%; box-sizing: border-box;
 }
 input[type="checkbox"] { width: auto; }
 input:focus, select:focus { outline: none; border-color: var(--cyan); }
@@ -178,8 +178,9 @@ input:focus, select:focus { outline: none; border-color: var(--cyan); }
   .grid-2 { grid-template-columns: 1fr; }
   .form-grid { grid-template-columns: 1fr; }
   
-  dialog { min-width: 90vw; width: 90vw; }
-  .modal-body.wide { min-width: 100%; }
+  dialog { min-width: 95vw; width: 95vw; max-width: 95vw; box-sizing: border-box; }
+  .modal-body.wide { min-width: 100%; max-width: 100%; box-sizing: border-box; }
+  label { grid-template-columns: 1fr; gap: 6px; align-items: stretch; }
   input, select { width: 100%; max-width: 100%; }
   
   .session-row { 

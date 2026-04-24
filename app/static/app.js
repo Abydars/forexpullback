@@ -349,6 +349,7 @@ async function loadConfig() {
     
     document.getElementById('c-enable_dca').checked = cfg.enable_dca === true;
     document.getElementById('c-max_dca_entries').value = cfg.max_dca_entries || 1;
+    document.getElementById('c-max_dca_per_scan').value = cfg.max_dca_per_scan || 2;
     document.getElementById('c-dca_trigger_sl_progress').value = cfg.dca_trigger_sl_progress || 0.5;
     document.getElementById('c-dca_lot_multiplier').value = cfg.dca_lot_multiplier || 0.7;
     document.getElementById('c-dca_max_total_risk_r').value = cfg.dca_max_total_risk_r || 2.0;
@@ -444,6 +445,7 @@ function collectConfigInputs() {
     trailing: document.getElementById('c-trailing').checked,
     enable_dca: document.getElementById('c-enable_dca').checked,
     max_dca_entries: parseInt(document.getElementById('c-max_dca_entries').value),
+    max_dca_per_scan: parseInt(document.getElementById('c-max_dca_per_scan').value),
     dca_trigger_sl_progress: parseFloat(document.getElementById('c-dca_trigger_sl_progress').value),
     dca_lot_multiplier: parseFloat(document.getElementById('c-dca_lot_multiplier').value),
     dca_max_total_risk_r: parseFloat(document.getElementById('c-dca_max_total_risk_r').value),
