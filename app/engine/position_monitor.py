@@ -131,7 +131,6 @@ async def monitor_loop():
                             t.closed_at = datetime.now(pytz.utc)
                             retry_counts.pop(t.ticket, None)
                             
-                        await db.commit()
                         
                         await broadcast({
                             "type": "trade.closed",
@@ -151,7 +150,6 @@ async def monitor_loop():
                                 from app.db.models import Event
                                 e = Event(level="INFO", component="smart_tp", message=f"Closed {t.ticket} ({t.symbol}): {exit_reason} at +${p['profit']:.2f}")
                                 db.add(e)
-                                await db.commit()
                                 await broadcast({"type": "log.event", "level": "INFO", "component": "smart_tp", "message": e.message, "created_at": datetime.now(pytz.utc).isoformat()})
                                 continue
                                 
@@ -227,7 +225,8 @@ async def monitor_loop():
                             res_sl = await mt5_client.order_send(req)
                             if res_sl and res_sl.get('retcode') == mt5.TRADE_RETCODE_DONE:
                                 t.sl = new_sl
-                                await db.commit()
+                                
+                await db.commit()
         except Exception as e:
             print("Monitor error:", e)
             

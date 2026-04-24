@@ -411,8 +411,8 @@ async def scan_loop():
                             }
                         })
                         
-                    from app.engine.order_manager import send_order
-                    await send_order(sig, res, bias, c["cfg"], is_dca=is_dca, dca_data=ltf_trigger if is_dca else None)
+                        from app.engine.order_manager import send_order
+                        await send_order(sig, res, bias, c["cfg"], is_dca=is_dca, dca_data=ltf_trigger if is_dca else None)
                 else:
                     is_dca = c.get("is_dca", False)
                     status = "DCA_SKIPPED" if is_dca else "SKIPPED"

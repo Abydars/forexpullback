@@ -198,8 +198,7 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
                             if db_trade:
                                 db_trade.sl = new_sl
                                 db_trade.tp = new_tp
-                    await db.commit()
-                
+                    
                 await broadcast({
                     "type": "trade.opened",
                     "trade": {
@@ -208,6 +207,8 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
                         "pnl": 0.0, "opened_at": t.opened_at.isoformat()
                     }
                 })
+                
+                await db.commit()
         else:
             async with AsyncSessionLocal() as db:
                 err_msg = f"Order rejected (Retcode {res.get('retcode')}): {res.get('comment', 'Unknown')}"
