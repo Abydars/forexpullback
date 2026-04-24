@@ -63,6 +63,9 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
                 await broadcast({"type": "log.event", "level": "WARN", "component": "order_manager", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
             return
             
+        from app.engine.fee_utils import get_active_fee_rate, estimate_round_trip_fee
+        fee_rate = get_active_fee_rate(cfg)
+        
         risk_pct = float(cfg.get("risk_percent", 1.0))
         risk_amount = balance * risk_pct / 100
         
@@ -70,7 +73,11 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
             qty = dca_data.get('dca_lot', 0)
         else:
             if sl_distance > 0:
-                qty = risk_amount / sl_distance
+                if str(cfg.get("include_fees_in_risk", "True")).lower() == "true":
+                    total_risk_per_qty = sl_distance + (actual_price * fee_rate) + (sig.sl * fee_rate)
+                    qty = risk_amount / total_risk_per_qty
+                else:
+                    qty = risk_amount / sl_distance
             else:
                 qty = 0
             
@@ -78,6 +85,29 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
         
         if qty <= 0:
             return
+            
+        if not is_dca and sig.tp:
+            gross_reward = abs(sig.tp - actual_price) * qty
+            estimated_fees = estimate_round_trip_fee(actual_price, sig.tp, qty, fee_rate)
+            
+            if str(cfg.get("include_fees_in_tp", "True")).lower() == "true" and gross_reward <= estimated_fees:
+                async with AsyncSessionLocal() as db:
+                    err_msg = f"Order {resolved} rejected: TP gross reward ${gross_reward:.2f} does not cover estimated fees ${estimated_fees:.2f}"
+                    e = Event(level="WARN", component="order_manager", message=err_msg)
+                    db.add(e)
+                    await db.commit()
+                    await broadcast({"type": "log.event", "level": "WARN", "component": "order_manager", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+                return
+            
+            min_net_reward_usd = float(cfg.get("min_net_reward_usd", 0))
+            net_reward = gross_reward - estimated_fees
+            if min_net_reward_usd > 0 and net_reward < min_net_reward_usd:
+                async with AsyncSessionLocal() as db:
+                    err_msg = f"Order {resolved} rejected: TP net reward ${net_reward:.2f} < min ${min_net_reward_usd:.2f}"
+                    e = Event(level="WARN", component="order_manager", message=err_msg)
+                    db.add(e)
+                    await db.commit()
+                return
             
         # Optional: set leverage
         default_leverage = int(cfg.get("default_leverage", 10))
@@ -229,7 +259,7 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
             })
 
     except Exception as e:
-        print("Order manager error:", e)
+        import traceback; traceback.print_exc()
         err_msg = f"Order exception: {str(e)}"
         try:
             async with AsyncSessionLocal() as db:

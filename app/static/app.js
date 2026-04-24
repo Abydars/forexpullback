@@ -326,7 +326,7 @@ function renderTrades() {
           <td class="px-5 py-3 text-right font-mono text-slate-400">${t.sl || '-'}</td>
           <td class="px-5 py-3 text-right font-mono text-slate-400">${t.tp || '-'}</td>
           <td class="px-5 py-3 text-right font-mono text-slate-300">${t.exit_price || '-'}</td>
-          <td class="px-5 py-3 text-right font-mono font-bold ${t.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${t.pnl >= 0 ? '+' : '-'}$${Math.abs(t.pnl || 0).toFixed(2)}</td>
+          <td class="px-5 py-3 text-right font-mono font-bold ${t.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}" title="Commission: $${(t.commission || 0).toFixed(4)}">${t.pnl >= 0 ? '+' : '-'}$${Math.abs(t.pnl || 0).toFixed(2)}</td>
           <td class="px-5 py-3 text-slate-400">${t.note || '-'}</td>
           <td class="px-5 py-3 text-right"></td>
         </tr>

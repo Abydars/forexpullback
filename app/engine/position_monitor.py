@@ -106,9 +106,11 @@ async def background_reconcile_trade(trade_id: int, symbol: str, default_entry: 
                 async with AsyncSessionLocal() as db:
                     t = await db.get(Trade, trade_id)
                     if t:
-                        t.pnl = float(inc_res[-1].get('income', 0))
+                        realized_pnl = float(inc_res[-1].get('income', 0))
+                        commission = float(trade_res[-1].get('commission', 0))
+                        t.commission = abs(commission)
+                        t.pnl = realized_pnl + commission # Binance commission is negative, so adding it subtracts the fee
                         t.exit_price = float(trade_res[-1].get('price', default_entry))
-                        t.commission = float(trade_res[-1].get('commission', 0))
                         t.note = "RECONCILED"
                         await db.commit()
                         await db.refresh(t)
@@ -171,6 +173,8 @@ async def monitor_loop():
             
 
             cfg = await get_config()
+            from app.engine.fee_utils import get_active_fee_rate, estimate_net_pnl
+            fee_rate = get_active_fee_rate(cfg)
             
             async with AsyncSessionLocal() as db:
                 result = await db.execute(select(Trade).where(Trade.closed_at == None))
@@ -212,12 +216,16 @@ async def monitor_loop():
                         
                         exit_reason = await evaluate_smart_exit(p, t, t.symbol)
                         if exit_reason:
-                            success = await close_trade_binance(t)
-                            if success:
-                                e = Event(level="INFO", component="smart_tp", message=f"Closed {t.symbol}: {exit_reason} at +${unrealized:.2f}")
-                                db.add(e)
-                                await broadcast({"type": "log.event", "level": "INFO", "component": "smart_tp", "message": e.message, "created_at": datetime.now(pytz.utc).isoformat()})
-                                continue
+                            net_pnl_est = estimate_net_pnl(t.direction, t.entry_price, mark_price, t.quantity, fee_rate)
+                            if net_pnl_est <= 0:
+                                pass # Skip smart TP if net negative
+                            else:
+                                success = await close_trade_binance(t)
+                                if success:
+                                    e = Event(level="INFO", component="smart_tp", message=f"Closed {t.symbol}: {exit_reason} at net +${net_pnl_est:.2f}")
+                                    db.add(e)
+                                    await broadcast({"type": "log.event", "level": "INFO", "component": "smart_tp", "message": e.message, "created_at": datetime.now(pytz.utc).isoformat()})
+                                    continue
                                 
                         current_dist = mark_price - t.entry_price if t.direction == 'bullish' else t.entry_price - mark_price
                         tp_dist = abs(t.tp - t.entry_price) if t.tp else 0
@@ -229,7 +237,8 @@ async def monitor_loop():
                             estimated_risk = tp_dist / reward_ratio
                             
                             if be_r > 0 and estimated_risk > 0 and current_dist >= (estimated_risk * be_r):
-                                be_buffer = t.entry_price * 0.001 # rough fee buffer
+                                breakeven_extra_buffer_rate = float(cfg.get("breakeven_extra_buffer_rate", 0.0001))
+                                be_buffer = t.entry_price * (fee_rate * 2 + breakeven_extra_buffer_rate)
                                 if t.direction == 'bullish':
                                     be_price = t.entry_price + be_buffer
                                     if not t.sl or t.sl < be_price:
@@ -294,34 +303,40 @@ async def monitor_loop():
                 # Basket logic
                 enable_basket = cfg.get("enable_basket_trailing", False)
                 if enable_basket and len(bot_positions) > 0:
-                    total_unrealized_pnl = sum(float(p.get('unRealizedProfit', 0)) for p in bot_positions)
+                    basket_gross_unrealized = sum(float(p['unRealizedProfit']) for p in bot_positions)
+                    if str(cfg.get("include_fees_in_basket_pnl", "True")).lower() == "true":
+                        estimated_entry_fees = sum(t.entry_price * t.quantity * fee_rate for t in open_trades if t.symbol in [p['symbol'] for p in bot_positions])
+                        basket_net_pnl = basket_gross_unrealized - estimated_entry_fees
+                    else:
+                        basket_net_pnl = basket_gross_unrealized
+
                     start_usd = float(cfg.get("basket_trailing_start_usd", 5.0))
                     drawdown_usd = float(cfg.get("basket_trailing_drawdown_usd", 1.5))
                     min_close_usd = float(cfg.get("basket_trailing_min_close_usd", 5.0))
                     
-                    if total_unrealized_pnl >= start_usd:
+                    if basket_net_pnl >= start_usd:
                         if not basket_state["active"]:
                             basket_state["active"] = True
-                            basket_state["peak_pnl"] = total_unrealized_pnl
-                            msg = f"Basket trailing activated at +${total_unrealized_pnl:.2f}"
+                            basket_state["peak_pnl"] = basket_net_pnl
+                            msg = f"Basket trailing activated at net +${basket_net_pnl:.2f}"
                             db.add(Event(level="INFO", component="basket", message=msg))
                             await broadcast({"type": "log.event", "level": "INFO", "component": "basket", "message": msg, "created_at": datetime.now(pytz.utc).isoformat()})
                         else:
-                            if total_unrealized_pnl > basket_state["peak_pnl"]:
-                                basket_state["peak_pnl"] = total_unrealized_pnl
+                            if basket_net_pnl > basket_state["peak_pnl"]:
+                                basket_state["peak_pnl"] = basket_net_pnl
                     
                     if basket_state["active"]:
-                        if total_unrealized_pnl < min_close_usd:
-                            msg = f"Basket trailing reset: PnL dropped below minimum close profit (Peak was +${basket_state['peak_pnl']:.2f})"
+                        if basket_net_pnl < min_close_usd:
+                            msg = f"Basket trailing reset: Net PnL dropped below minimum close profit (Peak was +${basket_state['peak_pnl']:.2f})"
                             basket_state["active"] = False
                             basket_state["peak_pnl"] = 0.0
                             db.add(Event(level="INFO", component="basket", message=msg))
                             await broadcast({"type": "log.event", "level": "INFO", "component": "basket", "message": msg, "created_at": datetime.now(pytz.utc).isoformat()})
-                        elif basket_state["peak_pnl"] - total_unrealized_pnl >= drawdown_usd:
+                        elif basket_state["peak_pnl"] - basket_net_pnl >= drawdown_usd:
                             for t in open_trades:
                                 await close_trade_binance(t)
                                 
-                            msg = f"Basket trailing close: secured +${total_unrealized_pnl:.2f} minimum basket profit (Peak: +${basket_state['peak_pnl']:.2f})"
+                            msg = f"Basket trailing close: secured net +${basket_net_pnl:.2f} minimum basket profit (Peak: +${basket_state['peak_pnl']:.2f})"
                             db.add(Event(level="INFO", component="basket", message=msg))
                             await broadcast({"type": "log.event", "level": "INFO", "component": "basket", "message": msg, "created_at": datetime.now(pytz.utc).isoformat()})
                             basket_state["active"] = False

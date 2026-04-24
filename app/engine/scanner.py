@@ -286,9 +286,16 @@ async def scan_loop():
                                                         dca_reanchor_sl = cfg.get("dca_reanchor_sl", True)
                                                         new_sl = ltf_trigger['sl'] if dca_reanchor_sl else base_sl
                                                         
+                                                        from app.engine.fee_utils import get_active_fee_rate, estimate_round_trip_fee
+                                                        fee_rate = get_active_fee_rate(cfg)
+                                                        include_fees = str(cfg.get("include_fees_in_risk", "True")).lower() == "true"
+                                                        
                                                         def _calc_risk(qty, open_price, sl_price):
                                                             if not open_price or not sl_price or open_price == sl_price: return 0
-                                                            return abs(open_price - sl_price) * qty
+                                                            risk = abs(open_price - sl_price) * qty
+                                                            if include_fees:
+                                                                risk += estimate_round_trip_fee(open_price, sl_price, qty, fee_rate)
+                                                            return risk
                                                         
                                                         base_1r_risk = _calc_risk(original_qty, base_entry, base_sl)
                                                         if base_1r_risk == 0: base_1r_risk = 1.0
