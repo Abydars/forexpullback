@@ -154,45 +154,58 @@ async def monitor_loop():
                                 await broadcast({"type": "log.event", "level": "INFO", "component": "smart_tp", "message": e.message, "created_at": datetime.now(pytz.utc).isoformat()})
                                 continue
                                 
-                        # Trailing Stop (Starts at 70% of TP)
                         cfg = await get_config()
-                        if cfg.get("trailing", True) and t.tp:
-                            tp_dist = abs(t.tp - t.entry_price)
-                            current_dist = p['price_current'] - t.entry_price if p['type'] == mt5.ORDER_TYPE_BUY else t.entry_price - p['price_current']
+                        current_dist = p['price_current'] - t.entry_price if p['type'] == mt5.ORDER_TYPE_BUY else t.entry_price - p['price_current']
+                        tp_dist = abs(t.tp - t.entry_price) if t.tp else 0
+                        
+                        info = mt5.symbol_info(t.symbol)
+                        digits = info.digits if info else 5
+                        new_sl = None
+                        
+                        if tp_dist > 0:
+                            # 1. Breakeven Logic
+                            be_r = float(cfg.get("breakeven_trigger_r", 1.0))
+                            reward_ratio = float(cfg.get("reward_ratio", 2.0))
+                            estimated_risk = tp_dist / reward_ratio
                             
-                            if tp_dist > 0 and current_dist >= (tp_dist * 0.7):
-                                info = mt5.symbol_info(t.symbol)
+                            if be_r > 0 and estimated_risk > 0 and current_dist >= (estimated_risk * be_r):
+                                if p['type'] == mt5.ORDER_TYPE_BUY:
+                                    if not t.sl or t.sl < t.entry_price:
+                                        new_sl = t.entry_price
+                                else:
+                                    if not t.sl or t.sl > t.entry_price:
+                                        new_sl = t.entry_price
+                            
+                            # 2. Trailing Stop (Starts at 70% of TP)
+                            if cfg.get("trailing", True) and current_dist >= (tp_dist * 0.7):
                                 if info:
                                     # Fetch recent ATR for volatility-aware trailing distance
                                     df_trail = await mt5_client.get_rates(t.symbol, mt5.TIMEFRAME_M15, 14)
-                                    new_sl = None
                                     if not df_trail.empty:
                                         atr_trail = (df_trail['high'] - df_trail['low']).mean()
-                                        # Use 1.5 ATR for trailing distance
                                         dist_points = atr_trail * 1.5
-                                        digits = info.digits
                                         
                                         if p['type'] == mt5.ORDER_TYPE_BUY:
                                             pot_sl = p['price_current'] - dist_points
-                                            if pot_sl > t.entry_price and (not t.sl or pot_sl > t.sl):
+                                            if pot_sl > t.entry_price and (not t.sl or pot_sl > t.sl) and (not new_sl or pot_sl > new_sl):
                                                 new_sl = round(pot_sl, digits)
                                         else:
                                             pot_sl = p['price_current'] + dist_points
-                                            if pot_sl < t.entry_price and (not t.sl or pot_sl < t.sl):
+                                            if pot_sl < t.entry_price and (not t.sl or pot_sl < t.sl) and (not new_sl or pot_sl < new_sl):
                                                 new_sl = round(pot_sl, digits)
                                             
-                                    if new_sl:
-                                        req = {
-                                            "action": mt5.TRADE_ACTION_SLTP,
-                                            "position": t.ticket,
-                                            "symbol": t.symbol,
-                                            "sl": new_sl,
-                                            "tp": t.tp
-                                        }
-                                        res_sl = await mt5_client.order_send(req)
-                                        if res_sl and res_sl.get('retcode') == mt5.TRADE_RETCODE_DONE:
-                                            t.sl = new_sl
-                                            await db.commit()
+                        if new_sl:
+                            req = {
+                                "action": mt5.TRADE_ACTION_SLTP,
+                                "position": t.ticket,
+                                "symbol": t.symbol,
+                                "sl": new_sl,
+                                "tp": t.tp
+                            }
+                            res_sl = await mt5_client.order_send(req)
+                            if res_sl and res_sl.get('retcode') == mt5.TRADE_RETCODE_DONE:
+                                t.sl = new_sl
+                                await db.commit()
         except Exception as e:
             print("Monitor error:", e)
             
