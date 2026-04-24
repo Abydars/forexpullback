@@ -241,7 +241,26 @@ async def scan_loop():
                                                     else:
                                                         progress = (current_price - base_entry) / (base_sl - base_entry) if base_entry != base_sl else 0
                                                         
-                                                    dca_count = len(same_dir_db) - 1
+                                                    # Infer DCA count directly from Binance volume mathematically
+                                                    binance_qty = abs(float(binance_pos['positionAmt']))
+                                                    base_qty = base_trade.quantity
+                                                    dca_lot_multiplier = float(cfg.get("dca_lot_multiplier", 0.7))
+                                                    
+                                                    expected_dca_lot = base_qty * dca_lot_multiplier
+                                                    lot_filter = next((f for f in info['filters'] if f['filterType'] == 'LOT_SIZE'), None)
+                                                    if lot_filter:
+                                                        if expected_dca_lot < float(lot_filter['minQty']): expected_dca_lot = float(lot_filter['minQty'])
+                                                        if expected_dca_lot > float(lot_filter['maxQty']): expected_dca_lot = float(lot_filter['maxQty'])
+                                                    expected_dca_lot = symbol_resolver.round_qty(resolved, expected_dca_lot)
+                                                    
+                                                    db_dca_count = len(same_dir_db) - 1
+                                                    if expected_dca_lot > 0:
+                                                        extra_qty = round(binance_qty - base_qty, 6)
+                                                        inferred_dca_count = max(0, round(extra_qty / expected_dca_lot))
+                                                        # Fallback to DB if manual intervention warped the volume
+                                                        dca_count = inferred_dca_count if abs(extra_qty - inferred_dca_count * expected_dca_lot) < expected_dca_lot * 0.1 else db_dca_count
+                                                    else:
+                                                        dca_count = db_dca_count
                                                     
                                                     if dca_count >= max_dca_entries:
                                                         status = "DCA_SKIPPED"
