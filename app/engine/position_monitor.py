@@ -171,7 +171,15 @@ async def monitor_loop():
                             if be_r > 0 and estimated_risk > 0 and current_dist >= (estimated_risk * be_r):
                                 tick = mt5.symbol_info_tick(t.symbol)
                                 spread_buffer = (tick.ask - tick.bid) if tick else (info.point * 15)
-                                commission_buffer = info.point * 5  # 0.5 pips extra
+                                
+                                if "JPY" in t.symbol:
+                                    pip_size = 0.01
+                                elif digits in [3, 5]:
+                                    pip_size = info.point * 10
+                                else:
+                                    pip_size = info.point
+                                    
+                                commission_buffer = pip_size * 0.5
                                 be_buffer = spread_buffer + commission_buffer
                                 
                                 if p['type'] == mt5.ORDER_TYPE_BUY:
