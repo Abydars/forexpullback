@@ -165,13 +165,13 @@ async def monitor_loop():
                                 if info:
                                     # Fetch recent ATR for volatility-aware trailing distance
                                     df_trail = await mt5_client.get_rates(t.symbol, mt5.TIMEFRAME_M15, 14)
+                                    new_sl = None
                                     if not df_trail.empty:
                                         atr_trail = (df_trail['high'] - df_trail['low']).mean()
                                         # Use 1.5 ATR for trailing distance
                                         dist_points = atr_trail * 1.5
                                         digits = info.digits
                                         
-                                        new_sl = None
                                         if p['type'] == mt5.ORDER_TYPE_BUY:
                                             pot_sl = p['price_current'] - dist_points
                                             if pot_sl > t.entry_price and (not t.sl or pot_sl > t.sl):

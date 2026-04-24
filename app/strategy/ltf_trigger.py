@@ -15,7 +15,7 @@ def find_htf_liquidity(df_15m: pd.DataFrame, bias: str, entry: float) -> float |
     else:
         return float(df_15m['low'].iloc[-50:].min())
 
-def find_ltf_trigger(df: pd.DataFrame, df_15m: pd.DataFrame, atr_15m: float, zone: dict, bias: str, point: float, reward_ratio: float = 2.0) -> dict | None:
+def find_ltf_trigger(df: pd.DataFrame, df_15m: pd.DataFrame, atr_15m: float, zone: dict, bias: str, point: float, reward_ratio: float = 2.0, atr_buffer_multiplier: float = 0.2, use_liquidity_tp: bool = True) -> dict | None:
     if len(df) < 20: return None
     
     df = df.copy()
@@ -71,16 +71,16 @@ def find_ltf_trigger(df: pd.DataFrame, df_15m: pd.DataFrame, atr_15m: float, zon
                 strength += 15
                 trigger_name += " + RSI Reclaim"
             
-            atr_buffer = atr_15m * 0.2
+            atr_buffer = atr_15m * atr_buffer_multiplier
             sl = float(min(last['low'], prev['low'], zone['zone_low']) - atr_buffer)
             rr_tp = entry + (entry - sl) * reward_ratio
             
-            liq_tp = find_htf_liquidity(df_15m, bias, entry)
-            if liq_tp and liq_tp > entry:
-                tp = float(min(rr_tp, liq_tp))
-                if tp == liq_tp: trigger_name += " (Liq TP)"
-            else:
-                tp = rr_tp
+            tp = rr_tp
+            if use_liquidity_tp:
+                liq_tp = find_htf_liquidity(df_15m, bias, entry)
+                if liq_tp and liq_tp > entry:
+                    tp = float(min(rr_tp, liq_tp))
+                    if tp == liq_tp: trigger_name += " (Liq TP)"
                 
             return {"entry": entry, "sl": sl, "tp": tp, "trigger_type": trigger_name, "strength": min(100, strength)}
             
@@ -114,16 +114,16 @@ def find_ltf_trigger(df: pd.DataFrame, df_15m: pd.DataFrame, atr_15m: float, zon
                 strength += 15
                 trigger_name += " + RSI Reclaim"
                 
-            atr_buffer = atr_15m * 0.2
+            atr_buffer = atr_15m * atr_buffer_multiplier
             sl = float(max(last['high'], prev['high'], zone['zone_high']) + atr_buffer)
             rr_tp = entry - (sl - entry) * reward_ratio
             
-            liq_tp = find_htf_liquidity(df_15m, bias, entry)
-            if liq_tp and liq_tp < entry:
-                tp = float(max(rr_tp, liq_tp))
-                if tp == liq_tp: trigger_name += " (Liq TP)"
-            else:
-                tp = rr_tp
+            tp = rr_tp
+            if use_liquidity_tp:
+                liq_tp = find_htf_liquidity(df_15m, bias, entry)
+                if liq_tp and liq_tp < entry:
+                    tp = float(max(rr_tp, liq_tp))
+                    if tp == liq_tp: trigger_name += " (Liq TP)"
                 
             return {"entry": entry, "sl": sl, "tp": tp, "trigger_type": trigger_name, "strength": min(100, strength)}
             

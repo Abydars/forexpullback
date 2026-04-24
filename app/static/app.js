@@ -341,12 +341,10 @@ async function loadConfig() {
     document.getElementById('c-reward_ratio').value = cfg.reward_ratio || 2.0;
     document.getElementById('c-dashboard_password').value = cfg.dashboard_password || 'admin';
 
-    document.getElementById('c-sl_mode').value = cfg.sl_mode || 'structural';
-    document.getElementById('c-atr_multiplier').value = cfg.atr_multiplier || 1.5;
-    document.getElementById('c-tp_mode').value = cfg.tp_mode || 'r_multiple';
+    document.getElementById('c-atr_buffer_multiplier').value = cfg.atr_buffer_multiplier || 0.2;
+    document.getElementById('c-use_liquidity_tp').checked = cfg.use_liquidity_tp !== false;
     document.getElementById('c-breakeven_trigger_r').value = cfg.breakeven_trigger_r || 1.0;
     document.getElementById('c-trailing').checked = cfg.trailing !== false;
-    document.getElementById('c-trailing_distance_pips').value = cfg.trailing_distance_pips || 15.0;
     
     state.symbols = (cfg.symbols || []).map(s => ({generic: s, resolved: null, status: 'pending'}));
     renderChips();
@@ -431,12 +429,10 @@ function collectConfigInputs() {
     scan_interval_seconds: parseInt(document.getElementById('c-scan_interval_seconds').value),
     reward_ratio: parseFloat(document.getElementById('c-reward_ratio').value),
     dashboard_password: document.getElementById('c-dashboard_password').value,
-    sl_mode: document.getElementById('c-sl_mode').value,
-    atr_multiplier: parseFloat(document.getElementById('c-atr_multiplier').value),
-    tp_mode: document.getElementById('c-tp_mode').value,
+    atr_buffer_multiplier: parseFloat(document.getElementById('c-atr_buffer_multiplier').value),
+    use_liquidity_tp: document.getElementById('c-use_liquidity_tp').checked,
     breakeven_trigger_r: parseFloat(document.getElementById('c-breakeven_trigger_r').value),
     trailing: document.getElementById('c-trailing').checked,
-    trailing_distance_pips: parseFloat(document.getElementById('c-trailing_distance_pips').value),
   };
 }
 
