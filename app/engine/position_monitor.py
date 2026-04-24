@@ -169,12 +169,19 @@ async def monitor_loop():
                             estimated_risk = tp_dist / reward_ratio
                             
                             if be_r > 0 and estimated_risk > 0 and current_dist >= (estimated_risk * be_r):
+                                tick = mt5.symbol_info_tick(t.symbol)
+                                spread_buffer = (tick.ask - tick.bid) if tick else (info.point * 15)
+                                commission_buffer = info.point * 5  # 0.5 pips extra
+                                be_buffer = spread_buffer + commission_buffer
+                                
                                 if p['type'] == mt5.ORDER_TYPE_BUY:
-                                    if not t.sl or t.sl < t.entry_price:
-                                        new_sl = t.entry_price
+                                    be_price = t.entry_price + be_buffer
+                                    if not t.sl or t.sl < be_price:
+                                        new_sl = round(be_price, digits)
                                 else:
-                                    if not t.sl or t.sl > t.entry_price:
-                                        new_sl = t.entry_price
+                                    be_price = t.entry_price - be_buffer
+                                    if not t.sl or t.sl > be_price:
+                                        new_sl = round(be_price, digits)
                             
                             # 2. Trailing Stop (Starts at 70% of TP)
                             if cfg.get("trailing", True) and current_dist >= (tp_dist * 0.7):
