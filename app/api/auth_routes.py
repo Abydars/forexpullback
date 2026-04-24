@@ -20,6 +20,10 @@ async def login(req: LoginRequest, response: Response):
     else:
         # Default is admin
         expected_hashed = cfg.get("dashboard_password", hash_password("admin"))
+        
+        # Backward compatibility for plain-text passwords stored before the hashing update
+        if len(expected_hashed) != 64:
+            expected_hashed = hash_password(expected_hashed)
     
     if verify_password(req.password, expected_hashed):
         token = create_access_token()
