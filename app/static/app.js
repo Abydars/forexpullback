@@ -136,17 +136,42 @@ function renderPositions() {
     tbody.innerHTML = '<tr><td colspan="9" class="empty">NO OPEN POSITIONS</td></tr>';
     return;
   }
-  tbody.innerHTML = state.open_positions.map(t => `
+  
+  const groups = {};
+  state.open_positions.forEach(t => {
+    const key = `${t.symbol}_${t.direction}`;
+    if (!groups[key]) {
+      groups[key] = {
+        symbol: t.symbol, direction: t.direction, total_lot: 0, total_pnl: 0,
+        avg_entry: 0, count: 0, sl: t.sl, tp: t.tp, current_price: t.current_price
+      };
+    }
+    const g = groups[key];
+    g.total_lot += t.lot;
+    g.total_pnl += (t.pnl || 0);
+    g.avg_entry += (t.entry_price * t.lot);
+    g.count += 1;
+    g.sl = t.sl || g.sl;
+    g.tp = t.tp || g.tp;
+    g.current_price = t.current_price || g.current_price;
+  });
+
+  const groupedArray = Object.values(groups).map(g => {
+    g.avg_entry = g.avg_entry / g.total_lot;
+    return g;
+  });
+
+  tbody.innerHTML = groupedArray.map(g => `
     <tr>
-      <td>${t.symbol}</td>
-      <td><span class="pill ${t.direction === 'buy' ? 'g' : 'r'}">${t.direction}</span></td>
-      <td>${t.lot}</td>
-      <td>${t.entry_price}</td>
-      <td>${t.current_price || '-'}</td>
-      <td class="${t.pnl >= 0 ? 'g' : 'r'}">${t.pnl?.toFixed(2) || '0.00'}</td>
-      <td>${t.sl || '-'}</td>
-      <td>${t.tp || '-'}</td>
-      <td><button class="btn" style="padding:2px 8px; font-size:10px;" onclick="closeTrade(${t.ticket})">CLOSE</button></td>
+      <td>${g.symbol} ${g.count > 1 ? `<span class="pill" style="margin-left:6px; background:rgba(77,208,225,0.1); color:var(--cyan);">GROUP (${g.count})</span>` : ''}</td>
+      <td><span class="pill ${g.direction === 'buy' ? 'g' : 'r'}">${g.direction}</span></td>
+      <td>${g.total_lot.toFixed(2)}</td>
+      <td>${g.avg_entry.toFixed(5)}</td>
+      <td>${g.current_price || '-'}</td>
+      <td class="${g.total_pnl >= 0 ? 'g' : 'r'}">${g.total_pnl.toFixed(2)}</td>
+      <td>${g.sl || '-'}</td>
+      <td>${g.tp || '-'}</td>
+      <td><button class="btn" style="padding:2px 8px; font-size:10px;" onclick="closeGroup('${g.symbol}', '${g.direction}')">CLOSE ${g.count > 1 ? 'ALL' : ''}</button></td>
     </tr>
   `).join('');
 }
@@ -161,21 +186,63 @@ function renderTrades() {
     return;
   }
   
-  tbody.innerHTML = list.map(t => `
-    <tr>
-      <td>${new Date(t.opened_at || Date.now()).toLocaleTimeString()}</td>
-      <td>${t.symbol}</td>
-      <td><span class="pill ${t.direction === 'buy' ? 'g' : 'r'}">${t.direction}</span></td>
-      <td>${t.lot}</td>
-      <td>${t.entry_price}</td>
-      <td>${t.sl || '-'}</td>
-      <td>${t.tp || '-'}</td>
-      <td>${t.exit_price || '-'}</td>
-      <td class="${t.pnl >= 0 ? 'g' : 'r'}">${t.pnl?.toFixed(2) || '-'}</td>
-      <td>${t.note || '-'}</td>
-      <td>${activeSub === 'open' ? `<button class="btn" onclick="closeTrade(${t.ticket})">CLOSE</button>` : ''}</td>
-    </tr>
-  `).join('');
+  if (activeSub === 'open') {
+      const groups = {};
+      list.forEach(t => {
+        const key = `${t.symbol}_${t.direction}`;
+        if (!groups[key]) {
+          groups[key] = {
+            symbol: t.symbol, direction: t.direction, total_lot: 0, total_pnl: 0,
+            avg_entry: 0, count: 0, sl: t.sl, tp: t.tp, current_price: t.current_price, note: t.note
+          };
+        }
+        const g = groups[key];
+        g.total_lot += t.lot;
+        g.total_pnl += (t.pnl || 0);
+        g.avg_entry += (t.entry_price * t.lot);
+        g.count += 1;
+        g.sl = t.sl || g.sl;
+        g.tp = t.tp || g.tp;
+        if (g.count > 1) g.note = 'DCA GROUP';
+      });
+
+      const groupedArray = Object.values(groups).map(g => {
+        g.avg_entry = g.avg_entry / g.total_lot;
+        return g;
+      });
+
+      tbody.innerHTML = groupedArray.map(t => `
+        <tr>
+          <td>-</td>
+          <td>${t.symbol} ${t.count > 1 ? `<span class="pill" style="margin-left:6px; background:rgba(77,208,225,0.1); color:var(--cyan);">GROUP (${t.count})</span>` : ''}</td>
+          <td><span class="pill ${t.direction === 'buy' ? 'g' : 'r'}">${t.direction}</span></td>
+          <td>${t.total_lot.toFixed(2)}</td>
+          <td>${t.avg_entry.toFixed(5)}</td>
+          <td>${t.sl || '-'}</td>
+          <td>${t.tp || '-'}</td>
+          <td>-</td>
+          <td class="${t.total_pnl >= 0 ? 'g' : 'r'}">${t.total_pnl.toFixed(2)}</td>
+          <td>${t.note || '-'}</td>
+          <td><button class="btn" onclick="closeGroup('${t.symbol}', '${t.direction}')">CLOSE ${t.count > 1 ? 'ALL' : ''}</button></td>
+        </tr>
+      `).join('');
+  } else {
+      tbody.innerHTML = list.map(t => `
+        <tr>
+          <td>${new Date(t.opened_at || Date.now()).toLocaleTimeString()}</td>
+          <td>${t.symbol}</td>
+          <td><span class="pill ${t.direction === 'buy' ? 'g' : 'r'}">${t.direction}</span></td>
+          <td>${t.lot}</td>
+          <td>${t.entry_price}</td>
+          <td>${t.sl || '-'}</td>
+          <td>${t.tp || '-'}</td>
+          <td>${t.exit_price || '-'}</td>
+          <td class="${t.pnl >= 0 ? 'g' : 'r'}">${t.pnl?.toFixed(2) || '-'}</td>
+          <td>${t.note || '-'}</td>
+          <td></td>
+        </tr>
+      `).join('');
+  }
 }
 
 function renderSignals() {
@@ -270,6 +337,25 @@ async function closeTrade(ticket) {
       await api('POST', `/api/trades/${ticket}/close`);
     } catch (err) {
       console.error(err);
+    }
+  }
+}
+
+async function closeGroup(symbol, direction) {
+  const groupTrades = state.open_positions.filter(t => t.symbol === symbol && t.direction === direction);
+  if (!groupTrades.length) return;
+  
+  const msg = groupTrades.length > 1 
+    ? `Close ALL ${groupTrades.length} grouped positions for ${symbol}?` 
+    : `Close position for ${symbol}?`;
+    
+  if (confirm(msg)) {
+    for (const t of groupTrades) {
+      try {
+        await api('POST', `/api/trades/${t.ticket}/close`);
+      } catch (e) {
+        console.error("Error closing", t.ticket, e);
+      }
     }
   }
 }

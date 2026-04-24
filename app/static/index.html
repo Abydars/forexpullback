@@ -197,8 +197,11 @@
 
   <!-- MT5 LINK MODAL -->
   <dialog id="mt5-modal">
-    <form method="dialog" class="modal-body">
-      <div class="modal-title">MT5 LINK</div>
+    <form method="dialog" class="modal-layout">
+      <div class="modal-header">
+        <div class="modal-title">MT5 LINK</div>
+      </div>
+      <div class="modal-content">
       <div id="saved-accounts"></div>
       <datalist id="exness-servers">
         <option value="Exness-MT5Real">
@@ -218,24 +221,29 @@
       </div>
       <div id="m-status"></div>
       <div id="m-preview" class="hidden"></div>
-      <div class="modal-actions">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" onclick="closeMt5Modal()">CANCEL</button>
         <button type="button" class="btn" onclick="testMt5()">TEST CONNECTION</button>
         <button type="button" class="btn primary" id="m-save" onclick="saveMt5()" disabled>SAVE & USE</button>
-        <button type="button" class="btn" onclick="closeMt5Modal()">CANCEL</button>
       </div>
     </form>
   </dialog>
 
   <!-- CONFIG MODAL -->
   <dialog id="config-modal">
-    <form method="dialog" class="modal-body wide">
-      <div class="modal-title">CONFIGURATION</div>
-      <nav class="modal-tabs">
-        <button type="button" class="m-tab active" data-mtab="general">GENERAL</button>
-        <button type="button" class="m-tab" data-mtab="symbols">SYMBOLS</button>
-        <button type="button" class="m-tab" data-mtab="sessions">SESSIONS</button>
-        <button type="button" class="m-tab" data-mtab="risk">RISK</button>
-      </nav>
+    <form method="dialog" class="modal-layout">
+      <div class="modal-header">
+        <div class="modal-title">CONFIGURATION</div>
+        <nav class="modal-tabs">
+          <button type="button" class="m-tab active" data-mtab="general">GENERAL</button>
+          <button type="button" class="m-tab" data-mtab="symbols">SYMBOLS</button>
+          <button type="button" class="m-tab" data-mtab="sessions">SESSIONS</button>
+          <button type="button" class="m-tab" data-mtab="risk">RISK</button>
+        </nav>
+      </div>
+      
+      <div class="modal-content">
 
       <div class="m-panel active form-grid" data-mpanel="general">
         <label>MAGIC NUMBER <input type="number" id="c-magic_number" value="123456"></label>
@@ -269,23 +277,25 @@
 
       <div class="m-panel form-grid" data-mpanel="risk">
         <label>ATR SL BUFFER (xATR) <input type="number" step="0.1" id="c-atr_buffer_multiplier" value="0.2"></label>
-        <label>USE LIQUIDITY TP <input type="checkbox" id="c-use_liquidity_tp" checked></label>
+        <label class="checkbox-label">USE LIQUIDITY TP <input type="checkbox" id="c-use_liquidity_tp" checked></label>
         <label>BREAKEVEN TRIGGER (R) <input type="number" step="0.1" id="c-breakeven_trigger_r" value="1.0"></label>
-        <label>TRAILING STOP (1.5x ATR) <input type="checkbox" id="c-trailing" checked></label>
+        <label class="checkbox-label">TRAILING STOP (1.5x ATR) <input type="checkbox" id="c-trailing" checked></label>
         
         <h3 style="grid-column: 1 / -1; margin-top: 10px; font-size: 11px; color: var(--cyan);">DCA SETTINGS</h3>
-        <label>ENABLE DCA <input type="checkbox" id="c-enable_dca"></label>
+        <label class="checkbox-label">ENABLE DCA <input type="checkbox" id="c-enable_dca"></label>
         <label>MAX DCA ENTRIES (PER TRADE) <input type="number" id="c-max_dca_entries" value="1"></label>
         <label>MAX DCA PER SCAN <input type="number" id="c-max_dca_per_scan" value="2"></label>
         <label>TRIGGER SL PROGRESS <input type="number" step="0.1" id="c-dca_trigger_sl_progress" value="0.5"></label>
         <label>LOT MULTIPLIER <input type="number" step="0.1" id="c-dca_lot_multiplier" value="0.7"></label>
         <label>MAX TOTAL RISK (R) <input type="number" step="0.1" id="c-dca_max_total_risk_r" value="2.0"></label>
-        <label>RE-ANCHOR SL <input type="checkbox" id="c-dca_reanchor_sl" checked></label>
+        <label class="checkbox-label">RE-ANCHOR SL <input type="checkbox" id="c-dca_reanchor_sl" checked></label>
       </div>
 
-      <div class="modal-actions">
-        <button type="button" class="btn primary" onclick="saveConfig()">SAVE</button>
+      </div>
+
+      <div class="modal-footer">
         <button type="button" class="btn" onclick="closeConfigModal()">CANCEL</button>
+        <button type="button" class="btn primary" onclick="saveConfig()">SAVE CHANGES</button>
       </div>
     </form>
   </dialog>
