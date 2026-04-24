@@ -295,11 +295,11 @@ async def scan_loop():
                                                         
                                                         total_new_risk = _calc_risk(dca_lot, current_price, new_sl)
                                                         
-                                                        for p in same_dir_db:
-                                                            p_entry = p.entry_price
-                                                            p_vol = p.quantity
-                                                            p_risk = _calc_risk(p_vol, p_entry, new_sl)
-                                                            total_new_risk += p_risk
+                                                        # Use the combined Binance position to accurately assess the total accumulated risk
+                                                        p_entry = float(binance_pos['entryPrice'])
+                                                        p_vol = abs(float(binance_pos['positionAmt']))
+                                                        p_risk = _calc_risk(p_vol, p_entry, new_sl)
+                                                        total_new_risk += p_risk
                                                         
                                                         total_risk_r = total_new_risk / base_1r_risk
                                                         
