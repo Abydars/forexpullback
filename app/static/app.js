@@ -332,6 +332,7 @@ async function loadConfig() {
     const cfg = await api('GET', '/api/config');
     state.config = cfg;
     document.getElementById('c-max_open_positions').value = cfg.max_open_positions || 5;
+    document.getElementById('c-max_signals_per_scan').value = cfg.max_signals_per_scan || 1;
     document.getElementById('c-max_per_symbol').value = cfg.max_per_symbol || 1;
     document.getElementById('c-max_per_direction').value = cfg.max_per_direction || 3;
     document.getElementById('c-max_spread_pct').value = cfg.max_spread_pct || 20.0;
@@ -421,6 +422,7 @@ function addSessionRow(session) {
 function collectConfigInputs() {
   return {
     max_open_positions: parseInt(document.getElementById('c-max_open_positions').value),
+    max_signals_per_scan: parseInt(document.getElementById('c-max_signals_per_scan').value),
     max_per_symbol: parseInt(document.getElementById('c-max_per_symbol').value),
     max_per_direction: parseInt(document.getElementById('c-max_per_direction').value),
     max_spread_pct: parseFloat(document.getElementById('c-max_spread_pct').value),

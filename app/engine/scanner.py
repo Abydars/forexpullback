@@ -11,7 +11,7 @@ from app.strategy.ltf_trigger import find_ltf_trigger
 from app.strategy.scoring import calculate_score
 from app.core.config import get_config
 from app.db.session import AsyncSessionLocal
-from app.db.models import Signal, Session as SessionModel
+from app.db.models import Signal, Session as SessionModel, Trade
 from app.core.sessions import active_sessions, any_active, Session
 from app.ws.manager import broadcast
 from sqlalchemy import select
@@ -63,6 +63,22 @@ async def scan_loop():
             await symbol_resolver.refresh()
                 
             symbols = cfg.get("symbols", [])
+            
+            # --- RANKING CONFIG & POSITIONS ---
+            max_signals_per_scan = int(cfg.get("max_signals_per_scan", 1))
+            max_open = int(cfg.get("max_open_positions", 5))
+            max_symbol = int(cfg.get("max_per_symbol", 2))
+            max_dir = int(cfg.get("max_per_direction", 3))
+            magic = int(cfg.get("magic_number", 123456))
+            
+            bot_positions = []
+            res_pos = await mt5_client.get_positions()
+            if res_pos:
+                bot_positions = [p for p in res_pos if p.get('magic') == magic]
+                
+            candidates = []
+            updates_to_broadcast = []
+            
             for generic in symbols:
                 resolved = symbol_resolver.resolve(generic)
                 if not resolved:
@@ -169,6 +185,16 @@ async def scan_loop():
                                         cutoff = now_utc - timedelta(minutes=cooldown_mins)
                                         
                                         async with AsyncSessionLocal() as db:
+                                            # Check recent closed trades
+                                            recent_closed = await db.execute(select(Trade).where(
+                                                Trade.symbol == resolved,
+                                                Trade.direction == bias,
+                                                Trade.closed_at != None,
+                                                Trade.closed_at >= cutoff
+                                            ))
+                                            has_recent_closed = recent_closed.scalars().first()
+
+                                            # Also check recent duplicate signals
                                             recent_fired = await db.execute(select(Signal).where(
                                                 Signal.symbol == resolved,
                                                 Signal.direction == bias,
@@ -178,24 +204,48 @@ async def scan_loop():
                                             has_recent_fired = recent_fired.scalars().first()
                                         
                                         state_key = f"{resolved}_{bias}"
-                                        last_sig = scanner_state.get(state_key, {"time": datetime.min.replace(tzinfo=pytz.utc), "status": ""})
-                                        mins_since = (now_utc - last_sig["time"]).total_seconds() / 60
                                         
-                                        if has_recent_fired:
+                                        # Also check if a trade is currently open for this symbol
+                                        sym_count = len([p for p in bot_positions if p['symbol'] == resolved])
+                                        
+                                        if sym_count > 0:
+                                            status = "COOLDOWN"
+                                            reason_full["msg"] = "Skipped: position already open for this symbol"
+                                        elif has_recent_closed:
+                                            status = "COOLDOWN"
+                                            reason_full["msg"] = f"Skipped: recent trade exit cooldown ({cooldown_mins}m)"
+                                        elif has_recent_fired:
                                             status = "COOLDOWN"
                                             reason_full["msg"] = f"Fired recently, waiting {cooldown_mins}m"
                                         elif score >= base_threshold:
-                                            status = "FIRED"
-                                            reason_full["msg"] = f"Accepted! Score: {score} >= {base_threshold}"
-                                            scanner_state[state_key] = {"time": now_utc, "status": "FIRED"}
+                                            # POSITION LIMITS CHECK BEFORE CANDIDATE SELECTION
+                                            ord_type = mt5.ORDER_TYPE_BUY if bias == 'bullish' else mt5.ORDER_TYPE_SELL
+                                            dir_count = len([p for p in bot_positions if p.get('type') == ord_type])
+                                            
+                                            if len(bot_positions) >= max_open or sym_count >= max_symbol or dir_count >= max_dir:
+                                                status = "SKIPPED"
+                                                reason_full["msg"] = "Skipped because position limit already reached"
+                                            else:
+                                                status = "FIRED" # Temporary status
+                                                reason_full["msg"] = f"Candidate Accepted! Score: {score} >= {base_threshold}"
+                                                candidates.append({
+                                                    "generic": generic,
+                                                    "resolved": resolved,
+                                                    "bias": bias,
+                                                    "score": score,
+                                                    "ltf_trigger": ltf_trigger,
+                                                    "reason_full": dict(reason_full),
+                                                    "cfg": cfg,
+                                                    "threshold": base_threshold,
+                                                    "state_key": state_key
+                                                })
                                         else:
                                             status = "WATCHING"
                                             reason_full["msg"] = f"Low Score ({score} < {base_threshold})"
                                             scanner_state[state_key] = {"time": now_utc, "status": "WATCHING"}
 
-                await broadcast({
-                    "type": "scan.update",
-                    "data": {
+                if status != "FIRED":
+                    updates_to_broadcast.append({
                         "symbol": generic,
                         "resolved": resolved,
                         "bias": bias,
@@ -203,12 +253,34 @@ async def scan_loop():
                         "status": status,
                         "reason": reason_full,
                         "updated_at": datetime.now(pytz.utc).isoformat()
-                    }
-                })
+                    })
 
-                if status == 'FIRED':
+            # --- CANDIDATE RANKING ---
+            candidates.sort(key=lambda x: x["score"], reverse=True)
+            selected_candidates = candidates[:max_signals_per_scan]
+            selected_symbols = [c["resolved"] for c in selected_candidates]
+            
+            for c in candidates:
+                res = c["resolved"]
+                generic = c["generic"]
+                bias = c["bias"]
+                score = c["score"]
+                ltf_trigger = c["ltf_trigger"]
+                reason_full = c["reason_full"]
+                state_key = c["state_key"]
+                
+                if res in selected_symbols:
+                    status = "FIRED"
+                    reason_full["msg"] = f"Executed! Rank 1 (Score: {score})"
+                    scanner_state[state_key] = {"time": now_utc, "status": "FIRED"}
+                    
+                    updates_to_broadcast.append({
+                        "symbol": generic, "resolved": res, "bias": bias, "score": score,
+                        "status": status, "reason": reason_full, "updated_at": datetime.now(pytz.utc).isoformat()
+                    })
+                    
                     async with AsyncSessionLocal() as db:
-                        sig = Signal(symbol=resolved, direction=bias, score=score, htf_bias=bias, 
+                        sig = Signal(symbol=res, direction=bias, score=score, htf_bias=bias, 
                                     entry=ltf_trigger['entry'], sl=ltf_trigger['sl'], tp=ltf_trigger['tp'],
                                     reason=reason_full, status=status)
                         db.add(sig)
@@ -224,9 +296,20 @@ async def scan_loop():
                         })
                         
                     from app.engine.order_manager import send_order
-                    await send_order(sig, resolved, bias, cfg)
-
+                    await send_order(sig, res, bias, c["cfg"])
+                else:
+                    status = "SKIPPED"
+                    reason_full["msg"] = "Skipped because higher-ranked signal selected"
                     
+                    updates_to_broadcast.append({
+                        "symbol": generic, "resolved": res, "bias": bias, "score": score,
+                        "status": status, "reason": reason_full, "updated_at": datetime.now(pytz.utc).isoformat()
+                    })
+
+            # Broadcast all states for UI
+            for update in updates_to_broadcast:
+                await broadcast({"type": "scan.update", "data": update})
+
             await asyncio.sleep(interval)
         except Exception as e:
             print("Scanner error:", e)
