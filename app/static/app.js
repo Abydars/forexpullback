@@ -148,17 +148,20 @@ function renderStats() {
 function renderPositions() {
   const tbody = document.getElementById('open-pos-body');
   if (!state.open_positions.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-slate-500 py-8 uppercase tracking-widest text-xs">NO OPEN POSITIONS</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-slate-500 py-10 uppercase tracking-widest text-xs">NO OPEN POSITIONS</td></tr>';
     return;
   }
   
   const groups = {};
-  state.open_positions.forEach(t => {
+  const sortedPos = [...state.open_positions].sort((a,b) => (a.ticket || 0) - (b.ticket || 0));
+  
+  sortedPos.forEach(t => {
     const key = `${t.symbol}_${t.direction}`;
     if (!groups[key]) {
       groups[key] = {
         symbol: t.symbol, direction: t.direction, total_lot: 0, total_pnl: 0,
-        avg_entry: 0, count: 0, sl: t.sl, tp: t.tp, current_price: t.current_price
+        avg_entry: 0, count: 0, sl: t.sl, tp: t.tp, current_price: t.current_price,
+        positions: []
       };
     }
     const g = groups[key];
@@ -169,26 +172,59 @@ function renderPositions() {
     g.sl = t.sl || g.sl;
     g.tp = t.tp || g.tp;
     g.current_price = t.current_price || g.current_price;
+    g.positions.push(t);
   });
 
-  const groupedArray = Object.values(groups).map(g => {
+  const html = [];
+  Object.values(groups).forEach(g => {
     g.avg_entry = g.avg_entry / g.total_lot;
-    return g;
+    const gKey = `${g.symbol}_${g.direction}`;
+    
+    html.push(`
+      <tr class="group-row cursor-pointer hover:bg-white/[0.02] transition-colors group" onclick="document.querySelectorAll('.sub-${gKey}').forEach(e => e.classList.toggle('hidden'))">
+        <td class="px-5 py-3 flex items-center gap-2">
+          ${g.count > 1 ? `<span class="text-slate-500 group-hover:text-cyan-400 transition-colors text-[10px]">▶</span>` : ''}
+          <span class="font-bold text-slate-200">${g.symbol}</span>
+          ${g.count > 1 ? `<span class="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 text-[9px] font-bold tracking-widest border border-cyan-500/20">GROUP (${g.count})</span>` : ''}
+        </td>
+        <td class="px-5 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${g.direction === 'buy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${g.direction}</span></td>
+        <td class="px-5 py-3 text-right font-mono">${g.total_lot.toFixed(2)}</td>
+        <td class="px-5 py-3 text-right font-mono text-slate-400">${g.avg_entry.toFixed(5)}</td>
+        <td class="px-5 py-3 text-right font-mono text-slate-400">${g.current_price || '-'}</td>
+        <td class="px-5 py-3 text-right font-mono font-bold ${g.total_pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${g.total_pnl >= 0 ? '+' : '-'}$${Math.abs(g.total_pnl).toFixed(2)}</td>
+        <td class="px-5 py-3 text-right font-mono text-slate-400">${g.sl || '-'}</td>
+        <td class="px-5 py-3 text-right font-mono text-slate-400">${g.tp || '-'}</td>
+        <td class="px-5 py-3 text-right">
+          <button class="px-3 py-1.5 border border-border_strong text-slate-300 text-[10px] font-bold tracking-widest uppercase hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/30 transition-all rounded" onclick="event.stopPropagation(); closeGroup('${g.symbol}', '${g.direction}')">CLOSE ${g.count > 1 ? 'ALL' : ''}</button>
+        </td>
+      </tr>
+    `);
+    
+    if (g.count > 1) {
+      g.positions.forEach((p, idx) => {
+        const badge = idx === 0 ? 'BASE' : `DCA ${idx}`;
+        const badgeColor = idx === 0 ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-purple-400 bg-purple-500/10 border-purple-500/20';
+        html.push(`
+          <tr class="sub-${gKey} hidden bg-black/20 hover:bg-black/40 transition-colors text-[11px] border-b border-border_light/50">
+            <td class="px-5 py-2 pl-10 flex items-center gap-2">
+               <span class="px-1.5 py-0.5 rounded text-[8px] font-bold tracking-widest uppercase border ${badgeColor}">${badge}</span>
+               <span class="text-slate-500 font-mono">#${p.ticket}</span>
+            </td>
+            <td class="px-5 py-2"></td>
+            <td class="px-5 py-2 text-right font-mono text-slate-400">${p.lot.toFixed(2)}</td>
+            <td class="px-5 py-2 text-right font-mono text-slate-500">${p.entry_price.toFixed(5)}</td>
+            <td class="px-5 py-2"></td>
+            <td class="px-5 py-2 text-right font-mono ${p.pnl >= 0 ? 'text-emerald-500/70' : 'text-rose-500/70'}">${p.pnl >= 0 ? '+' : '-'}$${Math.abs(p.pnl).toFixed(2)}</td>
+            <td class="px-5 py-2 text-right font-mono text-slate-500">${p.sl || '-'}</td>
+            <td class="px-5 py-2 text-right font-mono text-slate-500">${p.tp || '-'}</td>
+            <td class="px-5 py-2 text-right"></td>
+          </tr>
+        `);
+      });
+    }
   });
 
-  tbody.innerHTML = groupedArray.map(g => `
-    <tr>
-      <td>${g.symbol} ${g.count > 1 ? `<span class="px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-widest" style="margin-left:6px; background:rgba(77,208,225,0.1); color:var(--cyan);">GROUP (${g.count})</span>` : ''}</td>
-      <td><span class="px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-widest ${g.direction === 'buy' ? 'text-emerald-400' : 'text-rose-400'}">${g.direction}</span></td>
-      <td>${g.total_lot.toFixed(2)}</td>
-      <td>${g.avg_entry.toFixed(5)}</td>
-      <td>${g.current_price || '-'}</td>
-      <td class="${g.total_pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${g.total_pnl.toFixed(2)}</td>
-      <td>${g.sl || '-'}</td>
-      <td>${g.tp || '-'}</td>
-      <td><button class="btn" style="padding:2px 8px; font-size:10px;" onclick="closeGroup('${g.symbol}', '${g.direction}')">CLOSE ${g.count > 1 ? 'ALL' : ''}</button></td>
-    </tr>
-  `).join('');
+  tbody.innerHTML = html.join('');
 }
 
 function renderTrades() {
@@ -221,40 +257,46 @@ function renderTrades() {
         if (g.count > 1) g.note = 'DCA GROUP';
       });
 
-      const groupedArray = Object.values(groups).map(g => {
+      const html = [];
+      Object.values(groups).forEach(g => {
         g.avg_entry = g.avg_entry / g.total_lot;
-        return g;
+        const gKey = `${g.symbol}_${g.direction}_trades`;
+        
+        html.push(`
+          <tr class="group-row cursor-pointer hover:bg-white/[0.02] transition-colors group" onclick="document.querySelectorAll('.sub-${gKey}').forEach(e => e.classList.toggle('hidden'))">
+            <td class="px-5 py-3 font-mono text-slate-500">-</td>
+            <td class="px-5 py-3 flex items-center gap-2">
+              ${g.count > 1 ? `<span class="text-slate-500 group-hover:text-cyan-400 transition-colors text-[10px]">▶</span>` : ''}
+              <span class="font-bold text-slate-200">${g.symbol}</span>
+              ${g.count > 1 ? `<span class="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 text-[9px] font-bold tracking-widest border border-cyan-500/20">GROUP (${g.count})</span>` : ''}
+            </td>
+            <td class="px-5 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${g.direction === 'buy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${g.direction}</span></td>
+            <td class="px-5 py-3 text-right font-mono">${g.total_lot.toFixed(2)}</td>
+            <td class="px-5 py-3 text-right font-mono text-slate-400">${g.avg_entry.toFixed(5)}</td>
+            <td class="px-5 py-3 text-right font-mono text-slate-400">${g.sl || '-'}</td>
+            <td class="px-5 py-3 text-right font-mono text-slate-400">${g.tp || '-'}</td>
+            <td class="px-5 py-3 text-right font-mono text-slate-500">-</td>
+            <td class="px-5 py-3 text-right font-mono font-bold ${g.total_pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${g.total_pnl >= 0 ? '+' : '-'}$${Math.abs(g.total_pnl).toFixed(2)}</td>
+            <td class="px-5 py-3 text-slate-400">${g.note || '-'}</td>
+            <td class="px-5 py-3 text-right"><button class="px-3 py-1.5 border border-border_strong text-slate-300 text-[10px] font-bold tracking-widest uppercase hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/30 transition-all rounded" onclick="event.stopPropagation(); closeGroup('${g.symbol}', '${g.direction}')">CLOSE ${g.count > 1 ? 'ALL' : ''}</button></td>
+          </tr>
+        `);
       });
-
-      tbody.innerHTML = groupedArray.map(t => `
-        <tr>
-          <td>-</td>
-          <td>${t.symbol} ${t.count > 1 ? `<span class="px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-widest" style="margin-left:6px; background:rgba(77,208,225,0.1); color:var(--cyan);">GROUP (${t.count})</span>` : ''}</td>
-          <td><span class="px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-widest ${t.direction === 'buy' ? 'text-emerald-400' : 'text-rose-400'}">${t.direction}</span></td>
-          <td>${t.total_lot.toFixed(2)}</td>
-          <td>${t.avg_entry.toFixed(5)}</td>
-          <td>${t.sl || '-'}</td>
-          <td>${t.tp || '-'}</td>
-          <td>-</td>
-          <td class="${t.total_pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${t.total_pnl.toFixed(2)}</td>
-          <td>${t.note || '-'}</td>
-          <td><button class="btn" onclick="closeGroup('${t.symbol}', '${t.direction}')">CLOSE ${t.count > 1 ? 'ALL' : ''}</button></td>
-        </tr>
-      `).join('');
+      tbody.innerHTML = html.join('');
   } else {
       tbody.innerHTML = list.map(t => `
-        <tr>
-          <td>${new Date(t.opened_at || Date.now()).toLocaleTimeString()}</td>
-          <td>${t.symbol}</td>
-          <td><span class="px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-widest ${t.direction === 'buy' ? 'text-emerald-400' : 'text-rose-400'}">${t.direction}</span></td>
-          <td>${t.lot}</td>
-          <td>${t.entry_price}</td>
-          <td>${t.sl || '-'}</td>
-          <td>${t.tp || '-'}</td>
-          <td>${t.exit_price || '-'}</td>
-          <td class="${t.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${t.pnl?.toFixed(2) || '-'}</td>
-          <td>${t.note || '-'}</td>
-          <td></td>
+        <tr class="hover:bg-white/[0.02] transition-colors">
+          <td class="px-5 py-3 font-mono text-slate-500 whitespace-nowrap">${new Date(t.opened_at || Date.now()).toLocaleTimeString()}</td>
+          <td class="px-5 py-3 font-bold text-slate-200">${t.symbol}</td>
+          <td class="px-5 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${t.direction === 'buy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${t.direction}</span></td>
+          <td class="px-5 py-3 text-right font-mono">${t.lot}</td>
+          <td class="px-5 py-3 text-right font-mono text-slate-400">${t.entry_price}</td>
+          <td class="px-5 py-3 text-right font-mono text-slate-400">${t.sl || '-'}</td>
+          <td class="px-5 py-3 text-right font-mono text-slate-400">${t.tp || '-'}</td>
+          <td class="px-5 py-3 text-right font-mono text-slate-300">${t.exit_price || '-'}</td>
+          <td class="px-5 py-3 text-right font-mono font-bold ${t.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${t.pnl >= 0 ? '+' : '-'}$${Math.abs(t.pnl || 0).toFixed(2)}</td>
+          <td class="px-5 py-3 text-slate-400">${t.note || '-'}</td>
+          <td class="px-5 py-3 text-right"></td>
         </tr>
       `).join('');
   }
@@ -266,16 +308,28 @@ function renderSignals() {
     tbody.innerHTML = '<tr><td colspan="6" class="text-center text-slate-500 py-8 uppercase tracking-widest text-xs">NO SIGNALS</td></tr>';
     return;
   }
-  tbody.innerHTML = state.all_signals.map(s => `
-    <tr>
-      <td>${new Date(s.created_at || Date.now()).toLocaleTimeString()}</td>
-      <td>${s.symbol}</td>
-      <td><span class="px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-widest ${s.direction === 'buy' ? 'text-emerald-400' : 'text-rose-400'}">${s.direction}</span></td>
-      <td>${s.score}</td>
-      <td><span class="px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-widest ${s.status === 'FIRED' ? 'bg-emerald-500/20 text-emerald-400' : s.status === 'REJECTED' ? 'bg-white/5 text-slate-400' : 'bg-amber-500/20 text-amber-400'}">${s.status}</span></td>
-      <td>${JSON.stringify(s.reason)}</td>
-    </tr>
-  `).join('');
+  const getStatusBadge = (status) => {
+    let color = 'bg-white/5 text-slate-400 border-white/10';
+    if (status === 'FIRED') color = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+    else if (status === 'DCA_FIRED') color = 'bg-purple-500/20 text-purple-400 border-purple-500/30';
+    else if (status === 'WATCHING') color = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+    else if (status === 'SKIPPED' || status === 'DCA_SKIPPED') color = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+    return `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap border ${color}">${status}</span>`;
+  };
+
+  tbody.innerHTML = state.all_signals.map(s => {
+    const isHighlight = s.status === 'FIRED' || s.status === 'DCA_FIRED';
+    return `
+      <tr class="${isHighlight ? 'bg-emerald-500/5 hover:bg-emerald-500/10' : 'hover:bg-white/[0.02]'} transition-colors">
+        <td class="px-5 py-3 font-mono text-slate-500 whitespace-nowrap">${new Date(s.created_at || Date.now()).toLocaleTimeString()}</td>
+        <td class="px-5 py-3 font-bold text-slate-200">${s.symbol}</td>
+        <td class="px-5 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${s.direction === 'buy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${s.direction}</span></td>
+        <td class="px-5 py-3 text-right font-mono ${s.score > 0 ? 'text-cyan-400 font-bold' : 'text-slate-500'}">${s.score}</td>
+        <td class="px-5 py-3">${getStatusBadge(s.status)}</td>
+        <td class="px-5 py-3 text-slate-300 w-full">${JSON.stringify(s.reason)}</td>
+      </tr>
+    `;
+  }).join('');
 }
 
 function renderLogs() {
@@ -285,11 +339,11 @@ function renderLogs() {
     return;
   }
   tbody.innerHTML = state.events.map(e => `
-    <tr>
-      <td>${new Date(e.created_at || Date.now()).toLocaleTimeString()}</td>
-      <td class="${e.level === 'ERROR' ? 'text-rose-400' : e.level === 'WARN' ? 'text-amber-400' : 'text-cyan-400'}">${e.level}</td>
-      <td>${e.component}</td>
-      <td>${e.message}</td>
+    <tr class="hover:bg-white/[0.02] transition-colors">
+      <td class="px-5 py-3 font-mono text-slate-500 whitespace-nowrap">${new Date(e.created_at || Date.now()).toLocaleTimeString()}</td>
+      <td class="px-5 py-3 font-bold ${e.level === 'ERROR' ? 'text-rose-400' : e.level === 'WARN' ? 'text-amber-400' : 'text-cyan-400'}">${e.level}</td>
+      <td class="px-5 py-3 text-slate-300">${e.component}</td>
+      <td class="px-5 py-3 text-slate-400 w-full">${e.message}</td>
     </tr>
   `).join('');
 }
@@ -302,29 +356,48 @@ function updateScanStatus(data) {
 function renderScannerStatus() {
   const tbody = document.getElementById('scan-status-body');
   const items = Object.values(state.scanner_status);
+  
+  // Sort items: FIRED > DCA_FIRED > WATCHING > SKIPPED > REJECTED > COOLDOWN
+  const statusWeight = { 'FIRED': 6, 'DCA_FIRED': 5, 'WATCHING': 4, 'SKIPPED': 3, 'DCA_SKIPPED': 3, 'REJECTED': 2, 'COOLDOWN': 1 };
+  items.sort((a, b) => (statusWeight[b.status] || 0) - (statusWeight[a.status] || 0));
+  
   if (!items.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-slate-500 py-8 uppercase tracking-widest text-xs">WAITING FOR SCAN...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-slate-500 py-10 uppercase tracking-widest text-xs">WAITING FOR SCAN...</td></tr>';
     return;
   }
   
+  const esc = (str) => String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  
+  const getStatusBadge = (status) => {
+    let color = 'bg-white/5 text-slate-400 border-white/10'; // Default muted (REJECTED, COOLDOWN, SKIPPED, DCA_SKIPPED)
+    if (status === 'FIRED') color = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+    else if (status === 'DCA_FIRED') color = 'bg-purple-500/20 text-purple-400 border-purple-500/30';
+    else if (status === 'WATCHING') color = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+    else if (status === 'SKIPPED' || status === 'DCA_SKIPPED') color = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+    
+    return `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap border ${color}">${status}</span>`;
+  };
+  
   tbody.innerHTML = items.map(s => {
     let reasonText = s.reason.msg || '';
-    if (s.status === 'FIRED') reasonText = 'Signal Triggered!';
+    if (s.status === 'FIRED' || s.status === 'DCA_FIRED') reasonText = 'Signal Triggered!';
     
-    // Clean up reason text safely
-    const esc = (str) => String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     const rawReason = esc(JSON.stringify(s.reason));
+    const isHighlight = s.status === 'FIRED' || s.status === 'DCA_FIRED';
     
     return `
-    <tr>
-      <td>${s.symbol} <span style="color:var(--muted); font-size:10px;">(${s.resolved})</span></td>
-      <td><span class="px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-widest ${s.bias === 'bullish' ? 'bg-emerald-500/20 text-emerald-400' : s.bias === 'bearish' ? 'bg-rose-500/20 text-rose-400' : ''}">${s.bias}</span></td>
-      <td>${s.score}</td>
-      <td><span class="px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-widest ${s.status === 'FIRED' ? 'bg-emerald-500/20 text-emerald-400' : s.status === 'REJECTED' ? 'bg-white/5 text-slate-400' : 'bg-amber-500/20 text-amber-400'}">${s.status}</span></td>
-      <td style="max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${rawReason}">
+    <tr class="${isHighlight ? 'bg-emerald-500/5 hover:bg-emerald-500/10' : 'hover:bg-white/[0.02]'} transition-colors">
+      <td class="px-5 py-3 flex items-center gap-2">
+        <span class="font-bold text-slate-200">${s.symbol}</span> 
+        <span class="text-slate-500 font-mono text-[9px] border border-border_strong px-1 rounded">${s.resolved}</span>
+      </td>
+      <td class="px-5 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${s.bias === 'bullish' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : s.bias === 'bearish' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-white/5 text-slate-400 border border-white/10'}">${s.bias || 'NONE'}</span></td>
+      <td class="px-5 py-3 text-right font-mono ${s.score > 0 ? 'text-cyan-400 font-bold' : 'text-slate-500'}">${s.score}</td>
+      <td class="px-5 py-3">${getStatusBadge(s.status)}</td>
+      <td class="px-5 py-3 text-slate-300" style="max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${rawReason}">
         ${esc(reasonText)}
       </td>
-      <td>${new Date(s.updated_at).toLocaleTimeString()}</td>
+      <td class="px-5 py-3 font-mono text-slate-500 text-right w-24 shrink-0">${new Date(s.updated_at).toLocaleTimeString()}</td>
     </tr>
     `;
   }).join('');
@@ -514,16 +587,33 @@ const IANA_ZONES = ['UTC','Europe/London','America/New_York','Asia/Tokyo','Asia/
 function addSessionRow(session) {
   const id = session?.id ?? ('new-' + Date.now());
   const html = `
-    <div class="session-row flex flex-col md:flex-row gap-3 items-start md:items-center p-3 border border-border_light bg-white/[0.02] rounded-sm" data-id="${id}">
-      <input placeholder="NAME" class="s-name bg-bg border border-border_strong text-slate-200 text-xs px-3 py-1.5 rounded-sm outline-none focus:border-cyan_neon w-full md:w-auto flex-1" value="${session?.name ?? ''}">
-      <input type="time" class="s-start bg-bg border border-border_strong text-slate-200 text-xs px-3 py-1.5 rounded-sm outline-none focus:border-cyan_neon" value="${session?.start_time ?? '08:00'}">
-      <input type="time" class="s-end bg-bg border border-border_strong text-slate-200 text-xs px-3 py-1.5 rounded-sm outline-none focus:border-cyan_neon" value="${session?.end_time ?? '12:00'}">
-      <select class="s-tz bg-bg border border-border_strong text-slate-200 text-[10px] px-2 py-1.5 rounded-sm outline-none focus:border-cyan_neon w-28">${IANA_ZONES.map(z => `<option ${z === (session?.timezone ?? 'UTC') ? 'selected' : ''}>${z}</option>`).join('')}</select>
-      <div class="day-checks flex gap-1">${['M','T','W','T','F','S','S'].map((d,i) => `
-        <label class="flex flex-col items-center gap-1 text-[9px] text-slate-500 cursor-pointer hover:text-slate-300"><input type="checkbox" data-day="${i}" class="w-3 h-3 accent-cyan_neon cursor-pointer" ${!session || (session?.days_mask & (1<<i)) ? 'checked' : ''}>${d}</label>
-      `).join('')}</div>
-      <label class="flex items-center gap-2 text-[10px] font-bold text-slate-300 uppercase shrink-0"><input type="checkbox" class="s-on w-4 h-4 accent-cyan_neon cursor-pointer" ${session?.enabled !== false ? 'checked' : ''}>ON</label>
-      <button type="button" class="px-2 py-1 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded transition-colors shrink-0" onclick="this.closest('.session-row').remove()">×</button>
+    <div class="session-row flex flex-col md:flex-row gap-4 items-start md:items-center p-4 border border-border_light bg-white/[0.02] rounded hover:bg-white/[0.04] transition-colors" data-id="${id}">
+      <div class="w-full md:w-32 shrink-0 flex flex-col gap-1.5">
+         <span class="text-[9px] uppercase tracking-widest text-slate-500 font-bold hidden md:block">Name</span>
+         <input placeholder="SESSION NAME" class="s-name bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon w-full" value="${session?.name ?? ''}">
+      </div>
+      <div class="w-full md:w-24 shrink-0 flex flex-col gap-1.5">
+         <span class="text-[9px] uppercase tracking-widest text-slate-500 font-bold hidden md:block">Start (UTC)</span>
+         <input type="time" class="s-start bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon w-full" value="${session?.start_time ?? '08:00'}">
+      </div>
+      <div class="w-full md:w-24 shrink-0 flex flex-col gap-1.5">
+         <span class="text-[9px] uppercase tracking-widest text-slate-500 font-bold hidden md:block">End (UTC)</span>
+         <input type="time" class="s-end bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon w-full" value="${session?.end_time ?? '12:00'}">
+      </div>
+      <div class="w-full md:w-32 shrink-0 flex flex-col gap-1.5">
+         <span class="text-[9px] uppercase tracking-widest text-slate-500 font-bold hidden md:block">Timezone</span>
+         <select class="s-tz bg-black/20 border border-border_strong text-slate-200 text-[10px] px-2 py-2 rounded outline-none focus:border-cyan_neon w-full">${IANA_ZONES.map(z => `<option ${z === (session?.timezone ?? 'UTC') ? 'selected' : ''}>${z}</option>`).join('')}</select>
+      </div>
+      <div class="flex-1 flex flex-col gap-1.5 min-w-[120px]">
+         <span class="text-[9px] uppercase tracking-widest text-slate-500 font-bold hidden md:block">Days</span>
+         <div class="day-checks flex gap-1 justify-between bg-black/10 border border-border_strong p-1 rounded">${['M','T','W','T','F','S','S'].map((d,i) => `
+           <label class="flex flex-col items-center gap-1 text-[9px] text-slate-500 cursor-pointer hover:text-slate-300 w-full text-center"><input type="checkbox" data-day="${i}" class="w-3 h-3 accent-cyan_neon cursor-pointer" ${!session || (session?.days_mask & (1<<i)) ? 'checked' : ''}>${d}</label>
+         `).join('')}</div>
+      </div>
+      <div class="shrink-0 flex items-center justify-between md:flex-col md:items-end gap-2 w-full md:w-auto mt-2 md:mt-0">
+        <label class="flex items-center gap-2 text-[10px] font-bold text-slate-300 uppercase shrink-0 cursor-pointer group"><input type="checkbox" class="s-on w-4 h-4 accent-cyan_neon cursor-pointer bg-black/20 border-border_strong group-hover:border-cyan_neon" ${session?.enabled !== false ? 'checked' : ''}> ENABLED</label>
+        <button type="button" class="px-2 py-1 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/30 rounded text-[10px] font-bold tracking-widest uppercase transition-all shrink-0" onclick="this.closest('.session-row').remove()">DELETE</button>
+      </div>
     </div>`;
   document.getElementById('sessions-list').insertAdjacentHTML('beforeend', html);
 }

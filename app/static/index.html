@@ -28,22 +28,22 @@
 <body class="bg-bg text-slate-300 font-mono h-screen flex flex-col text-[12px] antialiased">
   
   <!-- TOP BAR -->
-  <header class="flex items-center justify-between px-6 py-4 border-b border-border_light bg-panel shrink-0">
-    <div class="font-bold tracking-[0.15em] text-slate-100 text-sm">FOREX PULLBACK BOT</div>
-    <div class="flex gap-4 items-center text-slate-400 text-xs tracking-wide">
+  <header class="flex flex-col md:flex-row items-center justify-between px-6 py-4 border-b border-border_light bg-panel shrink-0 gap-4 md:gap-0">
+    <div class="font-bold tracking-[0.15em] text-slate-100 text-sm flex-1">FOREX PULLBACK BOT</div>
+    <div class="flex flex-wrap justify-center gap-3 md:gap-4 items-center text-slate-400 text-xs tracking-wide flex-1">
       <div class="flex items-center gap-2">
         <span class="w-2 h-2 rounded-full bg-rose-500" id="mt5-dot"></span>
         <span id="mt5-info">Not connected</span>
       </div>
-      <span class="text-border_strong">|</span>
+      <span class="text-border_strong hidden md:inline">|</span>
       <span>SESSIONS: <span class="text-cyan_neon font-bold" id="active-sessions">0</span></span>
-      <span class="text-border_strong">|</span>
+      <span class="text-border_strong hidden md:inline">|</span>
       <span>PNL TODAY: <span id="today-pnl" class="font-bold text-slate-200">$0.00</span></span>
     </div>
-    <div class="flex gap-3">
-      <button class="px-4 py-1.5 border border-border_strong text-slate-300 text-[10px] font-bold tracking-[0.1em] uppercase hover:bg-white/5 hover:border-slate-500 transition-all rounded-sm" onclick="openMt5Modal()">MT5 LINK</button>
-      <button class="px-4 py-1.5 border border-border_strong text-slate-300 text-[10px] font-bold tracking-[0.1em] uppercase hover:bg-white/5 hover:border-slate-500 transition-all rounded-sm" onclick="openConfigModal()">CONFIG</button>
-      <button class="px-5 py-1.5 bg-cyan_neon text-black font-bold text-[11px] tracking-[0.15em] uppercase shadow-[0_0_12px_rgba(34,211,238,0.2)] hover:brightness-110 hover:shadow-[0_0_20px_rgba(34,211,238,0.4)] transition-all rounded-sm" id="engine-toggle" onclick="toggleEngine()">START</button>
+    <div class="flex gap-3 flex-1 justify-end">
+      <button class="px-4 py-1.5 border border-border_strong text-slate-300 text-[10px] font-bold tracking-[0.1em] uppercase hover:bg-white/5 hover:border-slate-500 transition-all rounded-sm h-[32px] flex items-center" onclick="openMt5Modal()">MT5 LINK</button>
+      <button class="px-4 py-1.5 border border-border_strong text-slate-300 text-[10px] font-bold tracking-[0.1em] uppercase hover:bg-white/5 hover:border-slate-500 transition-all rounded-sm h-[32px] flex items-center" onclick="openConfigModal()">CONFIG</button>
+      <button class="px-5 py-1.5 bg-cyan_neon text-black font-bold text-[11px] tracking-[0.15em] uppercase shadow-[0_0_12px_rgba(34,211,238,0.2)] hover:brightness-110 hover:shadow-[0_0_20px_rgba(34,211,238,0.4)] transition-all rounded-sm h-[32px] flex items-center" id="engine-toggle" onclick="toggleEngine()">START</button>
     </div>
   </header>
 
@@ -59,28 +59,31 @@
   <main class="flex-1 overflow-y-auto p-6 min-w-0">
     <section class="tab-panel active space-y-6" data-panel="dashboard">
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="bg-panel border border-border_light p-5 rounded-sm">
+        <div class="bg-panel border border-border_light p-5 rounded-sm flex flex-col justify-center h-24">
           <div class="text-[10px] tracking-[0.15em] uppercase text-slate-500 mb-2 font-semibold">BALANCE</div>
-          <div class="text-2xl text-slate-100" id="s-balance">—</div>
+          <div class="text-2xl text-slate-100 font-mono" id="s-balance">—</div>
         </div>
-        <div class="bg-panel border border-border_light p-5 rounded-sm">
+        <div class="bg-panel border border-border_light p-5 rounded-sm flex flex-col justify-center h-24">
           <div class="text-[10px] tracking-[0.15em] uppercase text-slate-500 mb-2 font-semibold">EQUITY</div>
-          <div class="text-2xl text-cyan_neon" id="s-equity">—</div>
+          <div class="text-2xl text-cyan_neon font-mono" id="s-equity">—</div>
         </div>
-        <div class="bg-panel border border-border_light p-5 rounded-sm">
+        <div class="bg-panel border border-border_light p-5 rounded-sm flex flex-col justify-center h-24">
           <div class="text-[10px] tracking-[0.15em] uppercase text-slate-500 mb-2 font-semibold">UNREALIZED PNL</div>
-          <div class="text-2xl text-slate-100" id="s-unrealized">—</div>
+          <div class="text-2xl text-slate-100 font-mono" id="s-unrealized">—</div>
         </div>
-        <div class="bg-panel border border-border_light p-5 rounded-sm">
-          <div class="text-[10px] tracking-[0.15em] uppercase text-slate-500 mb-2 font-semibold">OPEN POSITIONS</div>
-          <div class="text-2xl text-slate-100" id="s-open">0</div>
+        <div class="bg-panel border border-border_light p-5 rounded-sm flex flex-col justify-center h-24">
+          <div class="text-[10px] tracking-[0.15em] uppercase text-slate-500 mb-2 font-semibold flex justify-between">
+             <span>OPEN POSITIONS</span>
+             <span class="text-amber-500/70 lowercase tracking-normal bg-amber-500/10 px-1.5 py-0.5 rounded text-[9px]">live</span>
+          </div>
+          <div class="text-2xl text-slate-100 font-mono" id="s-open">0</div>
         </div>
       </div>
       
       <div class="bg-panel border border-border_light rounded-sm overflow-hidden flex flex-col">
         <div class="flex justify-between items-center px-5 py-4 border-b border-border_light bg-white/[0.02]">
           <span class="text-[10px] tracking-[0.15em] font-bold text-slate-400 uppercase">OPEN POSITIONS</span>
-          <button class="px-3 py-1 text-[10px] font-bold tracking-widest uppercase border border-border_strong text-slate-400 hover:text-white hover:border-slate-500 rounded-sm transition-colors" onclick="closeAllPositions()">CLOSE ALL</button>
+          <button class="px-3 py-1 text-[10px] font-bold tracking-widest uppercase border border-border_strong text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/30 rounded-sm transition-colors" onclick="closeAllPositions()">CLOSE ALL</button>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-left whitespace-nowrap">
@@ -88,12 +91,12 @@
               <tr class="bg-bg text-[10px] tracking-[0.1em] text-slate-500 uppercase border-b border-border_light">
                 <th class="px-5 py-3 font-semibold">SYMBOL</th>
                 <th class="px-5 py-3 font-semibold">DIR</th>
-                <th class="px-5 py-3 font-semibold">LOT</th>
-                <th class="px-5 py-3 font-semibold">ENTRY</th>
-                <th class="px-5 py-3 font-semibold">CUR</th>
-                <th class="px-5 py-3 font-semibold">PNL</th>
-                <th class="px-5 py-3 font-semibold">SL</th>
-                <th class="px-5 py-3 font-semibold">TP</th>
+                <th class="px-5 py-3 font-semibold text-right">LOT</th>
+                <th class="px-5 py-3 font-semibold text-right">ENTRY</th>
+                <th class="px-5 py-3 font-semibold text-right">CUR</th>
+                <th class="px-5 py-3 font-semibold text-right">PNL</th>
+                <th class="px-5 py-3 font-semibold text-right">SL</th>
+                <th class="px-5 py-3 font-semibold text-right">TP</th>
                 <th class="px-5 py-3 font-semibold text-right">ACTION</th>
               </tr>
             </thead>
@@ -146,12 +149,12 @@
                 <th class="px-5 py-3 font-semibold">TIME</th>
                 <th class="px-5 py-3 font-semibold">SYMBOL</th>
                 <th class="px-5 py-3 font-semibold">DIR</th>
-                <th class="px-5 py-3 font-semibold">LOT</th>
-                <th class="px-5 py-3 font-semibold">ENTRY</th>
-                <th class="px-5 py-3 font-semibold">SL</th>
-                <th class="px-5 py-3 font-semibold">TP</th>
-                <th class="px-5 py-3 font-semibold">EXIT</th>
-                <th class="px-5 py-3 font-semibold">PNL</th>
+                <th class="px-5 py-3 font-semibold text-right">LOT</th>
+                <th class="px-5 py-3 font-semibold text-right">ENTRY</th>
+                <th class="px-5 py-3 font-semibold text-right">SL</th>
+                <th class="px-5 py-3 font-semibold text-right">TP</th>
+                <th class="px-5 py-3 font-semibold text-right">EXIT</th>
+                <th class="px-5 py-3 font-semibold text-right">PNL</th>
                 <th class="px-5 py-3 font-semibold">NOTE</th>
                 <th class="px-5 py-3 font-semibold text-right">ACTION</th>
               </tr>
@@ -174,7 +177,7 @@
                 <th class="px-5 py-3 font-semibold">TIME</th>
                 <th class="px-5 py-3 font-semibold">SYMBOL</th>
                 <th class="px-5 py-3 font-semibold">DIR</th>
-                <th class="px-5 py-3 font-semibold">SCORE</th>
+                <th class="px-5 py-3 font-semibold text-right">SCORE</th>
                 <th class="px-5 py-3 font-semibold">STATUS</th>
                 <th class="px-5 py-3 font-semibold w-full">REASON</th>
               </tr>
@@ -260,13 +263,17 @@
         </nav>
       </div>
       
-      <div class="flex-1 flex flex-col bg-panel relative overflow-y-auto">
-        <div class="p-8 flex-1">
+      <div class="flex-1 flex flex-col bg-panel relative h-full">
+        <div class="p-8 flex-1 overflow-y-auto">
           <!-- General -->
-          <div class="m-panel active grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5" data-mpanel="general">
+          <div class="m-panel active grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-6" data-mpanel="general">
             <label class="flex flex-col gap-1.5 text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">MAGIC NUMBER <input type="number" id="c-magic_number" value="123456" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors"></label>
             <label class="flex flex-col gap-1.5 text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">MAX OPEN POSITIONS <input type="number" id="c-max_open_positions" value="5" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors"></label>
-            <label class="flex flex-col gap-1.5 text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">MAX SIGNALS PER SCAN <input type="number" id="c-max_signals_per_scan" value="1" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors"></label>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">MAX SIGNALS PER SCAN</label>
+              <input type="number" id="c-max_signals_per_scan" value="1" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors">
+              <div class="text-[9px] text-slate-500 font-normal normal-case">Limits how many new base positions can open in one cycle.</div>
+            </div>
             <label class="flex flex-col gap-1.5 text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">MAX PER SYMBOL <input type="number" id="c-max_per_symbol" value="1" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors"></label>
             <label class="flex flex-col gap-1.5 text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">MAX PER DIRECTION <input type="number" id="c-max_per_direction" value="3" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors"></label>
             <label class="flex flex-col gap-1.5 text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">MAX SPREAD (% OF SL) <input type="number" step="0.1" id="c-max_spread_pct" value="20.0" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors"></label>
@@ -289,34 +296,61 @@
 
           <!-- Sessions -->
           <div class="m-panel space-y-4" data-mpanel="sessions">
-            <div id="sessions-list" class="space-y-3"></div>
+            <div id="sessions-list" class="space-y-4"></div>
             <button type="button" class="px-5 py-2.5 border border-border_strong text-slate-300 text-[10px] font-bold tracking-[0.1em] uppercase hover:bg-white/5 transition-colors rounded" onclick="addSessionRow()">+ ADD SESSION</button>
           </div>
 
           <!-- Risk & DCA -->
-          <div class="m-panel grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5" data-mpanel="risk">
-            <label class="flex flex-col gap-1.5 text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">ATR SL BUFFER (xATR) <input type="number" step="0.1" id="c-atr_buffer_multiplier" value="0.2" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors"></label>
+          <div class="m-panel grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-6" data-mpanel="risk">
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">ATR SL BUFFER (xATR)</label>
+              <input type="number" step="0.1" id="c-atr_buffer_multiplier" value="0.2" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors">
+              <div class="text-[9px] text-slate-500 font-normal normal-case">Extra buffer applied to SL using ATR value.</div>
+            </div>
             <label class="flex flex-col gap-1.5 text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">BREAKEVEN TRIGGER (R) <input type="number" step="0.1" id="c-breakeven_trigger_r" value="1.0" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors"></label>
             
-            <label class="flex gap-3 items-center text-[10px] font-bold tracking-[0.1em] text-slate-300 uppercase mt-2 cursor-pointer group w-fit"><input type="checkbox" id="c-use_liquidity_tp" checked class="w-4 h-4 accent-cyan_neon cursor-pointer border-border_strong bg-black/20 group-hover:border-cyan_neon transition-colors"> USE LIQUIDITY TP</label>
-            <label class="flex gap-3 items-center text-[10px] font-bold tracking-[0.1em] text-slate-300 uppercase mt-2 cursor-pointer group w-fit"><input type="checkbox" id="c-trailing" checked class="w-4 h-4 accent-cyan_neon cursor-pointer border-border_strong bg-black/20 group-hover:border-cyan_neon transition-colors"> TRAILING STOP (1.5x ATR)</label>
+            <div class="flex flex-col gap-3">
+               <label class="flex gap-3 items-center text-[10px] font-bold tracking-[0.1em] text-slate-300 uppercase cursor-pointer group w-fit"><input type="checkbox" id="c-use_liquidity_tp" checked class="w-4 h-4 accent-cyan_neon cursor-pointer border-border_strong bg-black/20 group-hover:border-cyan_neon transition-colors"> USE LIQUIDITY TP</label>
+               <label class="flex gap-3 items-center text-[10px] font-bold tracking-[0.1em] text-slate-300 uppercase cursor-pointer group w-fit"><input type="checkbox" id="c-trailing" checked class="w-4 h-4 accent-cyan_neon cursor-pointer border-border_strong bg-black/20 group-hover:border-cyan_neon transition-colors"> TRAILING STOP (1.5x ATR)</label>
+            </div>
+            <div></div> <!-- empty grid cell -->
             
             <div class="col-span-1 md:col-span-2 mt-6 mb-2 text-[11px] font-bold tracking-[0.15em] text-cyan_neon border-b border-border_light pb-3 uppercase flex items-center gap-2"><span class="opacity-70 text-[8px]">■</span> DCA SETTINGS</div>
             
             <label class="flex flex-col gap-1.5 text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">MAX DCA ENTRIES (PER TRADE) <input type="number" id="c-max_dca_entries" value="1" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors"></label>
-            <label class="flex flex-col gap-1.5 text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">MAX DCA PER SCAN <input type="number" id="c-max_dca_per_scan" value="2" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors"></label>
-            <label class="flex flex-col gap-1.5 text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">TRIGGER SL PROGRESS <input type="number" step="0.1" id="c-dca_trigger_sl_progress" value="0.5" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors"></label>
-            <label class="flex flex-col gap-1.5 text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">LOT MULTIPLIER <input type="number" step="0.1" id="c-dca_lot_multiplier" value="0.7" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors"></label>
-            <label class="flex flex-col gap-1.5 text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">MAX TOTAL RISK (R) <input type="number" step="0.1" id="c-dca_max_total_risk_r" value="2.0" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors"></label>
+            
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">MAX DCA PER SCAN</label>
+              <input type="number" id="c-max_dca_per_scan" value="2" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors">
+              <div class="text-[9px] text-slate-500 font-normal normal-case">Limits how many DCA positions can open simultaneously.</div>
+            </div>
+
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">TRIGGER SL PROGRESS</label>
+              <input type="number" step="0.1" id="c-dca_trigger_sl_progress" value="0.5" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors">
+              <div class="text-[9px] text-slate-500 font-normal normal-case">0.5 means trigger when price is 50% toward Stop Loss.</div>
+            </div>
+
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">LOT MULTIPLIER</label>
+              <input type="number" step="0.1" id="c-dca_lot_multiplier" value="0.7" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors">
+              <div class="text-[9px] text-slate-500 font-normal normal-case">Next DCA lot size relative to original entry.</div>
+            </div>
+
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">MAX TOTAL RISK (R)</label>
+              <input type="number" step="0.1" id="c-dca_max_total_risk_r" value="2.0" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors">
+              <div class="text-[9px] text-slate-500 font-normal normal-case">Maximum R-risk across entire grouped position.</div>
+            </div>
             
             <div class="flex flex-col gap-4 mt-2">
               <label class="flex gap-3 items-center text-[10px] font-bold tracking-[0.1em] text-slate-300 uppercase cursor-pointer group w-fit"><input type="checkbox" id="c-enable_dca" class="w-4 h-4 accent-cyan_neon cursor-pointer border-border_strong bg-black/20 group-hover:border-cyan_neon transition-colors"> ENABLE DCA</label>
-              <label class="flex gap-3 items-center text-[10px] font-bold tracking-[0.1em] text-slate-300 uppercase cursor-pointer group w-fit"><input type="checkbox" id="c-dca_reanchor_sl" checked class="w-4 h-4 accent-cyan_neon cursor-pointer border-border_strong bg-black/20 group-hover:border-cyan_neon transition-colors"> RE-ANCHOR SL</label>
+              <label class="flex gap-3 items-center text-[10px] font-bold tracking-[0.1em] text-slate-300 uppercase cursor-pointer group w-fit" title="Update Stop Loss for all group tickets to match latest DCA."><input type="checkbox" id="c-dca_reanchor_sl" checked class="w-4 h-4 accent-cyan_neon cursor-pointer border-border_strong bg-black/20 group-hover:border-cyan_neon transition-colors"> RE-ANCHOR SL</label>
             </div>
           </div>
         </div>
 
-        <div class="sticky bottom-0 left-0 right-0 px-6 py-4 border-t border-border_light bg-panel/90 backdrop-blur flex justify-end gap-3 shrink-0">
+        <div class="px-6 py-4 border-t border-border_light bg-panel/90 backdrop-blur flex justify-end gap-3 shrink-0">
           <button type="button" class="px-4 py-2 border border-border_strong text-slate-300 text-[10px] font-bold tracking-[0.1em] uppercase hover:bg-white/5 transition-colors rounded-sm" onclick="closeConfigModal()">CANCEL</button>
           <button type="button" class="px-5 py-2 bg-cyan_neon text-black font-bold text-[10px] tracking-[0.1em] uppercase shadow-[0_0_10px_rgba(34,211,238,0.2)] hover:brightness-110 rounded-sm" onclick="saveConfig()">SAVE CHANGES</button>
         </div>
