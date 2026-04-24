@@ -67,7 +67,7 @@ async def scan_loop():
             # --- RANKING CONFIG & POSITIONS ---
             max_signals_per_scan = int(cfg.get("max_signals_per_scan", 1))
             max_open = int(cfg.get("max_open_positions", 5))
-            max_symbol = int(cfg.get("max_per_symbol", 2))
+            max_symbol = int(cfg.get("max_per_symbol", 1))
             max_dir = int(cfg.get("max_per_direction", 3))
             magic = int(cfg.get("magic_number", 123456))
             
@@ -258,14 +258,24 @@ async def scan_loop():
                                                         dca_reanchor_sl = cfg.get("dca_reanchor_sl", True)
                                                         new_sl = ltf_trigger['sl'] if dca_reanchor_sl else base_sl
                                                         
-                                                        orig_sl_dist = abs(base_entry - base_sl)
-                                                        base_risk_amount = orig_sl_dist * original_lot
+                                                        def _calc_risk(action, symbol, vol, open_price, sl_price):
+                                                            if not open_price or not sl_price or open_price == sl_price: return 0
+                                                            profit = mt5.order_calc_profit(action, symbol, vol, open_price, sl_price)
+                                                            return abs(profit) if profit and profit < 0 else 1.0 # Fallback
                                                         
-                                                        new_base_sl_dist = abs(base_entry - new_sl)
-                                                        new_dca_sl_dist = abs(current_price - new_sl)
+                                                        # Base 1R risk amount (original trade's initial risk)
+                                                        base_1r_risk = await asyncio.to_thread(_calc_risk, ord_type, resolved, original_lot, base_entry, base_sl)
+                                                        if base_1r_risk == 0: base_1r_risk = 1.0
                                                         
-                                                        total_risk_amount = (new_base_sl_dist * original_lot) + (new_dca_sl_dist * dca_lot)
-                                                        total_risk_r = total_risk_amount / base_risk_amount if base_risk_amount > 0 else 0
+                                                        total_new_risk = await asyncio.to_thread(_calc_risk, ord_type, resolved, dca_lot, current_price, new_sl)
+                                                        
+                                                        for p in same_dir_positions:
+                                                            p_entry = p.get('price_open')
+                                                            p_vol = p.get('volume')
+                                                            p_risk = await asyncio.to_thread(_calc_risk, ord_type, resolved, p_vol, p_entry, new_sl)
+                                                            total_new_risk += p_risk
+                                                        
+                                                        total_risk_r = total_new_risk / base_1r_risk
                                                         
                                                         if total_risk_r > dca_max_total_risk_r:
                                                             status = "DCA_SKIPPED"
@@ -345,9 +355,20 @@ async def scan_loop():
                     })
 
             # --- CANDIDATE RANKING ---
-            candidates.sort(key=lambda x: x["score"], reverse=True)
-            selected_candidates = candidates[:max_signals_per_scan]
-            selected_symbols = [c["resolved"] for c in selected_candidates]
+            dca_candidates = [c for c in candidates if c.get("is_dca")]
+            normal_candidates = [c for c in candidates if not c.get("is_dca")]
+            
+            dca_candidates.sort(key=lambda x: x["score"], reverse=True)
+            normal_candidates.sort(key=lambda x: x["score"], reverse=True)
+            
+            max_dca_per_scan = int(cfg.get("max_dca_per_scan", 2))
+            
+            selected_dca = dca_candidates[:max_dca_per_scan]
+            selected_normal = normal_candidates[:max_signals_per_scan]
+            
+            selected_candidates = selected_dca + selected_normal
+            selected_symbols_dca = {c["resolved"] for c in selected_dca}
+            selected_symbols_normal = {c["resolved"] for c in selected_normal}
             
             for c in candidates:
                 res = c["resolved"]
@@ -358,8 +379,10 @@ async def scan_loop():
                 reason_full = c["reason_full"]
                 state_key = c["state_key"]
                 
-                if res in selected_symbols:
-                    is_dca = c.get("is_dca", False)
+                is_dca = c.get("is_dca", False)
+                
+                # Check if it was selected based on its list
+                if (is_dca and res in selected_symbols_dca) or (not is_dca and res in selected_symbols_normal):
                     status = "DCA_FIRED" if is_dca else "FIRED"
                     if is_dca:
                         reason_full["msg"] = f"DCA Executed! Rank 1 (Score: {score})"

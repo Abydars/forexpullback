@@ -168,22 +168,37 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
                 await db.commit()
                 await db.refresh(t)
                 
-                if is_dca and dca_data and cfg.get("dca_reanchor_sl", True):
-                    parent_ticket = dca_data.get('parent_ticket')
-                    if parent_ticket:
-                        req_sl = {
-                            "action": mt5.TRADE_ACTION_SLTP,
-                            "position": parent_ticket,
-                            "symbol": resolved,
-                            "sl": sig.sl,
-                            "magic": magic
-                        }
-                        await asyncio.to_thread(mt5.order_send, req_sl)
-                        parent_trade = await db.execute(select(Trade).where(Trade.ticket == parent_ticket))
-                        p_trade = parent_trade.scalars().first()
-                        if p_trade:
-                            p_trade.sl = sig.sl
-                            await db.commit()
+                if is_dca and dca_data:
+                    dir_type = 0 if bias == 'bullish' else 1
+                    all_pos = await mt5_client.get_positions()
+                    sym_dir_pos = [p for p in all_pos if p.get('magic') == magic and p['symbol'] == resolved and p['type'] == dir_type]
+                    
+                    reanchor_sl = cfg.get("dca_reanchor_sl", True)
+                    
+                    for p in sym_dir_pos:
+                        if p['ticket'] == ticket:
+                            continue
+                            
+                        new_tp = sig.tp
+                        new_sl = sig.sl if reanchor_sl else p['sl']
+                        
+                        if p['tp'] != new_tp or p['sl'] != new_sl:
+                            req_sltp = {
+                                "action": mt5.TRADE_ACTION_SLTP,
+                                "position": p['ticket'],
+                                "symbol": resolved,
+                                "sl": new_sl,
+                                "tp": new_tp,
+                                "magic": magic
+                            }
+                            await asyncio.to_thread(mt5.order_send, req_sltp)
+                            
+                            db_trade_res = await db.execute(select(Trade).where(Trade.ticket == p['ticket']))
+                            db_trade = db_trade_res.scalars().first()
+                            if db_trade:
+                                db_trade.sl = new_sl
+                                db_trade.tp = new_tp
+                    await db.commit()
                 
                 await broadcast({
                     "type": "trade.opened",
