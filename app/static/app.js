@@ -80,39 +80,51 @@ async function api(method, path, body) {
 
 // ---- Tabs ----
 document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
-  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(x => {
+    x.classList.remove('text-white', 'border-cyan-400');
+    x.classList.add('text-slate-400', 'border-transparent');
+  });
   document.querySelectorAll('.tab-panel').forEach(x => x.classList.remove('active'));
-  t.classList.add('active');
+  t.classList.remove('text-slate-400', 'border-transparent');
+  t.classList.add('text-white', 'border-cyan-400');
   document.querySelector(`.tab-panel[data-panel="${t.dataset.tab}"]`).classList.add('active');
 });
 
 document.querySelectorAll('.m-tab').forEach(t => t.onclick = () => {
-  document.querySelectorAll('.m-tab').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.m-tab').forEach(x => {
+    x.classList.remove('bg-cyan-500/10', 'text-cyan-400', 'border-cyan-500/20', 'shadow-sm');
+    x.classList.add('text-slate-400', 'border-transparent');
+  });
   document.querySelectorAll('.m-panel').forEach(x => x.classList.remove('active'));
-  t.classList.add('active');
+  t.classList.remove('text-slate-400', 'border-transparent');
+  t.classList.add('bg-cyan-500/10', 'text-cyan-400', 'border-cyan-500/20', 'shadow-sm');
   document.querySelector(`.m-panel[data-mpanel="${t.dataset.mtab}"]`).classList.add('active');
 });
 
 document.querySelectorAll('.sub-tab').forEach(t => t.onclick = () => {
-  document.querySelectorAll('.sub-tab').forEach(x => x.classList.remove('active'));
-  t.classList.add('active');
+  document.querySelectorAll('.sub-tab').forEach(x => {
+    x.classList.remove('text-cyan-400', 'border-cyan-400', 'active');
+    x.classList.add('text-slate-500', 'border-transparent');
+  });
+  t.classList.remove('text-slate-500', 'border-transparent');
+  t.classList.add('text-cyan-400', 'border-cyan-400', 'active');
   renderTrades();
 });
 
 
 // ---- Renderers (each idempotent, rebuild target) ----
 function renderTopbar() {
-  document.getElementById('mt5-dot').className = `dot ${state.mt5_connected ? 'on' : ''}`;
+  document.getElementById('mt5-dot').className = `w-2 h-2 rounded-full inline-block ${state.mt5_connected ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]" : "bg-rose-500"}`;
   document.getElementById('mt5-info').innerText = state.mt5_connected ? (state.account?.server || 'Connected') : 'Not connected';
   document.getElementById('active-sessions').innerText = state.sessions.filter(s => s.enabled).length;
   document.getElementById('today-pnl').innerText = `$${state.today_pnl.toFixed(2)}`;
-  document.getElementById('today-pnl').className = state.today_pnl >= 0 ? 'g' : 'r';
+  document.getElementById('today-pnl').className = state.today_pnl >= 0 ? 'text-emerald-400' : 'text-rose-400';
 }
 
 function renderEngineBtn() {
   const btn = document.getElementById('engine-toggle');
   btn.innerText = state.engine_running ? 'STOP' : 'START';
-  btn.className = `btn ${state.engine_running ? 'primary' : ''}`;
+  btn.className = state.engine_running ? 'px-4 py-1.5 rounded bg-cyan-500 text-black font-bold text-[11px] uppercase tracking-widest shadow-[0_0_15px_rgba(6,182,212,0.4)]' : 'px-4 py-1.5 rounded border border-slate-700 text-slate-300 hover:bg-white/5 text-[11px] uppercase tracking-widest';
 }
 
 function renderStats() {
@@ -123,7 +135,7 @@ function renderStats() {
   const unEl = document.getElementById('s-unrealized');
   if (unEl) {
       unEl.innerText = `$${unrealized.toFixed(2)}`;
-      unEl.className = `stat-value ${unrealized >= 0 ? 'g' : 'r'}`;
+      unEl.className = `stat-value ${unrealized >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
   }
   
   document.getElementById('s-today').innerText = `$${state.today_pnl.toFixed(2)}`;
@@ -133,7 +145,7 @@ function renderStats() {
 function renderPositions() {
   const tbody = document.getElementById('open-pos-body');
   if (!state.open_positions.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="empty">NO OPEN POSITIONS</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-slate-500 py-8 uppercase tracking-widest text-xs">NO OPEN POSITIONS</td></tr>';
     return;
   }
   
@@ -163,12 +175,12 @@ function renderPositions() {
 
   tbody.innerHTML = groupedArray.map(g => `
     <tr>
-      <td>${g.symbol} ${g.count > 1 ? `<span class="pill" style="margin-left:6px; background:rgba(77,208,225,0.1); color:var(--cyan);">GROUP (${g.count})</span>` : ''}</td>
-      <td><span class="pill ${g.direction === 'buy' ? 'g' : 'r'}">${g.direction}</span></td>
+      <td>${g.symbol} ${g.count > 1 ? `<span class="px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-widest" style="margin-left:6px; background:rgba(77,208,225,0.1); color:var(--cyan);">GROUP (${g.count})</span>` : ''}</td>
+      <td><span class="px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-widest ${g.direction === 'buy' ? 'text-emerald-400' : 'text-rose-400'}">${g.direction}</span></td>
       <td>${g.total_lot.toFixed(2)}</td>
       <td>${g.avg_entry.toFixed(5)}</td>
       <td>${g.current_price || '-'}</td>
-      <td class="${g.total_pnl >= 0 ? 'g' : 'r'}">${g.total_pnl.toFixed(2)}</td>
+      <td class="${g.total_pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${g.total_pnl.toFixed(2)}</td>
       <td>${g.sl || '-'}</td>
       <td>${g.tp || '-'}</td>
       <td><button class="btn" style="padding:2px 8px; font-size:10px;" onclick="closeGroup('${g.symbol}', '${g.direction}')">CLOSE ${g.count > 1 ? 'ALL' : ''}</button></td>
@@ -182,7 +194,7 @@ function renderTrades() {
   const list = activeSub === 'open' ? state.open_positions : state.closed_trades;
   
   if (!list.length) {
-    tbody.innerHTML = `<tr><td colspan="11" class="empty">NO ${activeSub.toUpperCase()} TRADES</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" class="text-center text-slate-500 py-8 uppercase tracking-widest text-xs">NO ${activeSub.toUpperCase()} TRADES</td></tr>`;
     return;
   }
   
@@ -214,14 +226,14 @@ function renderTrades() {
       tbody.innerHTML = groupedArray.map(t => `
         <tr>
           <td>-</td>
-          <td>${t.symbol} ${t.count > 1 ? `<span class="pill" style="margin-left:6px; background:rgba(77,208,225,0.1); color:var(--cyan);">GROUP (${t.count})</span>` : ''}</td>
-          <td><span class="pill ${t.direction === 'buy' ? 'g' : 'r'}">${t.direction}</span></td>
+          <td>${t.symbol} ${t.count > 1 ? `<span class="px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-widest" style="margin-left:6px; background:rgba(77,208,225,0.1); color:var(--cyan);">GROUP (${t.count})</span>` : ''}</td>
+          <td><span class="px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-widest ${t.direction === 'buy' ? 'text-emerald-400' : 'text-rose-400'}">${t.direction}</span></td>
           <td>${t.total_lot.toFixed(2)}</td>
           <td>${t.avg_entry.toFixed(5)}</td>
           <td>${t.sl || '-'}</td>
           <td>${t.tp || '-'}</td>
           <td>-</td>
-          <td class="${t.total_pnl >= 0 ? 'g' : 'r'}">${t.total_pnl.toFixed(2)}</td>
+          <td class="${t.total_pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${t.total_pnl.toFixed(2)}</td>
           <td>${t.note || '-'}</td>
           <td><button class="btn" onclick="closeGroup('${t.symbol}', '${t.direction}')">CLOSE ${t.count > 1 ? 'ALL' : ''}</button></td>
         </tr>
@@ -231,13 +243,13 @@ function renderTrades() {
         <tr>
           <td>${new Date(t.opened_at || Date.now()).toLocaleTimeString()}</td>
           <td>${t.symbol}</td>
-          <td><span class="pill ${t.direction === 'buy' ? 'g' : 'r'}">${t.direction}</span></td>
+          <td><span class="px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-widest ${t.direction === 'buy' ? 'text-emerald-400' : 'text-rose-400'}">${t.direction}</span></td>
           <td>${t.lot}</td>
           <td>${t.entry_price}</td>
           <td>${t.sl || '-'}</td>
           <td>${t.tp || '-'}</td>
           <td>${t.exit_price || '-'}</td>
-          <td class="${t.pnl >= 0 ? 'g' : 'r'}">${t.pnl?.toFixed(2) || '-'}</td>
+          <td class="${t.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${t.pnl?.toFixed(2) || '-'}</td>
           <td>${t.note || '-'}</td>
           <td></td>
         </tr>
@@ -248,16 +260,16 @@ function renderTrades() {
 function renderSignals() {
   const tbody = document.getElementById('signals-body');
   if (!state.all_signals.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty">NO SIGNALS</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-slate-500 py-8 uppercase tracking-widest text-xs">NO SIGNALS</td></tr>';
     return;
   }
   tbody.innerHTML = state.all_signals.map(s => `
     <tr>
       <td>${new Date(s.created_at || Date.now()).toLocaleTimeString()}</td>
       <td>${s.symbol}</td>
-      <td><span class="pill ${s.direction === 'buy' ? 'g' : 'r'}">${s.direction}</span></td>
+      <td><span class="px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-widest ${s.direction === 'buy' ? 'text-emerald-400' : 'text-rose-400'}">${s.direction}</span></td>
       <td>${s.score}</td>
-      <td><span class="pill ${s.status === 'FIRED' ? 'g' : 'amber'}">${s.status}</span></td>
+      <td><span class="px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-widest ${s.status === 'FIRED' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}">${s.status}</span></td>
       <td>${JSON.stringify(s.reason)}</td>
     </tr>
   `).join('');
@@ -266,13 +278,13 @@ function renderSignals() {
 function renderLogs() {
   const tbody = document.getElementById('logs-body');
   if (!state.events.length) {
-    tbody.innerHTML = '<tr><td colspan="4" class="empty">NO LOGS</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-slate-500 py-8 uppercase tracking-widest text-xs">NO LOGS</td></tr>';
     return;
   }
   tbody.innerHTML = state.events.map(e => `
     <tr>
       <td>${new Date(e.created_at || Date.now()).toLocaleTimeString()}</td>
-      <td class="${e.level === 'ERROR' ? 'r' : e.level === 'WARN' ? 'amber' : 'c'}">${e.level}</td>
+      <td class="${e.level === 'ERROR' ? 'text-rose-400' : e.level === 'WARN' ? 'text-amber-400' : 'text-cyan-400'}">${e.level}</td>
       <td>${e.component}</td>
       <td>${e.message}</td>
     </tr>
@@ -288,7 +300,7 @@ function renderScannerStatus() {
   const tbody = document.getElementById('scan-status-body');
   const items = Object.values(state.scanner_status);
   if (!items.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty">WAITING FOR SCAN...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-slate-500 py-8 uppercase tracking-widest text-xs">WAITING FOR SCAN...</td></tr>';
     return;
   }
   
@@ -303,9 +315,9 @@ function renderScannerStatus() {
     return `
     <tr>
       <td>${s.symbol} <span style="color:var(--muted); font-size:10px;">(${s.resolved})</span></td>
-      <td><span class="pill ${s.bias === 'bullish' ? 'g' : s.bias === 'bearish' ? 'r' : ''}">${s.bias}</span></td>
+      <td><span class="px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-widest ${s.bias === 'bullish' ? 'bg-emerald-500/20 text-emerald-400' : s.bias === 'bearish' ? 'bg-rose-500/20 text-rose-400' : ''}">${s.bias}</span></td>
       <td>${s.score}</td>
-      <td><span class="pill ${s.status === 'FIRED' ? 'g' : 'amber'}">${s.status}</span></td>
+      <td><span class="px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-widest ${s.status === 'FIRED' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}">${s.status}</span></td>
       <td style="max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${rawReason}">
         ${esc(reasonText)}
       </td>
@@ -482,9 +494,9 @@ async function resolveAllSymbols() {
 
 function renderChips() {
   document.getElementById('sym-chips').innerHTML = state.symbols.map(s => `
-    <span class="chip ${s.status}">
+    <span class="flex items-center gap-2 px-3 py-1 rounded bg-panel border ${s.status === 'resolved' ? 'border-emerald-500/30 text-emerald-400' : s.status === 'pending' ? 'border-amber-500/30 text-amber-400' : 'border-rose-500/30 text-rose-400'} text-xs font-mono">
       ${s.generic}${s.resolved ? ' → ' + s.resolved + ' ✓' : ' ✗'}
-      <span class="x" onclick="removeSymbol('${s.generic}')">×</span>
+      <span class="cursor-pointer text-slate-500 hover:text-white px-1" onclick="removeSymbol('${s.generic}')">×</span>
     </span>
   `).join('');
 }
@@ -499,16 +511,16 @@ const IANA_ZONES = ['UTC','Europe/London','America/New_York','Asia/Tokyo','Asia/
 function addSessionRow(session) {
   const id = session?.id ?? ('new-' + Date.now());
   const html = `
-    <div class="session-row" data-id="${id}">
-      <input placeholder="NAME" class="s-name" value="${session?.name ?? ''}">
-      <input type="time" class="s-start" value="${session?.start_time ?? '08:00'}">
-      <input type="time" class="s-end" value="${session?.end_time ?? '12:00'}">
-      <select class="s-tz">${IANA_ZONES.map(z => `<option ${z === (session?.timezone ?? 'UTC') ? 'selected' : ''}>${z}</option>`).join('')}</select>
-      <div class="day-checks">${['M','T','W','T','F','S','S'].map((d,i) => `
-        <label><input type="checkbox" data-day="${i}" ${!session || (session?.days_mask & (1<<i)) ? 'checked' : ''}>${d}</label>
+    <div class="session-row flex flex-col md:flex-row gap-3 items-start md:items-center p-3 border border-border_light bg-white/[0.02] rounded-sm" data-id="${id}">
+      <input placeholder="NAME" class="s-name bg-bg border border-border_strong text-slate-200 text-xs px-3 py-1.5 rounded-sm outline-none focus:border-cyan_neon w-full md:w-auto flex-1" value="${session?.name ?? ''}">
+      <input type="time" class="s-start bg-bg border border-border_strong text-slate-200 text-xs px-3 py-1.5 rounded-sm outline-none focus:border-cyan_neon" value="${session?.start_time ?? '08:00'}">
+      <input type="time" class="s-end bg-bg border border-border_strong text-slate-200 text-xs px-3 py-1.5 rounded-sm outline-none focus:border-cyan_neon" value="${session?.end_time ?? '12:00'}">
+      <select class="s-tz bg-bg border border-border_strong text-slate-200 text-[10px] px-2 py-1.5 rounded-sm outline-none focus:border-cyan_neon w-28">${IANA_ZONES.map(z => `<option ${z === (session?.timezone ?? 'UTC') ? 'selected' : ''}>${z}</option>`).join('')}</select>
+      <div class="day-checks flex gap-1">${['M','T','W','T','F','S','S'].map((d,i) => `
+        <label class="flex flex-col items-center gap-1 text-[9px] text-slate-500 cursor-pointer hover:text-slate-300"><input type="checkbox" data-day="${i}" class="w-3 h-3 accent-cyan_neon cursor-pointer" ${!session || (session?.days_mask & (1<<i)) ? 'checked' : ''}>${d}</label>
       `).join('')}</div>
-      <label><input type="checkbox" class="s-on" ${session?.enabled !== false ? 'checked' : ''}>ON</label>
-      <button type="button" class="btn" onclick="this.closest('.session-row').remove()">×</button>
+      <label class="flex items-center gap-2 text-[10px] font-bold text-slate-300 uppercase shrink-0"><input type="checkbox" class="s-on w-4 h-4 accent-cyan_neon cursor-pointer" ${session?.enabled !== false ? 'checked' : ''}>ON</label>
+      <button type="button" class="px-2 py-1 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded transition-colors shrink-0" onclick="this.closest('.session-row').remove()">×</button>
     </div>`;
   document.getElementById('sessions-list').insertAdjacentHTML('beforeend', html);
 }
