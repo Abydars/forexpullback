@@ -5,9 +5,10 @@ from app.db.session import AsyncSessionLocal
 from app.db.models import Trade, Event
 from datetime import datetime
 from app.ws.manager import broadcast
+from sqlalchemy import select
 import pytz
 
-async def send_order(sig, resolved: str, bias: str, cfg: dict):
+async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca_data=None):
     try:
         magic = int(cfg.get("magic_number", 123456))
         positions = await mt5_client.get_positions()
@@ -17,14 +18,15 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict):
         if len(bot_positions) >= int(cfg.get("max_open_positions", 5)):
             return
             
-        sym_pos = [p for p in bot_positions if p['symbol'] == resolved]
-        if len(sym_pos) >= int(cfg.get("max_per_symbol", 1)):
-            return
-            
-        dir_type = 0 if bias == 'bullish' else 1
-        sym_dir_pos = [p for p in sym_pos if p['type'] == dir_type]
-        if len(sym_dir_pos) >= int(cfg.get("max_per_direction", 3)):
-            return
+        if not is_dca:
+            sym_pos = [p for p in bot_positions if p['symbol'] == resolved]
+            if len(sym_pos) >= int(cfg.get("max_per_symbol", 1)):
+                return
+                
+            dir_type = 0 if bias == 'bullish' else 1
+            sym_dir_pos = [p for p in sym_pos if p['type'] == dir_type]
+            if len(sym_dir_pos) >= int(cfg.get("max_per_direction", 3)):
+                return
             
         acc = await mt5_client.account_info()
         balance = acc['balance']
@@ -62,19 +64,22 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict):
             
         profit_1_lot = await asyncio.to_thread(_calc_profit)
         
-        if profit_1_lot is not None and profit_1_lot != 0:
-            loss_for_1_lot = abs(profit_1_lot)
-            lot = risk_amount / loss_for_1_lot
+        if is_dca and dca_data:
+            lot = dca_data.get('dca_lot', info.volume_min)
         else:
-            # Fallback for when order_calc_profit fails
-            sl_points = abs(actual_price - sig.sl) / info.point if info.point else 1
-            lot = risk_amount / (sl_points * info.trade_tick_value) if info.trade_tick_value else info.volume_min
-        
-        # precise volume calculation to prevent MT5 invalid volume errors
-        steps = round(lot / info.volume_step)
-        lot = steps * info.volume_step
-        lot = max(info.volume_min, min(info.volume_max, lot))
-        lot = float(f"{lot:.8f}".rstrip('0').rstrip('.')) if '.' in f"{lot:.8f}" else float(lot)
+            if profit_1_lot is not None and profit_1_lot != 0:
+                loss_for_1_lot = abs(profit_1_lot)
+                lot = risk_amount / loss_for_1_lot
+            else:
+                # Fallback for when order_calc_profit fails
+                sl_points = abs(actual_price - sig.sl) / info.point if info.point else 1
+                lot = risk_amount / (sl_points * info.trade_tick_value) if info.trade_tick_value else info.volume_min
+            
+            # precise volume calculation to prevent MT5 invalid volume errors
+            steps = round(lot / info.volume_step)
+            lot = steps * info.volume_step
+            lot = max(info.volume_min, min(info.volume_max, lot))
+            lot = float(f"{lot:.8f}".rstrip('0').rstrip('.')) if '.' in f"{lot:.8f}" else float(lot)
         
         action = mt5.TRADE_ACTION_DEAL
         type_ = mt5.ORDER_TYPE_BUY if bias == 'bullish' else mt5.ORDER_TYPE_SELL
@@ -149,9 +154,36 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict):
                 t = Trade(signal_id=sig.id, ticket=ticket, symbol=resolved, direction=bias,
                          lot=lot, entry_price=res.get('price'), sl=sig.sl, tp=sig.tp,
                          opened_at=datetime.now(pytz.utc))
+                
+                if is_dca and dca_data:
+                    t.parent_trade_id = dca_data.get('parent_ticket')
+                    t.dca_index = dca_data.get('dca_index', 0)
+                    t.group_id = f"grp_{t.parent_trade_id}"
+                    t.note = f"DCA #{t.dca_index}"
+                else:
+                    t.note = "BASE"
+                    t.group_id = f"grp_{ticket}"
+
                 db.add(t)
                 await db.commit()
                 await db.refresh(t)
+                
+                if is_dca and dca_data and cfg.get("dca_reanchor_sl", True):
+                    parent_ticket = dca_data.get('parent_ticket')
+                    if parent_ticket:
+                        req_sl = {
+                            "action": mt5.TRADE_ACTION_SLTP,
+                            "position": parent_ticket,
+                            "symbol": resolved,
+                            "sl": sig.sl,
+                            "magic": magic
+                        }
+                        await asyncio.to_thread(mt5.order_send, req_sl)
+                        parent_trade = await db.execute(select(Trade).where(Trade.ticket == parent_ticket))
+                        p_trade = parent_trade.scalars().first()
+                        if p_trade:
+                            p_trade.sl = sig.sl
+                            await db.commit()
                 
                 await broadcast({
                     "type": "trade.opened",

@@ -206,11 +206,86 @@ async def scan_loop():
                                         state_key = f"{resolved}_{bias}"
                                         
                                         # Also check if a trade is currently open for this symbol
-                                        sym_count = len([p for p in bot_positions if p['symbol'] == resolved])
+                                        open_positions_for_sym = [p for p in bot_positions if p['symbol'] == resolved]
+                                        ord_type = mt5.ORDER_TYPE_BUY if bias == 'bullish' else mt5.ORDER_TYPE_SELL
+                                        sym_count = len(open_positions_for_sym)
+                                        
+                                        is_dca_allowed = False
+                                        is_dca_candidate = False
                                         
                                         if sym_count > 0:
-                                            status = "COOLDOWN"
-                                            reason_full["msg"] = "Skipped: position already open for this symbol"
+                                            enable_dca = cfg.get("enable_dca", False)
+                                            same_dir_positions = [p for p in open_positions_for_sym if p.get('type') == ord_type]
+                                            
+                                            if enable_dca and score >= base_threshold and len(same_dir_positions) > 0:
+                                                max_dca_entries = int(cfg.get("max_dca_entries", 1))
+                                                dca_trigger_sl_progress = float(cfg.get("dca_trigger_sl_progress", 0.5))
+                                                dca_max_total_risk_r = float(cfg.get("dca_max_total_risk_r", 2.0))
+                                                
+                                                same_dir_positions.sort(key=lambda x: x.get('time', 0))
+                                                base_trade = same_dir_positions[0]
+                                                base_entry = base_trade.get('price_open')
+                                                base_sl = base_trade.get('sl')
+                                                
+                                                if base_entry and base_sl and base_entry != base_sl:
+                                                    current_price = tick.ask if bias == 'bullish' else tick.bid
+                                                    
+                                                    if bias == 'bullish':
+                                                        progress = (base_entry - current_price) / (base_entry - base_sl)
+                                                    else:
+                                                        progress = (current_price - base_entry) / (base_sl - base_entry)
+                                                        
+                                                    dca_count = len(same_dir_positions) - 1
+                                                    
+                                                    if dca_count >= max_dca_entries:
+                                                        status = "DCA_SKIPPED"
+                                                        reason_full["msg"] = "Skipped DCA: max entries reached"
+                                                    elif progress < dca_trigger_sl_progress:
+                                                        status = "DCA_SKIPPED"
+                                                        reason_full["msg"] = f"Skipped DCA: price not moved enough ({progress:.2f} < {dca_trigger_sl_progress})"
+                                                    elif progress >= 0.85:
+                                                        status = "DCA_SKIPPED"
+                                                        reason_full["msg"] = "Skipped DCA: too close to SL"
+                                                    else:
+                                                        original_lot = base_trade.get('volume')
+                                                        dca_lot_multiplier = float(cfg.get("dca_lot_multiplier", 0.7))
+                                                        dca_lot = original_lot * dca_lot_multiplier
+                                                        if dca_lot < info.volume_min: dca_lot = info.volume_min
+                                                        if dca_lot > info.volume_max: dca_lot = info.volume_max
+                                                        step = info.volume_step
+                                                        dca_lot = round(dca_lot / step) * step
+                                                        
+                                                        dca_reanchor_sl = cfg.get("dca_reanchor_sl", True)
+                                                        new_sl = ltf_trigger['sl'] if dca_reanchor_sl else base_sl
+                                                        
+                                                        orig_sl_dist = abs(base_entry - base_sl)
+                                                        base_risk_amount = orig_sl_dist * original_lot
+                                                        
+                                                        new_base_sl_dist = abs(base_entry - new_sl)
+                                                        new_dca_sl_dist = abs(current_price - new_sl)
+                                                        
+                                                        total_risk_amount = (new_base_sl_dist * original_lot) + (new_dca_sl_dist * dca_lot)
+                                                        total_risk_r = total_risk_amount / base_risk_amount if base_risk_amount > 0 else 0
+                                                        
+                                                        if total_risk_r > dca_max_total_risk_r:
+                                                            status = "DCA_SKIPPED"
+                                                            reason_full["msg"] = f"Skipped DCA: total risk cap exceeded ({total_risk_r:.2f} > {dca_max_total_risk_r})"
+                                                        else:
+                                                            status = "DCA_FIRED"
+                                                            reason_full["msg"] = "DCA added: fresh signal while price near SL"
+                                                            is_dca_allowed = True
+                                                            is_dca_candidate = True
+                                                            
+                                                            ltf_trigger['is_dca'] = True
+                                                            ltf_trigger['dca_index'] = dca_count + 1
+                                                            ltf_trigger['dca_lot'] = dca_lot
+                                                            ltf_trigger['sl'] = new_sl
+                                                            ltf_trigger['parent_ticket'] = base_trade.get('ticket')
+                                            
+                                            if not is_dca_allowed and status not in ("DCA_SKIPPED", "DCA_FIRED"):
+                                                status = "COOLDOWN"
+                                                reason_full["msg"] = "Skipped: position already open for this symbol"
+                                                
                                         elif has_recent_closed:
                                             status = "COOLDOWN"
                                             reason_full["msg"] = f"Skipped: recent trade exit cooldown ({cooldown_mins}m)"
@@ -219,7 +294,6 @@ async def scan_loop():
                                             reason_full["msg"] = f"Fired recently, waiting {cooldown_mins}m"
                                         elif score >= base_threshold:
                                             # POSITION LIMITS CHECK BEFORE CANDIDATE SELECTION
-                                            ord_type = mt5.ORDER_TYPE_BUY if bias == 'bullish' else mt5.ORDER_TYPE_SELL
                                             dir_count = len([p for p in bot_positions if p.get('type') == ord_type])
                                             
                                             if len(bot_positions) >= max_open or sym_count >= max_symbol or dir_count >= max_dir:
@@ -228,6 +302,7 @@ async def scan_loop():
                                             else:
                                                 status = "FIRED" # Temporary status
                                                 reason_full["msg"] = f"Candidate Accepted! Score: {score} >= {base_threshold}"
+                                                
                                                 candidates.append({
                                                     "generic": generic,
                                                     "resolved": resolved,
@@ -243,6 +318,20 @@ async def scan_loop():
                                             status = "WATCHING"
                                             reason_full["msg"] = f"Low Score ({score} < {base_threshold})"
                                             scanner_state[state_key] = {"time": now_utc, "status": "WATCHING"}
+                                            
+                                        if is_dca_candidate:
+                                            candidates.append({
+                                                "generic": generic,
+                                                "resolved": resolved,
+                                                "bias": bias,
+                                                "score": score,
+                                                "ltf_trigger": ltf_trigger,
+                                                "reason_full": dict(reason_full),
+                                                "cfg": cfg,
+                                                "threshold": base_threshold,
+                                                "state_key": state_key,
+                                                "is_dca": True
+                                            })
 
                 if status != "FIRED":
                     updates_to_broadcast.append({
@@ -270,9 +359,13 @@ async def scan_loop():
                 state_key = c["state_key"]
                 
                 if res in selected_symbols:
-                    status = "FIRED"
-                    reason_full["msg"] = f"Executed! Rank 1 (Score: {score})"
-                    scanner_state[state_key] = {"time": now_utc, "status": "FIRED"}
+                    is_dca = c.get("is_dca", False)
+                    status = "DCA_FIRED" if is_dca else "FIRED"
+                    if is_dca:
+                        reason_full["msg"] = f"DCA Executed! Rank 1 (Score: {score})"
+                    else:
+                        reason_full["msg"] = f"Executed! Rank 1 (Score: {score})"
+                    scanner_state[state_key] = {"time": now_utc, "status": status}
                     
                     updates_to_broadcast.append({
                         "symbol": generic, "resolved": res, "bias": bias, "score": score,
@@ -296,9 +389,10 @@ async def scan_loop():
                         })
                         
                     from app.engine.order_manager import send_order
-                    await send_order(sig, res, bias, c["cfg"])
+                    await send_order(sig, res, bias, c["cfg"], is_dca=is_dca, dca_data=ltf_trigger if is_dca else None)
                 else:
-                    status = "SKIPPED"
+                    is_dca = c.get("is_dca", False)
+                    status = "DCA_SKIPPED" if is_dca else "SKIPPED"
                     reason_full["msg"] = "Skipped because higher-ranked signal selected"
                     
                     updates_to_broadcast.append({

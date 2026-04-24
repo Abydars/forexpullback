@@ -78,6 +78,9 @@ class Trade(Base):
     commission: Mapped[float | None] = mapped_column(Float, nullable=True)
     swap: Mapped[float | None] = mapped_column(Float, nullable=True)
     note: Mapped[str | None] = mapped_column(String, nullable=True)
+    parent_trade_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    dca_index: Mapped[int] = mapped_column(Integer, default=0)
+    group_id: Mapped[str | None] = mapped_column(String, nullable=True)
 
 class Event(Base):
     __tablename__ = "events"

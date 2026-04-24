@@ -347,6 +347,13 @@ async function loadConfig() {
     document.getElementById('c-breakeven_trigger_r').value = cfg.breakeven_trigger_r || 1.0;
     document.getElementById('c-trailing').checked = cfg.trailing !== false;
     
+    document.getElementById('c-enable_dca').checked = cfg.enable_dca === true;
+    document.getElementById('c-max_dca_entries').value = cfg.max_dca_entries || 1;
+    document.getElementById('c-dca_trigger_sl_progress').value = cfg.dca_trigger_sl_progress || 0.5;
+    document.getElementById('c-dca_lot_multiplier').value = cfg.dca_lot_multiplier || 0.7;
+    document.getElementById('c-dca_max_total_risk_r').value = cfg.dca_max_total_risk_r || 2.0;
+    document.getElementById('c-dca_reanchor_sl').checked = cfg.dca_reanchor_sl !== false;
+    
     state.symbols = (cfg.symbols || []).map(s => ({generic: s, resolved: null, status: 'pending'}));
     renderChips();
     resolveAllSymbols();
@@ -435,6 +442,12 @@ function collectConfigInputs() {
     use_liquidity_tp: document.getElementById('c-use_liquidity_tp').checked,
     breakeven_trigger_r: parseFloat(document.getElementById('c-breakeven_trigger_r').value),
     trailing: document.getElementById('c-trailing').checked,
+    enable_dca: document.getElementById('c-enable_dca').checked,
+    max_dca_entries: parseInt(document.getElementById('c-max_dca_entries').value),
+    dca_trigger_sl_progress: parseFloat(document.getElementById('c-dca_trigger_sl_progress').value),
+    dca_lot_multiplier: parseFloat(document.getElementById('c-dca_lot_multiplier').value),
+    dca_max_total_risk_r: parseFloat(document.getElementById('c-dca_max_total_risk_r').value),
+    dca_reanchor_sl: document.getElementById('c-dca_reanchor_sl').checked,
   };
 }
 

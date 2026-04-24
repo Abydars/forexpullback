@@ -26,13 +26,20 @@ async def init_db_async():
         
         async def v1(c): pass
         
+        async def v2(c):
+            # SQLite ALTER TABLE for adding columns
+            try: await c.execute(text("ALTER TABLE trades ADD COLUMN parent_trade_id INTEGER"))
+            except Exception: pass
+            try: await c.execute(text("ALTER TABLE trades ADD COLUMN dca_index INTEGER DEFAULT 0"))
+            except Exception: pass
+            try: await c.execute(text("ALTER TABLE trades ADD COLUMN group_id VARCHAR"))
+            except Exception: pass
+
         # Define migrations
         migrations = [
             # v1: Initial setup (handled by create_all)
             v1,
-            
-            # Add future migrations here, e.g.:
-            # async def v2(c): await c.execute(text("ALTER TABLE trades ADD COLUMN new_col TEXT"))
+            v2
         ]
         
         target_version = len(migrations)
