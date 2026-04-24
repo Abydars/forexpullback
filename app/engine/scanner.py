@@ -2,6 +2,7 @@ import asyncio
 import MetaTrader5 as mt5
 from datetime import datetime, timedelta
 import pytz
+import pandas as pd
 from app.mt5_client.client import mt5_client
 from app.mt5_client.symbol_resolver import SymbolResolver
 from app.strategy.htf_bias import calculate_htf_bias
@@ -16,6 +17,22 @@ from app.ws.manager import broadcast
 from sqlalchemy import select
 
 symbol_resolver = SymbolResolver(mt5_client)
+
+scanner_state = {}
+
+def calc_adx(df: pd.DataFrame, period=14):
+    df['up_move'] = df['high'] - df['high'].shift(1)
+    df['down_move'] = df['low'].shift(1) - df['low']
+    df['+dm'] = 0.0
+    df['-dm'] = 0.0
+    df.loc[(df['up_move'] > df['down_move']) & (df['up_move'] > 0), '+dm'] = df['up_move']
+    df.loc[(df['down_move'] > df['up_move']) & (df['down_move'] > 0), '-dm'] = df['down_move']
+    df['tr'] = pd.concat([df['high'] - df['low'], abs(df['high'] - df['close'].shift(1)), abs(df['low'] - df['close'].shift(1))], axis=1).max(axis=1)
+    df['+di'] = 100 * (df['+dm'].ewm(alpha=1/period, adjust=False).mean() / df['tr'].ewm(alpha=1/period, adjust=False).mean())
+    df['-di'] = 100 * (df['-dm'].ewm(alpha=1/period, adjust=False).mean() / df['tr'].ewm(alpha=1/period, adjust=False).mean())
+    df['dx'] = 100 * abs(df['+di'] - df['-di']) / (df['+di'] + df['-di'])
+    df['adx'] = df['dx'].ewm(alpha=1/period, adjust=False).mean()
+    return df['adx'].iloc[-2], df['tr'].ewm(alpha=1/period, adjust=False).mean().iloc[-2]
 
 async def scan_loop():
     while True:
@@ -66,56 +83,79 @@ async def scan_loop():
                     reason_full["msg"] = "Market is CLOSED (Stale tick data)"
                 else:
                     df_4h = await mt5_client.get_rates(resolved, mt5.TIMEFRAME_H4, 200)
+                    df_1h = await mt5_client.get_rates(resolved, mt5.TIMEFRAME_H1, 200)
                     df_15m = await mt5_client.get_rates(resolved, mt5.TIMEFRAME_M15, 300)
                     df_5m = await mt5_client.get_rates(resolved, mt5.TIMEFRAME_M5, 500)
                     
-                    if df_4h.empty or df_15m.empty or df_5m.empty: 
+                    if df_4h.empty or df_1h.empty or df_15m.empty or df_5m.empty: 
                         reason_full["msg"] = "Not enough data (need more bars)"
                     else:
-                        htf = calculate_htf_bias(df_4h)
-                        reason_full["htf"] = htf
-                        bias = htf['bias']
+                        # Volatility and Spread Checks
+                        adx, atr = calc_adx(df_15m, 14)
+                        point = info.point if info else 0.0001
+                        spread_points = (tick.ask - tick.bid) / point if tick else 0
+                        atr_points = atr / point if point > 0 else 1
                         
-                        if bias == 'neutral':
-                            reason_full["msg"] = "Neutral HTF Bias (EMA not aligned / No BOS)"
+                        if adx < 15:
+                            reason_full["msg"] = f"Low Volatility (ADX={adx:.1f} < 15)"
+                        elif (spread_points / atr_points) > 0.5:
+                            reason_full["msg"] = f"Spread too high relative to ATR (Spread={spread_points:.1f}, ATR={atr_points:.1f})"
                         else:
-                            mtf_zone = find_mtf_zone(df_15m, bias)
-                            reason_full["zone"] = mtf_zone
+                            htf = calculate_htf_bias(df_4h, df_1h)
+                            reason_full["htf"] = htf
+                            bias = htf['bias']
                             
-                            if not mtf_zone:
-                                reason_full["msg"] = f"No 15M Zone or RSI not cooling off"
+                            if bias == 'neutral':
+                                reason_full["msg"] = "Neutral HTF Bias (4H EMA not aligned)"
                             else:
-                                point = 0.0001
-                                try:
-                                    info = mt5.symbol_info(resolved)
-                                    if info: point = info.point
-                                except: pass
-                                    
-                                ltf_trigger = find_ltf_trigger(df_5m, mtf_zone, bias, point, float(cfg.get("reward_ratio", 2.0)))
-                                reason_full["trigger"] = ltf_trigger
+                                mtf_zone = find_mtf_zone(df_15m, bias)
+                                reason_full["zone"] = mtf_zone
                                 
-                                if not ltf_trigger:
-                                    reason_full["msg"] = "Price in 15M Zone, waiting for 5M Trigger"
+                                if not mtf_zone:
+                                    reason_full["msg"] = "No 15M Pullback Zone (Not near EMA or FVG)"
                                 else:
-                                    score = calculate_score(htf['strength'], mtf_zone['quality'], ltf_trigger['strength'], True)
-                                    if score >= int(cfg.get("signal_threshold", 65)):
-                                        cooldown_mins = int(cfg.get("signal_cooldown_minutes", 30))
-                                        cutoff = datetime.now(pytz.utc) - timedelta(minutes=cooldown_mins)
+                                    ltf_trigger = find_ltf_trigger(df_5m, mtf_zone, bias, point, float(cfg.get("reward_ratio", 2.0)))
+                                    reason_full["trigger"] = ltf_trigger
+                                    
+                                    # Dynamic Threshold Logic
+                                    base_threshold = int(cfg.get("signal_threshold", 65))
+                                    current_hour = now_utc.hour
+                                    # London/NY overlap is roughly 12:00 to 16:00 UTC
+                                    if 12 <= current_hour <= 16:
+                                        base_threshold -= 5 # Easier threshold during overlap
+                                    elif current_hour < 6 or current_hour > 20:
+                                        base_threshold += 5 # Stricter during Asian session
                                         
-                                        async with AsyncSessionLocal() as db:
-                                            recent = await db.execute(select(Signal).where(
-                                                Signal.symbol == resolved,
-                                                Signal.direction == bias,
-                                                Signal.created_at >= cutoff
-                                            ))
-                                            if recent.scalars().first():
-                                                status = "COOLDOWN"
-                                                reason_full["msg"] = f"Triggered but skipped (Cooldown active for {cooldown_mins}m)"
-                                            else:
-                                                status = "FIRED"
-                                                reason_full["msg"] = f"Accepted! Score: {score}"
+                                    if spread_points > 15: base_threshold += 5
+                                    if htf['strength'] >= 80: base_threshold -= 5
+                                    
+                                    if not ltf_trigger:
+                                        status = "WATCHING"
+                                        reason_full["msg"] = f"Zone Valid, Waiting for Trigger (Thresh: {base_threshold})"
                                     else:
-                                        reason_full["msg"] = f"Triggered but Low Score ({score} < threshold)"
+                                        score = calculate_score(htf['strength'], mtf_zone['quality'], ltf_trigger['strength'], True)
+                                        
+                                        # Smart Cooldown
+                                        state_key = f"{resolved}_{bias}"
+                                        last_sig = scanner_state.get(state_key, {"time": datetime.min.replace(tzinfo=pytz.utc), "status": ""})
+                                        mins_since = (now_utc - last_sig["time"]).total_seconds() / 60
+                                        
+                                        cooldown_mins = int(cfg.get("signal_cooldown_minutes", 30))
+                                        
+                                        if last_sig["status"] == "FIRED" and mins_since < cooldown_mins:
+                                            status = "COOLDOWN"
+                                            reason_full["msg"] = f"Fired recently, waiting {cooldown_mins}m"
+                                        elif last_sig["status"] == "WATCHING" and mins_since < 5:
+                                            status = "COOLDOWN"
+                                            reason_full["msg"] = "Too many low-score/watch triggers, cooling down 5m"
+                                        elif score >= base_threshold:
+                                            status = "FIRED"
+                                            reason_full["msg"] = f"Accepted! Score: {score} >= {base_threshold}"
+                                            scanner_state[state_key] = {"time": now_utc, "status": "FIRED"}
+                                        else:
+                                            status = "WATCHING"
+                                            reason_full["msg"] = f"Low Score ({score} < {base_threshold})"
+                                            scanner_state[state_key] = {"time": now_utc, "status": "WATCHING"}
 
                 await broadcast({
                     "type": "scan.update",
