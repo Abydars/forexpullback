@@ -41,5 +41,5 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             data = await websocket.receive_text()
             pass
-    except WebSocketDisconnect:
+    except Exception:
         manager.disconnect(websocket)

@@ -184,9 +184,6 @@ async def scan_loop():
                                         if has_recent_fired:
                                             status = "COOLDOWN"
                                             reason_full["msg"] = f"Fired recently, waiting {cooldown_mins}m"
-                                        elif last_sig["status"] == "WATCHING" and mins_since < 5:
-                                            status = "COOLDOWN"
-                                            reason_full["msg"] = "Too many low-score/watch triggers, cooling down 5m"
                                         elif score >= base_threshold:
                                             status = "FIRED"
                                             reason_full["msg"] = f"Accepted! Score: {score} >= {base_threshold}"

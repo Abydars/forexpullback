@@ -73,6 +73,8 @@ main { padding: 20px; }
 
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
+.filters { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; }
+
 .data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .data-table th {
   text-align: left; color: var(--muted); font-weight: normal;
@@ -161,3 +163,41 @@ input:focus, select:focus { outline: none; border-color: var(--cyan); }
 .day-checks label { flex-direction: row; justify-content: flex-start; gap: 4px; font-size: 10px; align-items: center;}
 
 .hidden { display: none; }
+
+/* --- RESPONSIVE DESIGN --- */
+.data-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 900px) {
+  .stat-row { grid-template-columns: 1fr 1fr; }
+  .grid-2 { grid-template-columns: 1fr; }
+  .form-grid { grid-template-columns: 1fr; }
+  
+  dialog { min-width: 90vw; width: 90vw; }
+  .modal-body.wide { min-width: 100%; }
+  input, select { width: 100%; max-width: 100%; }
+  
+  .session-row { 
+    grid-template-columns: 1fr 1fr; 
+    gap: 12px; padding: 12px;
+  }
+  .session-row > * { width: 100%; }
+  
+  .filters { flex-direction: column; gap: 8px; align-items: stretch; margin-bottom: 12px; }
+}
+
+@media (max-width: 500px) {
+  .stat-row { grid-template-columns: 1fr; }
+  .session-row { grid-template-columns: 1fr; }
+  
+  .topbar { flex-direction: column; align-items: stretch; gap: 12px; padding: 16px; }
+  .status-strip { flex-wrap: wrap; justify-content: center; }
+  .actions { justify-content: stretch; }
+  .actions .btn { flex: 1; }
+  
+  .tabs { overflow-x: auto; white-space: nowrap; padding: 0; }
+  .tab { flex: 1; text-align: center; padding: 12px 10px; font-size: 10px; }
+}
