@@ -44,7 +44,7 @@ A production-grade forex pullback trading system that connects to any MT5 broker
    ```bash
    python main.py
    ```
-5. Access the dashboard: `http://localhost:8080`
+5. Access the dashboard: `http://localhost:8771`
 
 ## Troubleshooting
 
