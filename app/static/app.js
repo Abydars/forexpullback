@@ -524,6 +524,7 @@ async function loadConfig() {
     document.getElementById('c-signal_threshold').value = cfg.signal_threshold || 65;
     document.getElementById('c-risk_percent').value = cfg.risk_percent || 1.0;
     document.getElementById('c-scan_interval_seconds').value = cfg.scan_interval_seconds || 10;
+    document.getElementById('c-signal_cooldown_minutes').value = cfg.signal_cooldown_minutes || 30;
     document.getElementById('c-reward_ratio').value = cfg.reward_ratio || 2.0;
     document.getElementById('c-dashboard_password').value = cfg.dashboard_password || 'admin';
 
@@ -644,6 +645,7 @@ function collectConfigInputs() {
     signal_threshold: parseInt(document.getElementById('c-signal_threshold').value),
     risk_percent: parseFloat(document.getElementById('c-risk_percent').value),
     scan_interval_seconds: parseInt(document.getElementById('c-scan_interval_seconds').value),
+    signal_cooldown_minutes: parseInt(document.getElementById('c-signal_cooldown_minutes').value),
     reward_ratio: parseFloat(document.getElementById('c-reward_ratio').value),
     dashboard_password: document.getElementById('c-dashboard_password').value,
     atr_buffer_multiplier: parseFloat(document.getElementById('c-atr_buffer_multiplier').value),
