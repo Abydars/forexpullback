@@ -190,6 +190,10 @@ input:focus, select:focus { outline: none; border-color: var(--cyan); }
 }
 
 @media (max-width: 500px) {
+  html, body { overflow-x: hidden; }
+  main { padding: 12px; width: 100%; overflow-x: hidden; }
+  .panel { padding: 12px; max-width: 100%; }
+  
   .stat-row { grid-template-columns: 1fr; }
   .session-row { grid-template-columns: 1fr; }
   
