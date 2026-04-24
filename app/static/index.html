@@ -67,8 +67,11 @@
           <div class="text-[10px] tracking-[0.15em] uppercase text-slate-500 mb-2 font-semibold">EQUITY</div>
           <div class="text-2xl text-cyan_neon font-mono" id="s-equity">—</div>
         </div>
-        <div class="bg-panel border border-border_light p-5 rounded-sm flex flex-col justify-center h-24">
-          <div class="text-[10px] tracking-[0.15em] uppercase text-slate-500 mb-2 font-semibold">UNREALIZED PNL</div>
+        <div class="bg-panel border border-border_light p-5 rounded-sm flex flex-col justify-center h-24 relative">
+          <div class="text-[10px] tracking-[0.15em] uppercase text-slate-500 mb-2 font-semibold flex justify-between items-center gap-2">
+             <span>UNREALIZED PNL</span>
+             <span id="s-basket-badge" class="hidden text-cyan-400 tracking-wider bg-cyan-400/10 px-1.5 py-0.5 rounded text-[9px] border border-cyan-400/20 whitespace-nowrap">TRAIL: $0.00</span>
+          </div>
           <div class="text-2xl text-slate-100 font-mono" id="s-unrealized">—</div>
         </div>
         <div class="bg-panel border border-border_light p-5 rounded-sm flex flex-col justify-center h-24">
@@ -347,6 +350,32 @@
               <label class="flex gap-3 items-center text-[10px] font-bold tracking-[0.1em] text-slate-300 uppercase cursor-pointer group w-fit"><input type="checkbox" id="c-enable_dca" class="w-4 h-4 accent-cyan_neon cursor-pointer border-border_strong bg-black/20 group-hover:border-cyan_neon transition-colors"> ENABLE DCA</label>
               <label class="flex gap-3 items-center text-[10px] font-bold tracking-[0.1em] text-slate-300 uppercase cursor-pointer group w-fit" title="Update Stop Loss for all group tickets to match latest DCA."><input type="checkbox" id="c-dca_reanchor_sl" checked class="w-4 h-4 accent-cyan_neon cursor-pointer border-border_strong bg-black/20 group-hover:border-cyan_neon transition-colors"> RE-ANCHOR SL</label>
             </div>
+            <div></div> <!-- empty grid cell -->
+
+            <div class="col-span-1 md:col-span-2 mt-6 mb-2 text-[11px] font-bold tracking-[0.15em] text-cyan_neon border-b border-border_light pb-3 uppercase flex items-center gap-2"><span class="opacity-70 text-[8px]">■</span> BASKET TRAILING SETTINGS</div>
+            
+            <div class="flex flex-col gap-1.5 col-span-1 md:col-span-2 mb-2">
+               <label class="flex gap-3 items-center text-[10px] font-bold tracking-[0.1em] text-slate-300 uppercase cursor-pointer group w-fit"><input type="checkbox" id="c-enable_basket_trailing" class="w-4 h-4 accent-cyan_neon cursor-pointer border-border_strong bg-black/20 group-hover:border-cyan_neon transition-colors"> ENABLE BASKET TRAILING</label>
+            </div>
+
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">START (USD)</label>
+              <input type="number" step="0.1" id="c-basket_trailing_start_usd" value="5.0" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors">
+              <div class="text-[9px] text-slate-500 font-normal normal-case">Target total PnL to activate trailing.</div>
+            </div>
+
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">DRAWDOWN (USD)</label>
+              <input type="number" step="0.1" id="c-basket_trailing_drawdown_usd" value="1.5" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors">
+              <div class="text-[9px] text-slate-500 font-normal normal-case">Amount to trail behind peak PnL.</div>
+            </div>
+
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">MIN CLOSE (USD)</label>
+              <input type="number" step="0.1" id="c-basket_trailing_min_close_usd" value="5.0" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors">
+              <div class="text-[9px] text-slate-500 font-normal normal-case">Minimum profit required to execute close.</div>
+            </div>
+            
           </div>
         </div>
 

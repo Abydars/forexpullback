@@ -72,7 +72,10 @@ async def evaluate_smart_exit(p: dict, t, symbol: str) -> str | None:
                 
     return None
 
+basket_state = {"active": False, "peak_pnl": 0.0}
+
 async def monitor_loop():
+    global basket_state
     retry_counts = {}
     while True:
         from app.core.state import state
@@ -94,9 +97,63 @@ async def monitor_loop():
             
             pos_dict = {p['ticket']: p for p in positions}
             
+
+            cfg = await get_config()
+            magic = int(cfg.get('magic_number', 123456))
+            bot_positions = [p for p in positions if p.get('magic') == magic]
+            
+            enable_basket = cfg.get("enable_basket_trailing", False)
+            if enable_basket and len(bot_positions) > 0:
+                total_unrealized_pnl = sum(p.get('profit', 0) for p in bot_positions)
+                start_usd = float(cfg.get("basket_trailing_start_usd", 5.0))
+                drawdown_usd = float(cfg.get("basket_trailing_drawdown_usd", 1.5))
+                min_close_usd = float(cfg.get("basket_trailing_min_close_usd", 5.0))
+                
+                if total_unrealized_pnl >= start_usd:
+                    if not basket_state["active"]:
+                        basket_state["active"] = True
+                        basket_state["peak_pnl"] = total_unrealized_pnl
+                        msg = f"Basket trailing activated at +${total_unrealized_pnl:.2f}"
+                        async with AsyncSessionLocal() as db:
+                            from app.db.models import Event
+                            db.add(Event(level="INFO", component="basket", message=msg))
+                            await db.commit()
+                        await broadcast({"type": "log.event", "level": "INFO", "component": "basket", "message": msg, "created_at": datetime.now(pytz.utc).isoformat()})
+                    else:
+                        if total_unrealized_pnl > basket_state["peak_pnl"]:
+                            basket_state["peak_pnl"] = total_unrealized_pnl
+                
+                if basket_state["active"]:
+                    if total_unrealized_pnl < min_close_usd:
+                        msg = f"Basket trailing reset: PnL dropped below minimum close profit (Peak was +${basket_state['peak_pnl']:.2f})"
+                        basket_state["active"] = False
+                        basket_state["peak_pnl"] = 0.0
+                        async with AsyncSessionLocal() as db:
+                            from app.db.models import Event
+                            db.add(Event(level="INFO", component="basket", message=msg))
+                            await db.commit()
+                        await broadcast({"type": "log.event", "level": "INFO", "component": "basket", "message": msg, "created_at": datetime.now(pytz.utc).isoformat()})
+                    elif basket_state["peak_pnl"] - total_unrealized_pnl >= drawdown_usd:
+                        # Close ALL bot positions
+                        for p in bot_positions:
+                            await mt5_client.position_close(p['ticket'])
+                            
+                        msg = f"Basket trailing close: secured +${total_unrealized_pnl:.2f} minimum basket profit (Peak: +${basket_state['peak_pnl']:.2f})"
+                        async with AsyncSessionLocal() as db:
+                            from app.db.models import Event
+                            db.add(Event(level="INFO", component="basket", message=msg))
+                            await db.commit()
+                        await broadcast({"type": "log.event", "level": "INFO", "component": "basket", "message": msg, "created_at": datetime.now(pytz.utc).isoformat()})
+                        basket_state["active"] = False
+                        basket_state["peak_pnl"] = 0.0
+            else:
+                basket_state["active"] = False
+                basket_state["peak_pnl"] = 0.0
+                
             await broadcast({
                 "type": "positions.update",
-                "positions": positions
+                "positions": positions,
+                "basket_state": basket_state
             })
             
             async with AsyncSessionLocal() as db:

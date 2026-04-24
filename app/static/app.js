@@ -47,6 +47,17 @@ function handleEvent(msg) {
             sl: p.sl,
             tp: p.tp
         }));
+        if (msg.basket_state) {
+            const badge = document.getElementById('s-basket-badge');
+            if (badge) {
+                if (msg.basket_state.active) {
+                    badge.classList.remove('hidden');
+                    badge.innerText = `TRAIL: $${msg.basket_state.peak_pnl.toFixed(2)}`;
+                } else {
+                    badge.classList.add('hidden');
+                }
+            }
+        }
         renderPositions();
         renderStats();
         break;
@@ -529,6 +540,11 @@ async function loadConfig() {
     document.getElementById('c-dca_max_total_risk_r').value = cfg.dca_max_total_risk_r || 2.0;
     document.getElementById('c-dca_reanchor_sl').checked = cfg.dca_reanchor_sl !== false;
     
+    document.getElementById('c-enable_basket_trailing').checked = cfg.enable_basket_trailing === true;
+    document.getElementById('c-basket_trailing_start_usd').value = cfg.basket_trailing_start_usd || 5.0;
+    document.getElementById('c-basket_trailing_drawdown_usd').value = cfg.basket_trailing_drawdown_usd || 1.5;
+    document.getElementById('c-basket_trailing_min_close_usd').value = cfg.basket_trailing_min_close_usd || 5.0;
+    
     state.symbols = (cfg.symbols || []).map(s => ({generic: s, resolved: null, status: 'pending'}));
     renderChips();
     resolveAllSymbols();
@@ -641,6 +657,10 @@ function collectConfigInputs() {
     dca_lot_multiplier: parseFloat(document.getElementById('c-dca_lot_multiplier').value),
     dca_max_total_risk_r: parseFloat(document.getElementById('c-dca_max_total_risk_r').value),
     dca_reanchor_sl: document.getElementById('c-dca_reanchor_sl').checked,
+    enable_basket_trailing: document.getElementById('c-enable_basket_trailing').checked,
+    basket_trailing_start_usd: parseFloat(document.getElementById('c-basket_trailing_start_usd').value),
+    basket_trailing_drawdown_usd: parseFloat(document.getElementById('c-basket_trailing_drawdown_usd').value),
+    basket_trailing_min_close_usd: parseFloat(document.getElementById('c-basket_trailing_min_close_usd').value),
   };
 }
 
