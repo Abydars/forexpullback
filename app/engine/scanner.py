@@ -36,6 +36,11 @@ def calc_adx(df: pd.DataFrame, period=14):
 async def scan_loop():
     while True:
         try:
+            from app.api.config_routes import get_config
+            cfg = await get_config()
+            interval = cfg.get("scan_interval_seconds", 10)
+            now_utc = datetime.now(pytz.utc)
+            
             import time
             scan_start = time.time()
             await symbol_resolver.refresh()
@@ -80,10 +85,13 @@ async def scan_loop():
                 elif not tick or (current_time - tick['time']) > 300:
                     reason_full["msg"] = "Market is CLOSED (Stale tick data)"
                 else:
-                    df_4h = await binance_client.get_rates(resolved, 'H4', 200)
-                    df_1h = await binance_client.get_rates(resolved, 'H1', 200)
-                    df_15m = await binance_client.get_rates(resolved, 'M15', 300)
-                    df_5m = await binance_client.get_rates(resolved, 'M5', 500)
+                    tick, df_4h, df_1h, df_15m, df_5m = await asyncio.gather(
+                        binance_client.symbol_info_tick(resolved),
+                        binance_client.get_rates(resolved, 'H4', 200),
+                        binance_client.get_rates(resolved, 'H1', 200),
+                        binance_client.get_rates(resolved, 'M15', 300),
+                        binance_client.get_rates(resolved, 'M5', 500)
+                    )
                     
                     if df_4h.empty or df_1h.empty or df_15m.empty or df_5m.empty: 
                         reason_full["msg"] = "Not enough data (need more bars)"
@@ -349,7 +357,7 @@ async def scan_loop():
                 updates_to_broadcast.extend(upd)
                 candidates.extend(cand)
             
-            dca_candidates = dca_candidates = [c for c in candidates if c.get("is_dca")]
+            dca_candidates = [c for c in candidates if c.get("is_dca")]
             normal_candidates = [c for c in candidates if not c.get("is_dca")]
             
             dca_candidates.sort(key=lambda x: x["score"], reverse=True)
