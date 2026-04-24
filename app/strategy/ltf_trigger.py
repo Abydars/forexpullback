@@ -74,7 +74,7 @@ def find_ltf_trigger(df: pd.DataFrame, df_15m: pd.DataFrame, atr_15m: float, zon
             atr_buffer = atr_15m * atr_buffer_multiplier
             
             # Use stronger M15 structure instead of M5
-            m15_swing_low = df_15m['low'].iloc[-5:].min()
+            m15_swing_low = df_15m['low'].iloc[-10:].min()
             structural_low = min(last['low'], prev['low'], m15_swing_low, zone['zone_low'])
             
             sl = float(structural_low - atr_buffer)
@@ -128,7 +128,7 @@ def find_ltf_trigger(df: pd.DataFrame, df_15m: pd.DataFrame, atr_15m: float, zon
             atr_buffer = atr_15m * atr_buffer_multiplier
             
             # Use stronger M15 structure instead of M5
-            m15_swing_high = df_15m['high'].iloc[-5:].max()
+            m15_swing_high = df_15m['high'].iloc[-10:].max()
             structural_high = max(last['high'], prev['high'], m15_swing_high, zone['zone_high'])
             
             sl = float(structural_high + atr_buffer)
