@@ -58,6 +58,7 @@ async def evaluate_smart_exit(p: dict, t, symbol: str) -> str | None:
     return None
 
 async def monitor_loop():
+    retry_counts = {}
     while True:
         from app.core.state import state
         if not mt5_client.is_connected():
@@ -93,20 +94,27 @@ async def monitor_loop():
                             return mt5.history_deals_get(position=t.ticket)
                         history = await asyncio.to_thread(_get_hist)
                         
-                        t.closed_at = datetime.now(pytz.utc)
-                        
                         if history and len(history) > 0:
                             exit_deal = history[-1]
                             t.exit_price = exit_deal.price
                             t.pnl = exit_deal.profit
                             t.commission = exit_deal.commission
                             t.swap = exit_deal.swap
+                            t.closed_at = datetime.now(pytz.utc)
+                            retry_counts.pop(t.ticket, None)
                         else:
-                            # Fallback if history is not immediately available
+                            retries = retry_counts.get(t.ticket, 0)
+                            if retries < 15:
+                                retry_counts[t.ticket] = retries + 1
+                                continue # Retry on next loop (0.2s)
+                                
+                            # Fallback if history is completely unavailable after 3 seconds
                             t.exit_price = t.entry_price
                             t.pnl = 0.0
                             t.commission = 0.0
                             t.swap = 0.0
+                            t.closed_at = datetime.now(pytz.utc)
+                            retry_counts.pop(t.ticket, None)
                             
                         await db.commit()
                         

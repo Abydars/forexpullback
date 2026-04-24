@@ -1,6 +1,7 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from typing import List
 import json
+from app.core.auth import verify_access_token
 
 router = APIRouter()
 
@@ -31,7 +32,7 @@ async def broadcast(event: dict):
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     token = websocket.cookies.get("auth_token")
-    if token != "authenticated":
+    if not verify_access_token(token):
         await websocket.close(code=1008)
         return
         

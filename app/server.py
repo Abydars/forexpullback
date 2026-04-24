@@ -6,6 +6,7 @@ from app.engine.lifecycle import start_engine, stop_engine
 from app.api import (mt5_routes, config_routes, sessions_routes,
                      signals_routes, trades_routes, engine_routes, events_routes, auth_routes)
 from app.ws.manager import router as ws_router
+from app.core.auth import verify_access_token
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -25,7 +26,7 @@ async def auth_middleware(request: Request, call_next):
         
     # Check cookie for authentication
     token = request.cookies.get("auth_token")
-    if token != "authenticated":
+    if not verify_access_token(token):
         if path.startswith("/api/"):
             return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
         elif path == "/ws":

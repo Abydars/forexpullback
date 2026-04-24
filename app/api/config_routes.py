@@ -5,10 +5,24 @@ router = APIRouter(prefix="/api")
 
 @router.get("/config")
 async def read_config():
-    return await get_config()
+    cfg = await get_config()
+    # Mask password for UI
+    if "dashboard_password" in cfg:
+        cfg["dashboard_password"] = ""
+    return cfg
 
 @router.patch("/config")
 async def patch_config(updates: dict):
+    from app.core.auth import hash_password
+    
+    # Hash password if provided, otherwise remove it from updates to prevent clearing
+    if "dashboard_password" in updates:
+        pw = updates["dashboard_password"]
+        if pw and pw.strip():
+            updates["dashboard_password"] = hash_password(pw.strip())
+        else:
+            del updates["dashboard_password"]
+            
     await update_config(updates)
     return {"status": "ok"}
     
