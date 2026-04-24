@@ -8,23 +8,24 @@ async def start_engine():
     global _tasks
     from app.core.state import state
     from app.db.session import AsyncSessionLocal
-    from app.db.models import MT5Account
-    from app.mt5_client.client import mt5_client
+    from app.db.models import BinanceAccount
+    from app.binance_client.client import binance_client
     from app.db.crypto import decrypt_password
     from sqlalchemy import select
     
-    # Auto-connect MT5 to last saved account
+    # Auto-connect Binance to last saved account
     try:
         async with AsyncSessionLocal() as db:
-            result = await db.execute(select(MT5Account).order_by(MT5Account.id.desc()).limit(1))
+            result = await db.execute(select(BinanceAccount).order_by(BinanceAccount.id.desc()).limit(1))
             acc = result.scalar()
             if acc:
-                pw = decrypt_password(acc.password_enc)
-                await mt5_client.connect(acc.server, acc.login, pw, acc.path)
-                state.mt5_connected = True
-                print(f"Auto-connected to MT5: {acc.login}")
+                pw_secret = decrypt_password(acc.api_secret_enc)
+                key = decrypt_password(acc.api_key_enc)
+                await binance_client.connect(key, pw_secret, acc.testnet)
+                state.binance_connected = True
+                print(f"Auto-connected to Binance")
     except Exception as e:
-        print(f"MT5 Auto-connect failed: {e}")
+        print(f"Binance Auto-connect failed: {e}")
 
     state.engine_running = True
     

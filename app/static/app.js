@@ -1,5 +1,5 @@
 const state = {
-  mt5_connected: false,
+  binance_connected: false,
   engine_running: false,
   account: null,
   today_pnl: 0,
@@ -29,7 +29,7 @@ function connectWS() {
 
 function handleEvent(msg) {
   switch (msg.type) {
-    case 'mt5.connection':  state.mt5_connected = msg.state === 'connected'; renderTopbar(); break;
+    case 'binance.connection':  state.binance_connected = msg.state === 'connected'; renderTopbar(); break;
     case 'account.tick':    state.account = msg; renderTopbar(); renderStats(); break;
     case 'scan.update':     updateScanStatus(msg.data); break;
     case 'signal.new':      state.recent_signals.unshift(msg.signal); state.all_signals.unshift(msg.signal); renderSignals(); break;
@@ -40,7 +40,7 @@ function handleEvent(msg) {
             ticket: p.ticket,
             symbol: p.symbol,
             direction: p.type === 0 ? 'buy' : 'sell',
-            lot: p.volume,
+            quantity: p.volume,
             entry_price: p.price_open,
             current_price: p.price_current,
             pnl: p.profit,
@@ -125,8 +125,8 @@ document.querySelectorAll('.sub-tab').forEach(t => t.onclick = () => {
 
 // ---- Renderers (each idempotent, rebuild target) ----
 function renderTopbar() {
-  document.getElementById('mt5-dot').className = `w-2 h-2 rounded-full inline-block ${state.mt5_connected ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]" : "bg-rose-500"}`;
-  document.getElementById('mt5-info').innerText = state.mt5_connected ? (state.account?.server || 'Connected') : 'Not connected';
+  document.getElementById('binance-dot').className = `w-2 h-2 rounded-full inline-block ${state.binance_connected ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]" : "bg-rose-500"}`;
+  document.getElementById('binance-info').innerText = state.binance_connected ? (state.account?.testnet ? 'Connected (Testnet)' : 'Connected (Live)') : 'Not connected';
   document.getElementById('active-sessions').innerText = state.sessions.filter(s => s.enabled).length;
   document.getElementById('today-pnl').innerText = `${state.today_pnl < 0 ? '-' : ''}$${Math.abs(state.today_pnl).toFixed(2)}`;
   document.getElementById('today-pnl').className = state.today_pnl >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold';
@@ -176,9 +176,9 @@ function renderPositions() {
       };
     }
     const g = groups[key];
-    g.total_lot += t.lot;
+    g.total_lot += t.quantity;
     g.total_pnl += (t.pnl || 0);
-    g.avg_entry += (t.entry_price * t.lot);
+    g.avg_entry += (t.entry_price * t.quantity);
     g.count += 1;
     g.sl = t.sl || g.sl;
     g.tp = t.tp || g.tp;
@@ -222,7 +222,7 @@ function renderPositions() {
                <span class="text-slate-500 font-mono">#${p.ticket}</span>
             </td>
             <td class="px-5 py-2"></td>
-            <td class="px-5 py-2 text-right font-mono text-slate-400">${p.lot.toFixed(2)}</td>
+            <td class="px-5 py-2 text-right font-mono text-slate-400">${p.quantity.toFixed(3)}</td>
             <td class="px-5 py-2 text-right font-mono text-slate-500">${p.entry_price.toFixed(5)}</td>
             <td class="px-5 py-2"></td>
             <td class="px-5 py-2 text-right font-mono ${p.pnl >= 0 ? 'text-emerald-500/70' : 'text-rose-500/70'}">${p.pnl >= 0 ? '+' : '-'}$${Math.abs(p.pnl).toFixed(2)}</td>
@@ -259,9 +259,9 @@ function renderTrades() {
           };
         }
         const g = groups[key];
-        g.total_lot += t.lot;
+        g.total_lot += t.quantity;
         g.total_pnl += (t.pnl || 0);
-        g.avg_entry += (t.entry_price * t.lot);
+        g.avg_entry += (t.entry_price * t.quantity);
         g.count += 1;
         g.sl = t.sl || g.sl;
         g.tp = t.tp || g.tp;
@@ -300,7 +300,7 @@ function renderTrades() {
           <td class="px-5 py-3 font-mono text-slate-500 whitespace-nowrap">${new Date(t.opened_at || Date.now()).toLocaleTimeString()}</td>
           <td class="px-5 py-3 font-bold text-slate-200">${t.symbol}</td>
           <td class="px-5 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${t.direction === 'buy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${t.direction}</span></td>
-          <td class="px-5 py-3 text-right font-mono">${t.lot}</td>
+          <td class="px-5 py-3 text-right font-mono">${t.quantity}</td>
           <td class="px-5 py-3 text-right font-mono text-slate-400">${t.entry_price}</td>
           <td class="px-5 py-3 text-right font-mono text-slate-400">${t.sl || '-'}</td>
           <td class="px-5 py-3 text-right font-mono text-slate-400">${t.tp || '-'}</td>
@@ -473,43 +473,31 @@ async function closeAllPositions() {
 }
 
 // ---- Modals ----
-async function loadSavedAccounts() {
-  try {
-    const accs = await api('GET', '/api/mt5/accounts');
-    document.getElementById('saved-accounts').innerHTML = accs.map(a => `
-      <div style="padding: 8px; border: 1px solid var(--border); margin-bottom: 8px; display:flex; justify-content:space-between; cursor:pointer;"
-           onclick="document.getElementById('m-server').value='${a.server}'; document.getElementById('m-login').value='${a.login}';">
-        <span>${a.server}</span><span>${a.login}</span>
-      </div>
-    `).join('');
-  } catch(err) { console.error(err); }
-}
+function openBinanceModal() { document.getElementById('binance-modal').showModal(); }
+function closeBinanceModal() { document.getElementById('binance-modal').close(); }
 
-function openMt5Modal() { loadSavedAccounts(); document.getElementById('mt5-modal').showModal(); }
-function closeMt5Modal() { document.getElementById('mt5-modal').close(); }
-
-async function testMt5() {
-  document.getElementById('m-status').innerText = 'Testing...';
+async function saveBinance() {
+  document.getElementById('m-status').innerText = 'Connecting...';
+  document.getElementById('m-status').className = '';
   try {
-    const res = await api('POST', '/api/mt5/connect', {
-      server: document.getElementById('m-server').value,
-      login: parseInt(document.getElementById('m-login').value),
-      password: document.getElementById('m-password').value,
-      path: document.getElementById('m-path').value || undefined
+    const res = await api('POST', '/api/binance/link', {
+      api_key: document.getElementById('m-api-key').value,
+      api_secret: document.getElementById('m-api-secret').value,
+      testnet: document.getElementById('m-testnet').checked
     });
     document.getElementById('m-status').innerText = 'Success!';
-    document.getElementById('m-status').className = 'g';
-    document.getElementById('m-save').disabled = false;
+    document.getElementById('m-status').className = 'text-emerald-500';
+    setTimeout(() => {
+        closeBinanceModal();
+        api('GET', '/api/status').then(status => {
+            Object.assign(state, status);
+            renderTopbar(); renderStats();
+        });
+    }, 1000);
   } catch (err) {
     document.getElementById('m-status').innerText = err.message;
-    document.getElementById('m-status').className = 'r';
+    document.getElementById('m-status').className = 'text-rose-500';
   }
-}
-async function saveMt5() { 
-  closeMt5Modal(); 
-  const status = await api('GET', '/api/status');
-  Object.assign(state, status);
-  renderTopbar(); renderStats();
 }
 
 async function loadConfig() {

@@ -12,28 +12,26 @@ class Config(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
     version: Mapped[int] = mapped_column(Integer, default=1)
 
-class MT5Account(Base):
-    __tablename__ = "mt5_accounts"
+class BinanceAccount(Base):
+    __tablename__ = "binance_accounts"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    server: Mapped[str] = mapped_column(String)
-    login: Mapped[int] = mapped_column(Integer)
-    password_enc: Mapped[str] = mapped_column(String)
-    path: Mapped[str | None] = mapped_column(String, nullable=True)
+    api_key_enc: Mapped[str] = mapped_column(String)
+    api_secret_enc: Mapped[str] = mapped_column(String)
+    testnet: Mapped[bool] = mapped_column(Boolean, default=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     last_connected_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 class SymbolCache(Base):
     __tablename__ = "symbols_cache"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    account_id: Mapped[int] = mapped_column(ForeignKey("mt5_accounts.id"))
+    account_id: Mapped[int] = mapped_column(ForeignKey("binance_accounts.id"))
     generic: Mapped[str] = mapped_column(String)
     resolved: Mapped[str] = mapped_column(String)
-    digits: Mapped[int] = mapped_column(Integer)
-    point: Mapped[float] = mapped_column(Float)
-    contract_size: Mapped[float] = mapped_column(Float)
-    min_lot: Mapped[float] = mapped_column(Float)
-    max_lot: Mapped[float] = mapped_column(Float)
-    lot_step: Mapped[float] = mapped_column(Float)
+    tick_size: Mapped[float] = mapped_column(Float)
+    step_size: Mapped[float] = mapped_column(Float)
+    min_qty: Mapped[float] = mapped_column(Float)
+    max_qty: Mapped[float] = mapped_column(Float)
+    min_notional: Mapped[float] = mapped_column(Float)
     cached_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
 
 class Session(Base):
@@ -64,10 +62,13 @@ class Trade(Base):
     __tablename__ = "trades"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     signal_id: Mapped[int | None] = mapped_column(ForeignKey("signals.id"), nullable=True)
-    ticket: Mapped[int] = mapped_column(Integer)
+    exchange: Mapped[str] = mapped_column(String, default="binance")
+    order_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    client_order_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    position_side: Mapped[str | None] = mapped_column(String, nullable=True)
     symbol: Mapped[str] = mapped_column(String)
     direction: Mapped[str] = mapped_column(String)
-    lot: Mapped[float] = mapped_column(Float)
+    quantity: Mapped[float] = mapped_column(Float)
     entry_price: Mapped[float] = mapped_column(Float)
     sl: Mapped[float] = mapped_column(Float)
     tp: Mapped[float] = mapped_column(Float)
@@ -81,6 +82,8 @@ class Trade(Base):
     parent_trade_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     dca_index: Mapped[int] = mapped_column(Integer, default=0)
     group_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    sl_order_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    tp_order_id: Mapped[str | None] = mapped_column(String, nullable=True)
 
 class Event(Base):
     __tablename__ = "events"

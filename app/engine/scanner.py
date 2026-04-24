@@ -1,10 +1,9 @@
 import asyncio
-import MetaTrader5 as mt5
 from datetime import datetime, timedelta
 import pytz
 import pandas as pd
-from app.mt5_client.client import mt5_client
-from app.mt5_client.symbol_resolver import SymbolResolver
+from app.binance_client.client import binance_client
+from app.binance_client.symbol_resolver import SymbolResolver
 from app.strategy.htf_bias import calculate_htf_bias
 from app.strategy.mtf_zones import find_mtf_zone
 from app.strategy.ltf_trigger import find_ltf_trigger
@@ -16,7 +15,7 @@ from app.core.sessions import active_sessions, any_active, Session
 from app.ws.manager import broadcast
 from sqlalchemy import select
 
-symbol_resolver = SymbolResolver(mt5_client)
+symbol_resolver = SymbolResolver(binance_client)
 
 scanner_state = {}
 
@@ -41,7 +40,7 @@ async def scan_loop():
             interval = cfg.get("scan_interval_seconds", 10)
             
             from app.core.state import state
-            if not state.engine_running or not mt5_client.is_connected():
+            if not state.engine_running or not binance_client.is_connected():
                 await asyncio.sleep(interval)
                 continue
                 
@@ -64,17 +63,15 @@ async def scan_loop():
                 
             symbols = cfg.get("symbols", [])
             
-            # --- RANKING CONFIG & POSITIONS ---
             max_signals_per_scan = int(cfg.get("max_signals_per_scan", 1))
             max_open = int(cfg.get("max_open_positions", 5))
             max_symbol = int(cfg.get("max_per_symbol", 1))
             max_dir = int(cfg.get("max_per_direction", 3))
-            magic = int(cfg.get("magic_number", 123456))
             
             bot_positions = []
-            res_pos = await mt5_client.get_positions()
-            if res_pos:
-                bot_positions = [p for p in res_pos if p.get('magic') == magic]
+            async with AsyncSessionLocal() as db:
+                res_pos = await db.execute(select(Trade).where(Trade.closed_at == None))
+                bot_positions = res_pos.scalars().all()
                 
             candidates = []
             updates_to_broadcast = []
@@ -89,27 +86,30 @@ async def scan_loop():
                 score = 0
                 bias = "neutral"
                 
-                info = mt5.symbol_info(resolved)
-                tick = mt5.symbol_info_tick(resolved)
+                info = binance_client.symbol_info(resolved)
+                tick = await binance_client.symbol_info_tick(resolved)
                 current_time = datetime.now().timestamp()
                 
-                if not info or info.trade_mode != mt5.SYMBOL_TRADE_MODE_FULL:
+                if not info or info.get('status') != 'TRADING':
                     reason_full["msg"] = "Market is CLOSED (Trading Disabled)"
-                elif not tick or (current_time - tick.time) > 300:
+                elif not tick or (current_time - tick['time']) > 300:
                     reason_full["msg"] = "Market is CLOSED (Stale tick data)"
                 else:
-                    df_4h = await mt5_client.get_rates(resolved, mt5.TIMEFRAME_H4, 200)
-                    df_1h = await mt5_client.get_rates(resolved, mt5.TIMEFRAME_H1, 200)
-                    df_15m = await mt5_client.get_rates(resolved, mt5.TIMEFRAME_M15, 300)
-                    df_5m = await mt5_client.get_rates(resolved, mt5.TIMEFRAME_M5, 500)
+                    df_4h = await binance_client.get_rates(resolved, 'H4', 200)
+                    df_1h = await binance_client.get_rates(resolved, 'H1', 200)
+                    df_15m = await binance_client.get_rates(resolved, 'M15', 300)
+                    df_5m = await binance_client.get_rates(resolved, 'M5', 500)
                     
                     if df_4h.empty or df_1h.empty or df_15m.empty or df_5m.empty: 
                         reason_full["msg"] = "Not enough data (need more bars)"
                     else:
-                        # Volatility and Spread Checks
                         adx, atr = calc_adx(df_15m, 14)
-                        point = info.point if info else 0.0001
-                        spread_points = (tick.ask - tick.bid) / point if tick else 0
+                        
+                        price_filter = next((f for f in info['filters'] if f['filterType'] == 'PRICE_FILTER'), None)
+                        tick_size = float(price_filter['tickSize']) if price_filter else 0.0001
+                        point = tick_size
+                        
+                        spread_points = (tick['ask'] - tick['bid']) / point if tick else 0
                         atr_points = atr / point if point > 0 else 1
                         
                         htf = calculate_htf_bias(df_4h, df_1h)
@@ -127,7 +127,6 @@ async def scan_loop():
                             else:
                                 base_atr_mult = float(cfg.get("atr_buffer_multiplier", 0.2))
                                 
-                                # Dynamic Volatility (Spike) Factor instead of hardcoded symbols
                                 recent_tr = pd.concat([
                                     df_15m['high'] - df_15m['low'],
                                     abs(df_15m['high'] - df_15m['close'].shift(1)),
@@ -140,7 +139,6 @@ async def scan_loop():
                                 if local_atr > 0:
                                     spike_factor = max_tr / local_atr
                                     if spike_factor > 2.0:
-                                        # Scale multiplier based on how spiky the asset is (capped at 3x)
                                         scale = min(spike_factor / 1.5, 3.0)
                                         base_atr_mult *= scale
                                         
@@ -159,14 +157,12 @@ async def scan_loop():
                                 elif adx < 15 and not is_strong_trigger:
                                     reason_full["msg"] = f"Low Volatility (ADX={adx:.1f} < 15) and no strong trigger"
                                 else:
-                                    # Dynamic Threshold Logic
                                     base_threshold = int(cfg.get("signal_threshold", 65))
                                     current_hour = now_utc.hour
-                                    # London/NY overlap is roughly 12:00 to 16:00 UTC
                                     if 12 <= current_hour <= 16:
-                                        base_threshold -= 5 # Easier threshold during overlap
+                                        base_threshold -= 5
                                     elif current_hour < 6 or current_hour > 20:
-                                        base_threshold += 5 # Stricter during Asian session
+                                        base_threshold += 5
                                         
                                     if spread_points > 15: base_threshold += 5
                                     if htf['strength'] >= 80: base_threshold -= 5
@@ -174,18 +170,15 @@ async def scan_loop():
                                     if not ltf_trigger:
                                         status = "WATCHING"
                                         reason_full["msg"] = f"Zone Valid, Waiting for Trigger (Thresh: {base_threshold})"
-                                        
                                         state_key = f"{resolved}_{bias}"
                                         scanner_state[state_key] = {"time": now_utc, "status": "WATCHING"}
                                     else:
                                         score = calculate_score(htf['strength'], mtf_zone['quality'], ltf_trigger['strength'], True)
                                         
-                                        # Smart Cooldown
                                         cooldown_mins = int(cfg.get("signal_cooldown_minutes", 30))
                                         cutoff = now_utc - timedelta(minutes=cooldown_mins)
                                         
                                         async with AsyncSessionLocal() as db:
-                                            # Check recent closed trades
                                             recent_closed = await db.execute(select(Trade).where(
                                                 Trade.symbol == resolved,
                                                 Trade.direction == bias,
@@ -194,7 +187,6 @@ async def scan_loop():
                                             ))
                                             has_recent_closed = recent_closed.scalars().first()
 
-                                            # Also check recent duplicate signals
                                             recent_fired = await db.execute(select(Signal).where(
                                                 Signal.symbol == resolved,
                                                 Signal.direction == bias,
@@ -205,9 +197,7 @@ async def scan_loop():
                                         
                                         state_key = f"{resolved}_{bias}"
                                         
-                                        # Also check if a trade is currently open for this symbol
-                                        open_positions_for_sym = [p for p in bot_positions if p['symbol'] == resolved]
-                                        ord_type = mt5.ORDER_TYPE_BUY if bias == 'bullish' else mt5.ORDER_TYPE_SELL
+                                        open_positions_for_sym = [p for p in bot_positions if p.symbol == resolved]
                                         sym_count = len(open_positions_for_sym)
                                         
                                         is_dca_allowed = False
@@ -215,20 +205,20 @@ async def scan_loop():
                                         
                                         if sym_count > 0:
                                             enable_dca = cfg.get("enable_dca", False)
-                                            same_dir_positions = [p for p in open_positions_for_sym if p.get('type') == ord_type]
+                                            same_dir_positions = [p for p in open_positions_for_sym if p.direction == bias]
                                             
                                             if enable_dca and score >= base_threshold and len(same_dir_positions) > 0:
                                                 max_dca_entries = int(cfg.get("max_dca_entries", 1))
                                                 dca_trigger_sl_progress = float(cfg.get("dca_trigger_sl_progress", 0.5))
                                                 dca_max_total_risk_r = float(cfg.get("dca_max_total_risk_r", 2.0))
                                                 
-                                                same_dir_positions.sort(key=lambda x: x.get('time', 0))
+                                                same_dir_positions.sort(key=lambda x: x.opened_at.timestamp() if x.opened_at else 0)
                                                 base_trade = same_dir_positions[0]
-                                                base_entry = base_trade.get('price_open')
-                                                base_sl = base_trade.get('sl')
+                                                base_entry = base_trade.entry_price
+                                                base_sl = base_trade.sl
                                                 
                                                 if base_entry and base_sl and base_entry != base_sl:
-                                                    current_price = tick.ask if bias == 'bullish' else tick.bid
+                                                    current_price = tick['ask'] if bias == 'bullish' else tick['bid']
                                                     
                                                     if bias == 'bullish':
                                                         progress = (base_entry - current_price) / (base_entry - base_sl)
@@ -247,32 +237,33 @@ async def scan_loop():
                                                         status = "DCA_SKIPPED"
                                                         reason_full["msg"] = "Skipped DCA: too close to SL"
                                                     else:
-                                                        original_lot = base_trade.get('volume')
+                                                        original_qty = base_trade.quantity
                                                         dca_lot_multiplier = float(cfg.get("dca_lot_multiplier", 0.7))
-                                                        dca_lot = original_lot * dca_lot_multiplier
-                                                        if dca_lot < info.volume_min: dca_lot = info.volume_min
-                                                        if dca_lot > info.volume_max: dca_lot = info.volume_max
-                                                        step = info.volume_step
-                                                        dca_lot = round(dca_lot / step) * step
+                                                        dca_lot = original_qty * dca_lot_multiplier
+                                                        
+                                                        lot_filter = next((f for f in info['filters'] if f['filterType'] == 'LOT_SIZE'), None)
+                                                        if lot_filter:
+                                                            if dca_lot < float(lot_filter['minQty']): dca_lot = float(lot_filter['minQty'])
+                                                            if dca_lot > float(lot_filter['maxQty']): dca_lot = float(lot_filter['maxQty'])
+                                                            
+                                                        dca_lot = symbol_resolver.round_qty(resolved, dca_lot)
                                                         
                                                         dca_reanchor_sl = cfg.get("dca_reanchor_sl", True)
                                                         new_sl = ltf_trigger['sl'] if dca_reanchor_sl else base_sl
                                                         
-                                                        def _calc_risk(action, symbol, vol, open_price, sl_price):
+                                                        def _calc_risk(qty, open_price, sl_price):
                                                             if not open_price or not sl_price or open_price == sl_price: return 0
-                                                            profit = mt5.order_calc_profit(action, symbol, vol, open_price, sl_price)
-                                                            return abs(profit) if profit and profit < 0 else 1.0 # Fallback
+                                                            return abs(open_price - sl_price) * qty
                                                         
-                                                        # Base 1R risk amount (original trade's initial risk)
-                                                        base_1r_risk = await asyncio.to_thread(_calc_risk, ord_type, resolved, original_lot, base_entry, base_sl)
+                                                        base_1r_risk = _calc_risk(original_qty, base_entry, base_sl)
                                                         if base_1r_risk == 0: base_1r_risk = 1.0
                                                         
-                                                        total_new_risk = await asyncio.to_thread(_calc_risk, ord_type, resolved, dca_lot, current_price, new_sl)
+                                                        total_new_risk = _calc_risk(dca_lot, current_price, new_sl)
                                                         
                                                         for p in same_dir_positions:
-                                                            p_entry = p.get('price_open')
-                                                            p_vol = p.get('volume')
-                                                            p_risk = await asyncio.to_thread(_calc_risk, ord_type, resolved, p_vol, p_entry, new_sl)
+                                                            p_entry = p.entry_price
+                                                            p_vol = p.quantity
+                                                            p_risk = _calc_risk(p_vol, p_entry, new_sl)
                                                             total_new_risk += p_risk
                                                         
                                                         total_risk_r = total_new_risk / base_1r_risk
@@ -290,7 +281,7 @@ async def scan_loop():
                                                             ltf_trigger['dca_index'] = dca_count + 1
                                                             ltf_trigger['dca_lot'] = dca_lot
                                                             ltf_trigger['sl'] = new_sl
-                                                            ltf_trigger['parent_ticket'] = base_trade.get('ticket')
+                                                            ltf_trigger['parent_ticket'] = base_trade.id
                                             
                                             if not is_dca_allowed and status not in ("DCA_SKIPPED", "DCA_FIRED"):
                                                 status = "COOLDOWN"
@@ -303,14 +294,13 @@ async def scan_loop():
                                             status = "COOLDOWN"
                                             reason_full["msg"] = f"Fired recently, waiting {cooldown_mins}m"
                                         elif score >= base_threshold:
-                                            # POSITION LIMITS CHECK BEFORE CANDIDATE SELECTION
-                                            dir_count = len([p for p in bot_positions if p.get('type') == ord_type])
+                                            dir_count = len([p for p in bot_positions if p.direction == bias])
                                             
                                             if len(bot_positions) >= max_open or sym_count >= max_symbol or dir_count >= max_dir:
                                                 status = "SKIPPED"
                                                 reason_full["msg"] = "Skipped because position limit already reached"
                                             else:
-                                                status = "FIRED" # Temporary status
+                                                status = "FIRED"
                                                 reason_full["msg"] = f"Candidate Accepted! Score: {score} >= {base_threshold}"
                                                 
                                                 candidates.append({
@@ -354,7 +344,6 @@ async def scan_loop():
                         "updated_at": datetime.now(pytz.utc).isoformat()
                     })
 
-            # --- CANDIDATE RANKING ---
             dca_candidates = [c for c in candidates if c.get("is_dca")]
             normal_candidates = [c for c in candidates if not c.get("is_dca")]
             
@@ -381,7 +370,6 @@ async def scan_loop():
                 
                 is_dca = c.get("is_dca", False)
                 
-                # Check if it was selected based on its list
                 if (is_dca and res in selected_symbols_dca) or (not is_dca and res in selected_symbols_normal):
                     status = "DCA_FIRED" if is_dca else "FIRED"
                     if is_dca:
@@ -423,7 +411,6 @@ async def scan_loop():
                         "status": status, "reason": reason_full, "updated_at": datetime.now(pytz.utc).isoformat()
                     })
 
-            # Broadcast all states for UI
             for update in updates_to_broadcast:
                 await broadcast({"type": "scan.update", "data": update})
 

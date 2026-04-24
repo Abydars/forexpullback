@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from app.core.state import state
-from app.mt5_client.client import mt5_client
+from app.binance_client.client import binance_client
 from app.ws.manager import broadcast
 
 router = APIRouter(prefix="/api")
@@ -9,7 +9,7 @@ router = APIRouter(prefix="/api")
 async def get_status():
     return {
         "engine_running": state.engine_running,
-        "mt5_connected": mt5_client.is_connected(),
+        "binance_connected": binance_client.is_connected(),
         "today_pnl": state.today_pnl
     }
 

@@ -3,7 +3,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse, JSONResponse
 from contextlib import asynccontextmanager
 from app.engine.lifecycle import start_engine, stop_engine
-from app.api import (mt5_routes, config_routes, sessions_routes,
+from app.api import (binance_routes, config_routes, sessions_routes,
                      signals_routes, trades_routes, engine_routes, events_routes, auth_routes)
 from app.ws.manager import router as ws_router
 from app.core.auth import verify_access_token
@@ -47,7 +47,7 @@ async def login_page():
 async def index():
     return FileResponse('app/static/index.html')
 
-for r in [auth_routes.router, mt5_routes.router, config_routes.router, sessions_routes.router,
+for r in [auth_routes.router, binance_routes.router, config_routes.router, sessions_routes.router,
           signals_routes.router, trades_routes.router, engine_routes.router,
           events_routes.router, ws_router]:
     app.include_router(r)

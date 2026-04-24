@@ -1,48 +1,52 @@
 import asyncio
-import MetaTrader5 as mt5
-from app.mt5_client.client import mt5_client
+from app.binance_client.client import binance_client
+from app.binance_client.symbol_resolver import SymbolResolver
 from app.db.session import AsyncSessionLocal
 from app.db.models import Trade, Event
 from datetime import datetime
 from app.ws.manager import broadcast
 from sqlalchemy import select
 import pytz
+import time
+
+resolver = SymbolResolver(binance_client)
 
 async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca_data=None):
     try:
-        magic = int(cfg.get("magic_number", 123456))
-        positions = await mt5_client.get_positions()
+        positions = await binance_client.get_positions()
         
-        bot_positions = [p for p in positions if p.get('magic') == magic]
-        
-        if len(bot_positions) >= int(cfg.get("max_open_positions", 5)):
-            return
+        # We only track our bot's positions using DB, but we can also limit total open positions
+        # Let's count open positions from DB for active tracking
+        async with AsyncSessionLocal() as db:
+            active_trades = await db.execute(select(Trade).where(Trade.closed_at == None))
+            bot_positions = active_trades.scalars().all()
             
-        if not is_dca:
-            sym_pos = [p for p in bot_positions if p['symbol'] == resolved]
-            if len(sym_pos) >= int(cfg.get("max_per_symbol", 1)):
+            if len(bot_positions) >= int(cfg.get("max_open_positions", 5)):
                 return
                 
-            dir_type = 0 if bias == 'bullish' else 1
-            sym_dir_pos = [p for p in sym_pos if p['type'] == dir_type]
-            if len(sym_dir_pos) >= int(cfg.get("max_per_direction", 3)):
-                return
-            
-        acc = await mt5_client.account_info()
-        balance = acc['balance']
+            if not is_dca:
+                sym_pos = [p for p in bot_positions if p.symbol == resolved]
+                if len(sym_pos) >= int(cfg.get("max_per_symbol", 1)):
+                    return
+                    
+                sym_dir_pos = [p for p in sym_pos if p.direction == bias]
+                if len(sym_dir_pos) >= int(cfg.get("max_per_direction", 3)):
+                    return
         
-        info = mt5.symbol_info(resolved)
+        acc = await binance_client.account_info()
+        balance = float(acc.get('totalWalletBalance', 0.0))
+        
+        info = binance_client.symbol_info(resolved)
         if not info: return
         
-        tick = mt5.symbol_info_tick(resolved)
+        tick = await binance_client.symbol_info_tick(resolved)
         if not tick: return
-        actual_price = tick.ask if bias == 'bullish' else tick.bid
+        actual_price = tick['ask'] if bias == 'bullish' else tick['bid']
         
-        # Spread check (Dynamic Percentage of Stop Loss)
-        spread = tick.ask - tick.bid
+        # Spread check
+        spread = tick['ask'] - tick['bid']
         sl_distance = abs(actual_price - sig.sl)
         
-        # Calculate what percentage of the risk (SL distance) is eaten by the spread
         spread_pct = (spread / sl_distance) * 100 if sl_distance > 0 else 100
         max_spread_pct = float(cfg.get("max_spread_pct", 20.0))
         
@@ -54,170 +58,149 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
                 await db.commit()
                 await broadcast({"type": "log.event", "level": "WARN", "component": "order_manager", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
             return
-        
+            
         risk_pct = float(cfg.get("risk_percent", 1.0))
         risk_amount = balance * risk_pct / 100
         
-        def _calc_profit():
-            action_type = mt5.ORDER_TYPE_BUY if bias == 'bullish' else mt5.ORDER_TYPE_SELL
-            return mt5.order_calc_profit(action_type, resolved, 1.0, actual_price, sig.sl)
-            
-        profit_1_lot = await asyncio.to_thread(_calc_profit)
-        
         if is_dca and dca_data:
-            lot = dca_data.get('dca_lot', info.volume_min)
+            qty = dca_data.get('dca_lot', 0)
         else:
-            if profit_1_lot is not None and profit_1_lot != 0:
-                loss_for_1_lot = abs(profit_1_lot)
-                lot = risk_amount / loss_for_1_lot
+            if sl_distance > 0:
+                qty = risk_amount / sl_distance
             else:
-                # Fallback for when order_calc_profit fails
-                sl_points = abs(actual_price - sig.sl) / info.point if info.point else 1
-                lot = risk_amount / (sl_points * info.trade_tick_value) if info.trade_tick_value else info.volume_min
+                qty = 0
             
-            # precise volume calculation to prevent MT5 invalid volume errors
-            steps = round(lot / info.volume_step)
-            lot = steps * info.volume_step
-            lot = max(info.volume_min, min(info.volume_max, lot))
-            lot = float(f"{lot:.8f}".rstrip('0').rstrip('.')) if '.' in f"{lot:.8f}" else float(lot)
+        qty = resolver.round_qty(resolved, qty)
         
-        action = mt5.TRADE_ACTION_DEAL
-        type_ = mt5.ORDER_TYPE_BUY if bias == 'bullish' else mt5.ORDER_TYPE_SELL
+        if qty <= 0:
+            return
+            
+        # Optional: set leverage
+        default_leverage = int(cfg.get("default_leverage", 10))
+        await binance_client.set_leverage(resolved, default_leverage)
         
-        # dynamically determine correct filling mode based on broker/symbol limits
-        filling_type = mt5.ORDER_FILLING_IOC
-        if info.filling_mode & 1:
-            filling_type = mt5.ORDER_FILLING_FOK
-        elif info.filling_mode & 2:
-            filling_type = mt5.ORDER_FILLING_IOC
-        else:
-            filling_type = mt5.ORDER_FILLING_RETURN
+        # Optional: set margin type
+        margin_type = cfg.get("margin_type", "ISOLATED").upper()
+        await binance_client.set_margin_type(resolved, margin_type)
         
-        request = {
-            "action": action,
-            "symbol": resolved,
-            "volume": float(lot),
-            "type": type_,
-            "price": actual_price,
-            "sl": sig.sl,
-            "tp": sig.tp,
-            "deviation": 20,
-            "magic": magic,
-            "comment": f"Sig {sig.id}",
-            "type_time": mt5.ORDER_TIME_GTC,
-            "type_filling": filling_type,
+        side = 'BUY' if bias == 'bullish' else 'SELL'
+        position_side = 'LONG' if bias == 'bullish' else 'SHORT'
+        
+        client_order_id = f"fpb_{sig.id}_{int(time.time() * 1000)}"
+        if is_dca:
+            client_order_id = f"fpb_dca_{sig.id}_{int(time.time() * 1000)}"
+            
+        # 1. Entry Order
+        req = {
+            'symbol': resolved,
+            'side': side,
+            'positionSide': position_side,
+            'type': 'MARKET',
+            'quantity': qty,
+            'newClientOrderId': client_order_id
         }
         
-        # 1. Check Broker Stop Levels
-        stops_level_points = info.trade_stops_level * info.point
-        if abs(actual_price - sig.sl) <= stops_level_points:
-            async with AsyncSessionLocal() as db:
-                err_msg = f"Order {resolved} rejected: SL distance is closer than broker stops_level ({info.trade_stops_level} points)"
-                e = Event(level="WARN", component="order_manager", message=err_msg)
-                db.add(e)
-                await db.commit()
-                await broadcast({"type": "log.event", "level": "WARN", "component": "order_manager", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
-            return
-            
-        # 2. Dry-run Order Check
-        def _check_order():
-            return mt5.order_check(request)
-            
-        check_result = await asyncio.to_thread(_check_order)
-        # order_check() returns 0 on success, NOT TRADE_RETCODE_DONE (10009)
-        if check_result is None or check_result.retcode != 0:
-            async with AsyncSessionLocal() as db:
-                comment = check_result.comment if check_result else 'Unknown Error'
-                code = check_result.retcode if check_result else 'None'
-                err_msg = f"Order {resolved} failed dry-run: {comment} (Code {code})"
-                e = Event(level="WARN", component="order_manager", message=err_msg)
-                db.add(e)
-                await db.commit()
-                await broadcast({"type": "log.event", "level": "WARN", "component": "order_manager", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
-            return
+        res = await binance_client.order_send(req)
+        order_id = str(res.get('orderId'))
+        entry_price = float(res.get('avgPrice', res.get('price', actual_price)))
+        if entry_price == 0: entry_price = actual_price
         
-        res = await mt5_client.order_send(request)
-        if res.get('retcode') == mt5.TRADE_RETCODE_DONE:
-            order_ticket = res.get('order')
-            deal_ticket = res.get('deal')
+        # 2. SL Order
+        sl_side = 'SELL' if bias == 'bullish' else 'BUY'
+        sl_req = {
+            'symbol': resolved,
+            'side': sl_side,
+            'positionSide': position_side,
+            'type': 'STOP_MARKET',
+            'stopPrice': resolver.round_price(resolved, sig.sl),
+            'closePosition': 'true',
+            'timeInForce': 'GTC'
+        }
+        sl_res = await binance_client.order_send(sl_req)
+        sl_order_id = str(sl_res.get('orderId'))
+        
+        # 3. TP Order
+        tp_req = {
+            'symbol': resolved,
+            'side': sl_side,
+            'positionSide': position_side,
+            'type': 'TAKE_PROFIT_MARKET',
+            'stopPrice': resolver.round_price(resolved, sig.tp),
+            'closePosition': 'true',
+            'timeInForce': 'GTC'
+        }
+        tp_res = await binance_client.order_send(tp_req)
+        tp_order_id = str(tp_res.get('orderId'))
+        
+        async with AsyncSessionLocal() as db:
+            t = Trade(signal_id=sig.id, symbol=resolved, direction=bias,
+                      quantity=qty, entry_price=entry_price, sl=sig.sl, tp=sig.tp,
+                      opened_at=datetime.now(pytz.utc), exchange='binance',
+                      order_id=order_id, client_order_id=client_order_id,
+                      position_side=position_side, sl_order_id=sl_order_id, tp_order_id=tp_order_id)
             
-            def _get_pos_id():
-                if deal_ticket:
-                    deals = mt5.history_deals_get(ticket=deal_ticket)
-                    if deals and len(deals) > 0:
-                        return deals[0].position_id
-                return order_ticket
-                
-            ticket = await asyncio.to_thread(_get_pos_id)
-            
-            async with AsyncSessionLocal() as db:
-                t = Trade(signal_id=sig.id, ticket=ticket, symbol=resolved, direction=bias,
-                         lot=lot, entry_price=res.get('price'), sl=sig.sl, tp=sig.tp,
-                         opened_at=datetime.now(pytz.utc))
-                
-                if is_dca and dca_data:
-                    t.parent_trade_id = dca_data.get('parent_ticket')
-                    t.dca_index = dca_data.get('dca_index', 0)
-                    t.group_id = f"grp_{t.parent_trade_id}"
-                    t.note = f"DCA #{t.dca_index}"
-                else:
-                    t.note = "BASE"
-                    t.group_id = f"grp_{ticket}"
+            if is_dca and dca_data:
+                t.parent_trade_id = dca_data.get('parent_ticket')
+                t.dca_index = dca_data.get('dca_index', 0)
+                t.group_id = f"grp_{t.parent_trade_id}"
+                t.note = f"DCA #{t.dca_index}"
+            else:
+                t.note = "BASE"
+                t.group_id = f"grp_{order_id}"
 
-                db.add(t)
-                await db.commit()
-                await db.refresh(t)
-                
-                if is_dca and dca_data:
-                    dir_type = 0 if bias == 'bullish' else 1
-                    all_pos = await mt5_client.get_positions()
-                    sym_dir_pos = [p for p in all_pos if p.get('magic') == magic and p['symbol'] == resolved and p['type'] == dir_type]
+            db.add(t)
+            await db.commit()
+            await db.refresh(t)
+            
+            # Reanchor SL for existing DCA positions
+            if is_dca and dca_data:
+                reanchor_sl = cfg.get("dca_reanchor_sl", True)
+                if reanchor_sl:
+                    active_same = await db.execute(select(Trade).where(
+                        Trade.closed_at == None, Trade.symbol == resolved, Trade.direction == bias
+                    ))
+                    same_trades = active_same.scalars().all()
                     
-                    reanchor_sl = cfg.get("dca_reanchor_sl", True)
-                    
-                    for p in sym_dir_pos:
-                        if p['ticket'] == ticket:
-                            continue
-                            
-                        new_tp = sig.tp
-                        new_sl = sig.sl if reanchor_sl else p['sl']
+                    for p in same_trades:
+                        if p.id == t.id: continue
                         
-                        if p['tp'] != new_tp or p['sl'] != new_sl:
-                            req_sltp = {
-                                "action": mt5.TRADE_ACTION_SLTP,
-                                "position": p['ticket'],
-                                "symbol": resolved,
-                                "sl": new_sl,
-                                "tp": new_tp,
-                                "magic": magic
-                            }
-                            await asyncio.to_thread(mt5.order_send, req_sltp)
+                        # Cancel old SL
+                        if p.sl_order_id:
+                            try:
+                                await binance_client.order_cancel(resolved, order_id=p.sl_order_id)
+                            except:
+                                pass
+                                
+                        # Cancel old TP
+                        if p.tp_order_id:
+                            try:
+                                await binance_client.order_cancel(resolved, order_id=p.tp_order_id)
+                            except:
+                                pass
+                        
+                        # Place new SL/TP
+                        try:
+                            nsl_res = await binance_client.order_send(sl_req)
+                            p.sl_order_id = str(nsl_res.get('orderId'))
+                            p.sl = sig.sl
                             
-                            db_trade_res = await db.execute(select(Trade).where(Trade.ticket == p['ticket']))
-                            db_trade = db_trade_res.scalars().first()
-                            if db_trade:
-                                db_trade.sl = new_sl
-                                db_trade.tp = new_tp
+                            ntp_res = await binance_client.order_send(tp_req)
+                            p.tp_order_id = str(ntp_res.get('orderId'))
+                            p.tp = sig.tp
+                        except Exception as e:
+                            print("Reanchor error:", e)
                     
-                await broadcast({
-                    "type": "trade.opened",
-                    "trade": {
-                        "ticket": ticket, "symbol": resolved, "direction": bias,
-                        "lot": lot, "entry_price": t.entry_price, "sl": t.sl, "tp": t.tp,
-                        "pnl": 0.0, "opened_at": t.opened_at.isoformat()
-                    }
-                })
-                
-                await db.commit()
-        else:
-            async with AsyncSessionLocal() as db:
-                err_msg = f"Order rejected (Retcode {res.get('retcode')}): {res.get('comment', 'Unknown')}"
-                e = Event(level="ERROR", component="order_manager", message=err_msg)
-                db.add(e)
-                await db.commit()
-                await broadcast({
-                    "type": "log.event", "level": "ERROR", "component": "order_manager", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()
-                })
+                    await db.commit()
+            
+            await broadcast({
+                "type": "trade.opened",
+                "trade": {
+                    "id": t.id, "symbol": resolved, "direction": bias,
+                    "quantity": qty, "entry_price": t.entry_price, "sl": t.sl, "tp": t.tp,
+                    "pnl": 0.0, "opened_at": t.opened_at.isoformat()
+                }
+            })
+
     except Exception as e:
         print("Order manager error:", e)
         err_msg = f"Order exception: {str(e)}"
