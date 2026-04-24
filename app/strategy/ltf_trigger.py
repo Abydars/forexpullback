@@ -7,7 +7,15 @@ def calculate_rsi(series: pd.Series, period: int = 14) -> pd.Series:
     rs = gain / loss
     return 100 - (100 / (1 + rs))
 
-def find_ltf_trigger(df: pd.DataFrame, zone: dict, bias: str, point: float, reward_ratio: float = 2.0) -> dict | None:
+def find_htf_liquidity(df_15m: pd.DataFrame, bias: str, entry: float) -> float | None:
+    if len(df_15m) < 50: return None
+    # Find recent highest high / lowest low over the last 50 candles as liquidity targets
+    if bias == 'bullish':
+        return float(df_15m['high'].iloc[-50:].max())
+    else:
+        return float(df_15m['low'].iloc[-50:].min())
+
+def find_ltf_trigger(df: pd.DataFrame, df_15m: pd.DataFrame, atr_15m: float, zone: dict, bias: str, point: float, reward_ratio: float = 2.0) -> dict | None:
     if len(df) < 20: return None
     
     df = df.copy()
@@ -62,8 +70,18 @@ def find_ltf_trigger(df: pd.DataFrame, zone: dict, bias: str, point: float, rewa
             if last['rsi'] > 45 and prev['rsi'] <= 45:
                 strength += 15
                 trigger_name += " + RSI Reclaim"
-            sl = float(min(last['low'], prev['low'], zone['zone_low']) - (point * 15))
-            tp = entry + (entry - sl) * reward_ratio
+            
+            atr_buffer = atr_15m * 0.2
+            sl = float(min(last['low'], prev['low'], zone['zone_low']) - atr_buffer)
+            rr_tp = entry + (entry - sl) * reward_ratio
+            
+            liq_tp = find_htf_liquidity(df_15m, bias, entry)
+            if liq_tp and liq_tp > entry:
+                tp = float(min(rr_tp, liq_tp))
+                if tp == liq_tp: trigger_name += " (Liq TP)"
+            else:
+                tp = rr_tp
+                
             return {"entry": entry, "sl": sl, "tp": tp, "trigger_type": trigger_name, "strength": min(100, strength)}
             
     elif bias == 'bearish':
@@ -95,8 +113,18 @@ def find_ltf_trigger(df: pd.DataFrame, zone: dict, bias: str, point: float, rewa
             if last['rsi'] < 55 and prev['rsi'] >= 55:
                 strength += 15
                 trigger_name += " + RSI Reclaim"
-            sl = float(max(last['high'], prev['high'], zone['zone_high']) + (point * 15))
-            tp = entry - (sl - entry) * reward_ratio
+                
+            atr_buffer = atr_15m * 0.2
+            sl = float(max(last['high'], prev['high'], zone['zone_high']) + atr_buffer)
+            rr_tp = entry - (sl - entry) * reward_ratio
+            
+            liq_tp = find_htf_liquidity(df_15m, bias, entry)
+            if liq_tp and liq_tp < entry:
+                tp = float(max(rr_tp, liq_tp))
+                if tp == liq_tp: trigger_name += " (Liq TP)"
+            else:
+                tp = rr_tp
+                
             return {"entry": entry, "sl": sl, "tp": tp, "trigger_type": trigger_name, "strength": min(100, strength)}
             
     return None

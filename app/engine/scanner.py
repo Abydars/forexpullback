@@ -109,7 +109,7 @@ async def scan_loop():
                             if not mtf_zone:
                                 reason_full["msg"] = "No 15M Pullback Zone (Not near EMA or FVG)"
                             else:
-                                ltf_trigger = find_ltf_trigger(df_5m, mtf_zone, bias, point, float(cfg.get("reward_ratio", 2.0)))
+                                ltf_trigger = find_ltf_trigger(df_5m, df_15m, atr, mtf_zone, bias, point, float(cfg.get("reward_ratio", 2.0)))
                                 reason_full["trigger"] = ltf_trigger
                                 
                                 is_strong_trigger = ltf_trigger and ltf_trigger['strength'] >= 80

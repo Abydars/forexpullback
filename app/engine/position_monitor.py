@@ -13,8 +13,19 @@ async def evaluate_smart_exit(p: dict, t, symbol: str) -> str | None:
     if p['profit'] <= 0:
         return None
         
-    df = await mt5_client.get_rates(symbol, mt5.TIMEFRAME_M5, 5)
-    if df.empty or len(df) < 3: return None
+    # Minimum trade age (disable smart TP for first 20 mins ~ 4 candles)
+    opened_at = t.opened_at
+    if opened_at.tzinfo is None: opened_at = opened_at.replace(tzinfo=pytz.utc)
+    if (datetime.now(pytz.utc) - opened_at).total_seconds() < 20 * 60:
+        return None
+        
+    df = await mt5_client.get_rates(symbol, mt5.TIMEFRAME_M5, 15)
+    if df.empty or len(df) < 15: return None
+    
+    # Calculate ATR for volatility filter
+    df_copy = df.copy()
+    df_copy['tr'] = df_copy['high'] - df_copy['low']
+    atr = df_copy['tr'].mean()
     
     last = df.iloc[-2]
     prev = df.iloc[-3]
@@ -22,38 +33,41 @@ async def evaluate_smart_exit(p: dict, t, symbol: str) -> str | None:
     entry = t.entry_price
     tp = t.tp
     
+    body_last = abs(last['close'] - last['open'])
+    range_last = last['high'] - last['low']
+    is_strong = body_last > (range_last * 0.4)
+    
     if p['type'] == mt5.ORDER_TYPE_BUY:
         if tp and tp > entry:
             tp_dist = tp - entry
-            max_reached = max(last['high'], prev['high'], p['price_current']) - entry
+            # Use closed candle prices instead of live tick for 80% -> 60% logic
+            max_reached = max(last['high'], prev['high']) - entry
             
             if max_reached >= tp_dist * 0.8:
-                # 1. LIVE Exit: If price drops back to 60% after reaching 80%, exit instantly!
-                if p['price_current'] - entry <= tp_dist * 0.6:
-                    return "Smart TP: Live Rejection (Retraced from 80% to 60% of TP)"
+                if (last['close'] - entry) <= tp_dist * 0.6:
+                    return "Smart TP: Closed below 60% after reaching 80%"
                     
-                # 2. Candle Close Exit: If it holds above 60% but closes red, exit on close.
-                if last['close'] < last['open']:
-                    return "Smart TP: Momentum lost near TP (80%+ reached)"
-                    
-        # Bearish Reversal (Closed below previous candle's lowest point)
+        # Momentum Reversal (Bearish)
         if last['close'] < last['open'] and last['close'] < prev['low']:
-            return "Smart TP: Bearish Reversal Detected"
+            move_size = entry - last['close'] if entry > last['close'] else last['close'] - entry
+            if move_size > (0.5 * atr):
+                if is_strong or (prev['close'] < prev['open']): # Strong or 2-candle confirmation
+                    return "Smart TP: Strong Bearish Reversal Detected"
     else:
         if tp and tp < entry:
             tp_dist = entry - tp
-            max_reached = entry - min(last['low'], prev['low'], p['price_current'])
+            max_reached = entry - min(last['low'], prev['low'])
             
             if max_reached >= tp_dist * 0.8:
-                if entry - p['price_current'] <= tp_dist * 0.6:
-                    return "Smart TP: Live Rejection (Retraced from 80% to 60% of TP)"
+                if (entry - last['close']) <= tp_dist * 0.6:
+                    return "Smart TP: Closed below 60% after reaching 80%"
                     
-                if last['close'] > last['open']:
-                    return "Smart TP: Momentum lost near TP (80%+ reached)"
-                    
-        # Bullish Reversal (Closed above previous candle's highest point)
+        # Momentum Reversal (Bullish)
         if last['close'] > last['open'] and last['close'] > prev['high']:
-            return "Smart TP: Bullish Reversal Detected"
+            move_size = last['close'] - entry if last['close'] > entry else entry - last['close']
+            if move_size > (0.5 * atr):
+                if is_strong or (prev['close'] > prev['open']):
+                    return "Smart TP: Strong Bullish Reversal Detected"
                 
     return None
 
@@ -140,36 +154,32 @@ async def monitor_loop():
                                 await broadcast({"type": "log.event", "level": "INFO", "component": "smart_tp", "message": e.message, "created_at": datetime.now(pytz.utc).isoformat()})
                                 continue
                                 
-                        # Trailing Stop (Starts at 50% of TP)
+                        # Trailing Stop (Starts at 70% of TP)
                         cfg = await get_config()
                         if cfg.get("trailing", True) and t.tp:
                             tp_dist = abs(t.tp - t.entry_price)
                             current_dist = p['price_current'] - t.entry_price if p['type'] == mt5.ORDER_TYPE_BUY else t.entry_price - p['price_current']
                             
-                            if tp_dist > 0 and current_dist >= (tp_dist * 0.5):
+                            if tp_dist > 0 and current_dist >= (tp_dist * 0.7):
                                 info = mt5.symbol_info(t.symbol)
                                 if info:
-                                    trail_pips = float(cfg.get("trailing_distance_pips", 10.0))
-                                    
-                                    digits = info.digits
-                                    if "JPY" in t.symbol:
-                                        pip_size = 0.01
-                                    elif digits in [3, 5]:
-                                        pip_size = info.point * 10
-                                    else:
-                                        pip_size = info.point
+                                    # Fetch recent ATR for volatility-aware trailing distance
+                                    df_trail = await mt5_client.get_rates(t.symbol, mt5.TIMEFRAME_M15, 14)
+                                    if not df_trail.empty:
+                                        atr_trail = (df_trail['high'] - df_trail['low']).mean()
+                                        # Use 1.5 ATR for trailing distance
+                                        dist_points = atr_trail * 1.5
+                                        digits = info.digits
                                         
-                                    dist_points = trail_pips * pip_size
-                                    
-                                    new_sl = None
-                                    if p['type'] == mt5.ORDER_TYPE_BUY:
-                                        pot_sl = p['price_current'] - dist_points
-                                        if pot_sl > t.entry_price and (not t.sl or pot_sl > t.sl):
-                                            new_sl = round(pot_sl, digits)
-                                    else:
-                                        pot_sl = p['price_current'] + dist_points
-                                        if pot_sl < t.entry_price and (not t.sl or pot_sl < t.sl):
-                                            new_sl = round(pot_sl, digits)
+                                        new_sl = None
+                                        if p['type'] == mt5.ORDER_TYPE_BUY:
+                                            pot_sl = p['price_current'] - dist_points
+                                            if pot_sl > t.entry_price and (not t.sl or pot_sl > t.sl):
+                                                new_sl = round(pot_sl, digits)
+                                        else:
+                                            pot_sl = p['price_current'] + dist_points
+                                            if pot_sl < t.entry_price and (not t.sl or pot_sl < t.sl):
+                                                new_sl = round(pot_sl, digits)
                                             
                                     if new_sl:
                                         req = {
