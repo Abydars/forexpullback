@@ -117,8 +117,8 @@ function renderTopbar() {
   document.getElementById('mt5-dot').className = `w-2 h-2 rounded-full inline-block ${state.mt5_connected ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]" : "bg-rose-500"}`;
   document.getElementById('mt5-info').innerText = state.mt5_connected ? (state.account?.server || 'Connected') : 'Not connected';
   document.getElementById('active-sessions').innerText = state.sessions.filter(s => s.enabled).length;
-  document.getElementById('today-pnl').innerText = `$${state.today_pnl.toFixed(2)}`;
-  document.getElementById('today-pnl').className = state.today_pnl >= 0 ? 'text-emerald-400' : 'text-rose-400';
+  document.getElementById('today-pnl').innerText = `${state.today_pnl < 0 ? '-' : ''}$${Math.abs(state.today_pnl).toFixed(2)}`;
+  document.getElementById('today-pnl').className = state.today_pnl >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold';
 }
 
 function renderEngineBtn() {
@@ -134,11 +134,14 @@ function renderStats() {
   const unrealized = state.open_positions.reduce((sum, t) => sum + (t.pnl || 0), 0);
   const unEl = document.getElementById('s-unrealized');
   if (unEl) {
-      unEl.innerText = `$${unrealized.toFixed(2)}`;
-      unEl.className = `stat-value ${unrealized >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+      unEl.innerText = `${unrealized < 0 ? '-' : ''}$${Math.abs(unrealized).toFixed(2)}`;
+      unEl.className = `text-2xl ${unrealized > 0 ? 'text-emerald-400' : unrealized < 0 ? 'text-rose-400' : 'text-slate-100'}`;
   }
   
-  document.getElementById('s-today').innerText = `$${state.today_pnl.toFixed(2)}`;
+  const sToday = document.getElementById('s-today');
+  if (sToday) {
+      sToday.innerText = `${state.today_pnl < 0 ? '-' : ''}$${Math.abs(state.today_pnl).toFixed(2)}`;
+  }
   document.getElementById('s-open').innerText = state.open_positions.length;
 }
 
@@ -269,7 +272,7 @@ function renderSignals() {
       <td>${s.symbol}</td>
       <td><span class="px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-widest ${s.direction === 'buy' ? 'text-emerald-400' : 'text-rose-400'}">${s.direction}</span></td>
       <td>${s.score}</td>
-      <td><span class="px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-widest ${s.status === 'FIRED' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}">${s.status}</span></td>
+      <td><span class="px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-widest ${s.status === 'FIRED' ? 'bg-emerald-500/20 text-emerald-400' : s.status === 'REJECTED' ? 'bg-white/5 text-slate-400' : 'bg-amber-500/20 text-amber-400'}">${s.status}</span></td>
       <td>${JSON.stringify(s.reason)}</td>
     </tr>
   `).join('');
@@ -317,7 +320,7 @@ function renderScannerStatus() {
       <td>${s.symbol} <span style="color:var(--muted); font-size:10px;">(${s.resolved})</span></td>
       <td><span class="px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-widest ${s.bias === 'bullish' ? 'bg-emerald-500/20 text-emerald-400' : s.bias === 'bearish' ? 'bg-rose-500/20 text-rose-400' : ''}">${s.bias}</span></td>
       <td>${s.score}</td>
-      <td><span class="px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-widest ${s.status === 'FIRED' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}">${s.status}</span></td>
+      <td><span class="px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-widest ${s.status === 'FIRED' ? 'bg-emerald-500/20 text-emerald-400' : s.status === 'REJECTED' ? 'bg-white/5 text-slate-400' : 'bg-amber-500/20 text-amber-400'}">${s.status}</span></td>
       <td style="max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${rawReason}">
         ${esc(reasonText)}
       </td>
