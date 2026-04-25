@@ -229,7 +229,7 @@
   </main>
 
   <!-- BINANCE LINK MODAL -->
-  <dialog id="binance-modal" class="bg-panel border border-border_strong rounded-md shadow-2xl min-w-[500px] text-slate-300 overflow-hidden outline-none">
+  <dialog id="binance-modal" class="bg-panel border border-border_strong rounded-md shadow-2xl w-[95vw] max-w-[500px] text-slate-300 overflow-hidden outline-none">
     <form method="dialog" class="flex flex-col">
       <div class="px-6 py-4 border-b border-border_light bg-bg/50">
         <div class="text-[11px] font-bold tracking-[0.15em] text-cyan_neon flex items-center gap-2 uppercase">
@@ -252,19 +252,19 @@
   </dialog>
 
   <!-- CONFIG MODAL -->
-  <dialog id="config-modal" class="bg-panel border border-border_strong rounded-md shadow-2xl min-w-[700px] max-w-[90vw] text-slate-300 overflow-hidden outline-none">
-    <form method="dialog" class="flex flex-col md:flex-row h-[70vh] min-h-[500px]">
+  <dialog id="config-modal" class="bg-panel border border-border_strong rounded-md shadow-2xl w-[95vw] md:w-[90vw] max-w-[900px] text-slate-300 overflow-hidden outline-none">
+    <form method="dialog" class="flex flex-col md:flex-row h-[85vh] md:h-[70vh] min-h-[400px] md:min-h-[500px]">
       <div class="md:w-48 bg-bg border-r border-border_light flex flex-col shrink-0">
         <div class="p-6 border-b border-border_light">
           <div class="text-[11px] font-bold tracking-[0.15em] text-cyan_neon flex items-center gap-2 uppercase">
             <span class="text-[8px] opacity-70">■</span> CONFIGURATION
           </div>
         </div>
-        <nav class="flex flex-row md:flex-col overflow-x-auto md:overflow-visible">
-          <button type="button" class="m-tab active px-6 py-4 text-[10px] font-bold tracking-[0.1em] uppercase text-left whitespace-nowrap transition-all border-l-2 bg-cyan-500/10 text-cyan-400 border-cyan-500/20 shadow-sm" data-mtab="general">GENERAL</button>
-          <button type="button" class="m-tab px-6 py-4 text-[10px] font-bold tracking-[0.1em] uppercase text-left whitespace-nowrap transition-all border-l-2 text-slate-400 border-transparent hover:bg-white/[0.02]" data-mtab="symbols">SYMBOLS</button>
-          <button type="button" class="m-tab px-6 py-4 text-[10px] font-bold tracking-[0.1em] uppercase text-left whitespace-nowrap transition-all border-l-2 text-slate-400 border-transparent hover:bg-white/[0.02]" data-mtab="sessions">SESSIONS</button>
-          <button type="button" class="m-tab px-6 py-4 text-[10px] font-bold tracking-[0.1em] uppercase text-left whitespace-nowrap transition-all border-l-2 text-slate-400 border-transparent hover:bg-white/[0.02]" data-mtab="risk">RISK</button>
+        <nav class="flex flex-row md:flex-col overflow-x-auto md:overflow-visible border-b md:border-b-0 border-border_light">
+          <button type="button" class="m-tab active px-6 py-4 text-[10px] font-bold tracking-[0.1em] uppercase text-left whitespace-nowrap transition-all border-b-2 md:border-b-0 md:border-l-2 bg-cyan-500/10 text-cyan-400 border-cyan-500 shadow-sm" data-mtab="general">GENERAL</button>
+          <button type="button" class="m-tab px-6 py-4 text-[10px] font-bold tracking-[0.1em] uppercase text-left whitespace-nowrap transition-all border-b-2 md:border-b-0 md:border-l-2 text-slate-400 border-transparent hover:bg-white/[0.02]" data-mtab="symbols">SYMBOLS</button>
+          <button type="button" class="m-tab px-6 py-4 text-[10px] font-bold tracking-[0.1em] uppercase text-left whitespace-nowrap transition-all border-b-2 md:border-b-0 md:border-l-2 text-slate-400 border-transparent hover:bg-white/[0.02]" data-mtab="sessions">SESSIONS</button>
+          <button type="button" class="m-tab px-6 py-4 text-[10px] font-bold tracking-[0.1em] uppercase text-left whitespace-nowrap transition-all border-b-2 md:border-b-0 md:border-l-2 text-slate-400 border-transparent hover:bg-white/[0.02]" data-mtab="risk">RISK</button>
         </nav>
       </div>
       
