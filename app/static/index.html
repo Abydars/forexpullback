@@ -486,12 +486,32 @@
           </div>
         </div>
 
-        <div class="px-6 py-4 border-t border-border_light bg-panel/90 backdrop-blur flex justify-end gap-3 shrink-0">
-          <button type="button" class="px-4 py-2 border border-border_strong text-slate-300 text-[10px] font-bold tracking-[0.1em] uppercase hover:bg-white/5 transition-colors rounded-sm" onclick="closeConfigModal()">CANCEL</button>
-          <button type="button" class="px-5 py-2 bg-cyan_neon text-black font-bold text-[10px] tracking-[0.1em] uppercase shadow-[0_0_10px_rgba(34,211,238,0.2)] hover:brightness-110 rounded-sm" onclick="saveConfig()">SAVE CHANGES</button>
+        <div class="px-6 py-4 border-t border-border_light bg-panel/90 backdrop-blur flex justify-between items-center gap-3 shrink-0">
+          <button type="button" class="px-4 py-2 border border-border_strong text-slate-300 text-[10px] font-bold tracking-[0.1em] uppercase hover:bg-white/5 transition-colors rounded-sm" onclick="promptImportJSON()">IMPORT JSON</button>
+          <div class="flex gap-3">
+            <button type="button" class="px-4 py-2 border border-border_strong text-slate-300 text-[10px] font-bold tracking-[0.1em] uppercase hover:bg-white/5 transition-colors rounded-sm" onclick="closeConfigModal()">CANCEL</button>
+            <button type="button" class="px-5 py-2 bg-cyan_neon text-black font-bold text-[10px] tracking-[0.1em] uppercase shadow-[0_0_10px_rgba(34,211,238,0.2)] hover:brightness-110 rounded-sm" onclick="saveConfig()">SAVE CHANGES</button>
+          </div>
         </div>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="json-modal" class="bg-panel border border-border_strong rounded-md shadow-2xl w-[95vw] max-w-[500px] text-slate-300 overflow-hidden outline-none">
+    <div class="flex flex-col">
+      <div class="px-6 py-4 border-b border-border_light bg-bg/50">
+        <div class="text-[11px] font-bold tracking-[0.15em] text-cyan_neon flex items-center gap-2 uppercase">
+          <span class="text-[8px] opacity-70">■</span> IMPORT CONFIG JSON
+        </div>
+      </div>
+      <div class="p-6">
+        <textarea id="json-input" rows="8" class="bg-black/20 border border-border_strong text-slate-200 text-xs p-3 rounded outline-none focus:border-cyan_neon w-full transition-colors font-mono" placeholder='{"magic_number": 123456, "max_open_positions": 5}'></textarea>
+      </div>
+      <div class="px-6 py-4 border-t border-border_light bg-bg/50 flex justify-end gap-3">
+        <button type="button" class="px-4 py-2 border border-border_strong text-slate-300 text-[10px] font-bold tracking-[0.1em] uppercase hover:bg-white/5 transition-colors rounded-sm" onclick="document.getElementById('json-modal').close()">CANCEL</button>
+        <button type="button" class="px-5 py-2 bg-cyan_neon text-black font-bold text-[10px] tracking-[0.1em] uppercase shadow-[0_0_10px_rgba(34,211,238,0.2)] hover:brightness-110 rounded-sm" onclick="applyImportedJSON()">APPLY JSON</button>
+      </div>
+    </div>
   </dialog>
 
   <script src="/static/app.js"></script>

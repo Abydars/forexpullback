@@ -21,13 +21,13 @@ def find_ltf_trigger(df: pd.DataFrame, df_15m: pd.DataFrame, atr_15m: float, zon
     df = df.copy()
     df['rsi'] = calculate_rsi(df['close'], 14)
     
-    last = df.iloc[-2]
-    prev = df.iloc[-3]
-    prev2 = df.iloc[-4]
+    last = df.iloc[-1]
+    prev = df.iloc[-2]
+    prev2 = df.iloc[-3]
     
     # Soft zone requirement: Price should have touched the zone within the last 3 candles
     in_zone = False
-    for i in range(-2, -5, -1):
+    for i in range(-1, -4, -1):
         c = df.iloc[i]
         if (c['low'] <= zone['zone_high']) and (c['high'] >= zone['zone_low']):
             in_zone = True

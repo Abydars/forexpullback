@@ -31,7 +31,7 @@ def calc_adx(df: pd.DataFrame, period=14):
     df['-di'] = 100 * (df['-dm'].ewm(alpha=1/period, adjust=False).mean() / df['tr'].ewm(alpha=1/period, adjust=False).mean())
     df['dx'] = 100 * abs(df['+di'] - df['-di']) / (df['+di'] + df['-di'])
     df['adx'] = df['dx'].ewm(alpha=1/period, adjust=False).mean()
-    return df['adx'].iloc[-2], df['tr'].ewm(alpha=1/period, adjust=False).mean().iloc[-2]
+    return df['adx'].iloc[-1], df['tr'].ewm(alpha=1/period, adjust=False).mean().iloc[-1]
 
 async def scan_loop():
     while True:

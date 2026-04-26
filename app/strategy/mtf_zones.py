@@ -7,7 +7,7 @@ def find_mtf_zone(df: pd.DataFrame, bias: str) -> dict | None:
     df_copy['ema20'] = df_copy['close'].ewm(span=20, adjust=False).mean()
     df_copy['ema50'] = df_copy['close'].ewm(span=50, adjust=False).mean()
     
-    last_closed = df_copy.iloc[-2]
+    last_closed = df_copy.iloc[-1]
     
     zone_high = 0.0
     zone_low = 0.0
@@ -29,7 +29,7 @@ def find_mtf_zone(df: pd.DataFrame, bias: str) -> dict | None:
         
     # Check for FVG bonus in the last 30 candles
     fvg_bonus = False
-    for i in range(len(df)-3, len(df)-30, -1):
+    for i in range(len(df)-2, len(df)-30, -1):
         c1 = df.iloc[i-2]
         c2 = df.iloc[i-1]
         c3 = df.iloc[i]

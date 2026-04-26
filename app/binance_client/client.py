@@ -79,7 +79,7 @@ class BinanceClient:
         res = await self.request('GET', '/fapi/v1/klines', params={
             'symbol': symbol,
             'interval': interval,
-            'limit': count
+            'limit': count + 1
         })
         
         if not res:
@@ -97,6 +97,9 @@ class BinanceClient:
         df['low'] = df['low'].astype(float)
         df['close'] = df['close'].astype(float)
         df['volume'] = df['volume'].astype(float)
+        
+        # Drop the last row because it represents the currently forming (open) candle
+        df = df.iloc[:-1]
         
         return df[['time', 'open', 'high', 'low', 'close', 'volume']]
 

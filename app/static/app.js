@@ -759,3 +759,39 @@ async function init() {
   renderPositions(); renderTrades(); renderSignals(); renderLogs();
 }
 init();
+
+function promptImportJSON() {
+  document.getElementById("json-input").value = "";
+  document.getElementById("json-modal").showModal();
+}
+
+function applyImportedJSON() {
+  const jsonStr = document.getElementById("json-input").value;
+  if (!jsonStr.trim()) return;
+  try {
+    const data = JSON.parse(jsonStr);
+    for (const [key, value] of Object.entries(data)) {
+      const el = document.getElementById("c-" + key);
+      if (el) {
+        if (el.type === "checkbox") {
+          el.checked = (value === true || value === "true" || value === "True");
+        } else {
+          el.value = value;
+        }
+      }
+    }
+    document.getElementById("json-modal").close();
+    // Re-render UI elements to show the updated values
+    const mpanels = document.querySelectorAll('.m-panel');
+    mpanels.forEach(p => {
+       const inputs = p.querySelectorAll('input');
+       inputs.forEach(inp => {
+          const ev = new Event('input', { bubbles: true });
+          inp.dispatchEvent(ev);
+       });
+    });
+  } catch (e) {
+    alert("Invalid JSON format:\n" + e.message);
+  }
+}
+

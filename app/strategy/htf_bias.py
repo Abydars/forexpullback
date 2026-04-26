@@ -12,16 +12,16 @@ def calculate_htf_bias(df_4h: pd.DataFrame, df_1h: pd.DataFrame) -> dict:
     df_1h['ema200'] = df_1h['close'].ewm(span=200, adjust=False).mean()
     
     # 4H Logic
-    c_4h = df_4h['close'].iloc[-2]
-    e200_4h = df_4h['ema200'].iloc[-2]
-    e50_4h_now = df_4h['ema50'].iloc[-2]
-    e50_4h_past = df_4h['ema50'].iloc[-11]
+    c_4h = df_4h['close'].iloc[-1]
+    e200_4h = df_4h['ema200'].iloc[-1]
+    e50_4h_now = df_4h['ema50'].iloc[-1]
+    e50_4h_past = df_4h['ema50'].iloc[-10]
     
     # 1H Logic
-    c_1h = df_1h['close'].iloc[-2]
-    e200_1h = df_1h['ema200'].iloc[-2]
-    e50_1h_now = df_1h['ema50'].iloc[-2]
-    e50_1h_past = df_1h['ema50'].iloc[-6]
+    c_1h = df_1h['close'].iloc[-1]
+    e200_1h = df_1h['ema200'].iloc[-1]
+    e50_1h_now = df_1h['ema50'].iloc[-1]
+    e50_1h_past = df_1h['ema50'].iloc[-5]
     
     bias_4h = "neutral"
     if c_4h > e200_4h and e50_4h_now > e50_4h_past: bias_4h = "bullish"
