@@ -44,8 +44,26 @@ async def scan_loop():
             if not state.engine_running or not mt5_client.is_connected():
                 await asyncio.sleep(interval)
                 continue
-                
+            
             now_utc = datetime.now(pytz.utc)
+            current_5m_slot = (now_utc.minute // 5) * 5
+            
+            # Ensure we only scan exactly ONCE right after a 5-minute candle closes
+            if 'last_scan_slot' not in scanner_state:
+                # First run: set the slot and wait for the next close boundary
+                scanner_state['last_scan_slot'] = current_5m_slot
+                await asyncio.sleep(interval)
+                continue
+                
+            last_scan_slot = scanner_state['last_scan_slot']
+            
+            # If we haven't reached the next 5-minute boundary yet, skip
+            if last_scan_slot == current_5m_slot:
+                await asyncio.sleep(interval)
+                continue
+                
+            scanner_state['last_scan_slot'] = current_5m_slot
+            
             async with AsyncSessionLocal() as db:
                 result = await db.execute(select(SessionModel))
                 session_models = result.scalars().all()

@@ -1,3 +1,16 @@
+function formatLocalTime(dateStr) {
+  if (!dateStr) return new Date().toLocaleTimeString();
+  let str = String(dateStr);
+  if (!str.endsWith('Z') && !str.match(/(\+|-)\d{2}:\d{2}$/)) {
+      str += 'Z';
+  }
+  const date = new Date(str);
+  return date.toLocaleString([], {
+    month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
+  });
+}
+
 const state = {
   mt5_connected: false,
   engine_running: false,
@@ -139,8 +152,11 @@ function renderEngineBtn() {
 }
 
 function renderStats() {
-  document.getElementById('s-balance').innerText = state.account ? `$${state.account.balance.toFixed(2)}` : '—';
-  document.getElementById('s-equity').innerText = state.account ? `$${state.account.equity.toFixed(2)}` : '—';
+  const sBalance = document.getElementById('s-balance');
+  if (sBalance) sBalance.innerText = state.account ? `$${state.account.balance.toFixed(2)}` : '—';
+  
+  const sEquity = document.getElementById('s-equity');
+  if (sEquity) sEquity.innerText = state.account ? `$${state.account.equity.toFixed(2)}` : '—';
   
   const unrealized = state.open_positions.reduce((sum, t) => sum + (t.pnl || 0), 0);
   const unEl = document.getElementById('s-unrealized');
@@ -153,7 +169,9 @@ function renderStats() {
   if (sToday) {
       sToday.innerText = `${state.today_pnl < 0 ? '-' : ''}$${Math.abs(state.today_pnl).toFixed(2)}`;
   }
-  document.getElementById('s-open').innerText = state.open_positions.length;
+  
+  const sOpen = document.getElementById('s-open');
+  if (sOpen) sOpen.innerText = state.open_positions.length;
 }
 
 function renderPositions() {
@@ -297,7 +315,7 @@ function renderTrades() {
   } else {
       tbody.innerHTML = list.map(t => `
         <tr class="hover:bg-white/[0.02] transition-colors">
-          <td class="px-5 py-3 font-mono text-slate-500 whitespace-nowrap">${new Date(t.opened_at || Date.now()).toLocaleTimeString()}</td>
+          <td class="px-5 py-3 font-mono text-slate-500 whitespace-nowrap">${formatLocalTime(t.opened_at)}</td>
           <td class="px-5 py-3 font-bold text-slate-200">${t.symbol}</td>
           <td class="px-5 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${t.direction === 'buy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${t.direction}</span></td>
           <td class="px-5 py-3 text-right font-mono">${t.lot}</td>
@@ -332,7 +350,7 @@ function renderSignals() {
     const isHighlight = s.status === 'FIRED' || s.status === 'DCA_FIRED';
     return `
       <tr class="${isHighlight ? 'bg-emerald-500/5 hover:bg-emerald-500/10' : 'hover:bg-white/[0.02]'} transition-colors">
-        <td class="px-5 py-3 font-mono text-slate-500 whitespace-nowrap">${new Date(s.created_at || Date.now()).toLocaleTimeString()}</td>
+        <td class="px-5 py-3 font-mono text-slate-500 whitespace-nowrap">${formatLocalTime(s.created_at)}</td>
         <td class="px-5 py-3 font-bold text-slate-200">${s.symbol}</td>
         <td class="px-5 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${s.direction === 'buy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${s.direction}</span></td>
         <td class="px-5 py-3 text-right font-mono ${s.score > 0 ? 'text-cyan-400 font-bold' : 'text-slate-500'}">${s.score}</td>
@@ -351,7 +369,7 @@ function renderLogs() {
   }
   tbody.innerHTML = state.events.map(e => `
     <tr class="hover:bg-white/[0.02] transition-colors">
-      <td class="px-5 py-3 font-mono text-slate-500 whitespace-nowrap">${new Date(e.created_at || Date.now()).toLocaleTimeString()}</td>
+      <td class="px-5 py-3 font-mono text-slate-500 whitespace-nowrap">${formatLocalTime(e.created_at)}</td>
       <td class="px-5 py-3 font-bold ${e.level === 'ERROR' ? 'text-rose-400' : e.level === 'WARN' ? 'text-amber-400' : 'text-cyan-400'}">${e.level}</td>
       <td class="px-5 py-3 text-slate-300">${e.component}</td>
       <td class="px-5 py-3 text-slate-400 w-full">${e.message}</td>
@@ -408,7 +426,7 @@ function renderScannerStatus() {
       <td class="px-5 py-3 text-slate-300" style="max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${rawReason}">
         ${esc(reasonText)}
       </td>
-      <td class="px-5 py-3 font-mono text-slate-500 text-right w-24 shrink-0">${new Date(s.updated_at).toLocaleTimeString()}</td>
+      <td class="px-5 py-3 font-mono text-slate-500 text-right w-24 shrink-0">${formatLocalTime(s.updated_at)}</td>
     </tr>
     `;
   }).join('');
