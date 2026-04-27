@@ -134,10 +134,49 @@ async def monitor_loop():
                             await db.commit()
                         await broadcast({"type": "log.event", "level": "INFO", "component": "basket", "message": msg, "created_at": datetime.now(pytz.utc).isoformat()})
                     elif basket_state["peak_pnl"] - total_unrealized_pnl >= drawdown_usd:
-                        # Close ALL bot positions
-                        for p in bot_positions:
-                            await mt5_client.position_close(p['ticket'])
+                        # Close ALL bot positions using controlled concurrency
+                        close_concurrency = int(cfg.get("close_all_concurrency", 2))
+                        if close_concurrency < 1: close_concurrency = 1
+                        sem = asyncio.Semaphore(close_concurrency)
+                        
+                        async def close_one_position(p):
+                            async with sem:
+                                try:
+                                    return await mt5_client.position_close(p['ticket'])
+                                except Exception as e:
+                                    return e
+                                    
+                        tasks = [close_one_position(p) for p in bot_positions]
+                        results = await asyncio.gather(*tasks, return_exceptions=True)
+                        
+                        success_count = 0
+                        failed_count = 0
+                        failed_details = []
+                        
+                        for i, res in enumerate(results):
+                            ticket = bot_positions[i]['ticket']
+                            if isinstance(res, Exception):
+                                failed_count += 1
+                                failed_details.append(f"Ticket {ticket}: Exception {str(res)}")
+                            elif isinstance(res, dict) and res.get('retcode') != mt5.TRADE_RETCODE_DONE:
+                                failed_count += 1
+                                failed_details.append(f"Ticket {ticket}: Code {res.get('retcode')} - {res.get('comment')}")
+                            elif res is None:
+                                failed_count += 1
+                                failed_details.append(f"Ticket {ticket}: Unknown failure (None returned)")
+                            else:
+                                success_count += 1
+                                
+                        log_msg = f"Basket Close-all: Requested {len(bot_positions)}, Success {success_count}, Failed {failed_count}"
+                        if failed_count > 0:
+                            log_msg += f" Failures: {', '.join(failed_details)}"
                             
+                        async with AsyncSessionLocal() as db:
+                            from app.db.models import Event
+                            db.add(Event(level="INFO" if failed_count == 0 else "WARN", component="basket", message=log_msg))
+                            await db.commit()
+                        await broadcast({"type": "log.event", "level": "INFO" if failed_count == 0 else "WARN", "component": "basket", "message": log_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+
                         msg = f"Basket trailing close: secured +${total_unrealized_pnl:.2f} minimum basket profit (Peak: +${basket_state['peak_pnl']:.2f})"
                         async with AsyncSessionLocal() as db:
                             from app.db.models import Event
