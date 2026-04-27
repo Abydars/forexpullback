@@ -22,48 +22,58 @@ function connectWS() {
   ws.onopen = () => { setInterval(() => ws.readyState === 1 && ws.send('{"type":"ping"}'), 20000); };
   ws.onmessage = (e) => handleEvent(JSON.parse(e.data));
   ws.onclose = (e) => {
-      if (e.code === 1008) window.location.href = '/login';
-      else setTimeout(connectWS, 2000);
+    if (e.code === 1008) window.location.href = '/login';
+    else setTimeout(connectWS, 2000);
   };
 }
 
 function handleEvent(msg) {
   switch (msg.type) {
-    case 'binance.connection':  state.binance_connected = msg.state === 'connected'; renderTopbar(); break;
-    case 'account.tick':    state.account = msg; renderTopbar(); renderStats(); break;
-    case 'scan.update':     updateScanStatus(msg.data); break;
-    case 'signal.new':      state.recent_signals.unshift(msg.signal); state.all_signals.unshift(msg.signal); renderSignals(); break;
-    case 'trade.opened':    renderStats(); break;
-    case 'trade.closed':    moveToClosed(msg.trade); renderTrades(); renderStats(); break;
+    case 'binance.connection': state.binance_connected = msg.state === 'connected'; renderTopbar(); break;
+    case 'account.tick': state.account = msg; renderTopbar(); renderStats(); break;
+    case 'scan.update': updateScanStatus(msg.data); break;
+    case 'signal.new': state.recent_signals.unshift(msg.signal); state.all_signals.unshift(msg.signal); renderSignals(); break;
+    case 'trade.opened': renderStats(); break;
+    case 'trade.closed': moveToClosed(msg.trade); renderTrades(); renderStats(); break;
     case 'positions.update':
-        state.open_positions = msg.positions.map(p => ({
-            ticket: p.ticket,
-            symbol: p.symbol,
-            direction: p.type === 0 ? 'buy' : 'sell',
-            quantity: p.volume,
-            entry_price: p.price_open,
-            current_price: p.price_current,
-            pnl: p.profit,
-            sl: p.sl,
-            tp: p.tp
-        }));
-        if (msg.basket_state) {
-            const badge = document.getElementById('s-basket-badge');
-            if (badge) {
-                if (msg.basket_state.active) {
-                    badge.classList.remove('hidden');
-                    badge.innerText = `TRAIL: $${msg.basket_state.peak_pnl.toFixed(2)}`;
-                } else {
-                    badge.classList.add('hidden');
-                }
-            }
+      state.open_positions = msg.positions.map(p => ({
+        ticket: p.ticket,
+        symbol: p.symbol,
+        direction: p.type === 0 ? 'buy' : 'sell',
+        quantity: p.volume,
+        entry_price: p.price_open,
+        current_price: p.price_current,
+        pnl: p.profit,
+        sl: p.sl,
+        tp: p.tp
+      }));
+      if (msg.basket_state) {
+        const badge = document.getElementById('s-basket-badge');
+        if (badge) {
+          if (msg.basket_state.active) {
+            badge.classList.remove('hidden');
+            badge.innerText = `TRAIL: $${msg.basket_state.peak_pnl.toFixed(2)}`;
+          } else {
+            badge.classList.add('hidden');
+          }
         }
-        renderPositions();
-        renderStats();
-        break;
-    case 'log.event':       state.events.unshift(msg); renderLogs(); break;
-    case 'engine.status':   state.engine_running = msg.state === 'active'; renderEngineBtn(); break;
+      }
+      renderPositions();
+      renderStats();
+      break;
+    case 'log.event': state.events.unshift(msg); renderLogs(); break;
+    case 'engine.status': state.engine_running = msg.state === 'active'; renderEngineBtn(); break;
     case 'symbols.dynamic_update': renderDynamicSymbols(msg.data); break;
+    case 'rpc_response':
+      if (pendingRpcs[msg.id]) {
+        if (msg.status === 200) pendingRpcs[msg.id].resolve(msg.data);
+        else {
+          if (msg.status === 401) window.location.href = '/login';
+          pendingRpcs[msg.id].reject(new Error(msg.data));
+        }
+        delete pendingRpcs[msg.id];
+      }
+      break;
   }
 }
 
@@ -75,12 +85,12 @@ function renderDynamicSymbols(data) {
     html += `<span class="font-bold text-slate-200">${s}</span>`;
     const m = metadata && metadata[s];
     if (m) {
-        if (m.reason === 'manual_include') {
-           html += `<span class="text-[8px] text-cyan-500 uppercase">INCLUDED</span>`;
-        } else {
-           const dir = m.priceChangePercent >= 0 ? 'text-emerald-400' : 'text-rose-400';
-           html += `<span class="${dir}">${m.priceChangePercent > 0 ? '+' : ''}${m.priceChangePercent.toFixed(1)}%</span>`;
-        }
+      if (m.reason === 'manual_include') {
+        html += `<span class="text-[8px] text-cyan-500 uppercase">INCLUDED</span>`;
+      } else {
+        const dir = m.priceChangePercent >= 0 ? 'text-emerald-400' : 'text-rose-400';
+        html += `<span class="${dir}">${m.priceChangePercent > 0 ? '+' : ''}${m.priceChangePercent.toFixed(1)}%</span>`;
+      }
     }
     html += `</span>`;
     return html;
@@ -97,17 +107,32 @@ function moveToClosed(trade) {
 }
 
 // ---- REST helpers ----
-async function api(method, path, body) {
-  const res = await fetch(path, {
-    method,
-    headers: body ? {'Content-Type': 'application/json'} : {},
-    body: body ? JSON.stringify(body) : undefined,
+let rpcIdCounter = 1;
+const pendingRpcs = {};
+
+// ---- RPC wrapper (replaces REST fetch) ----
+function api(method, path, body) {
+  return new Promise((resolve, reject) => {
+    const id = rpcIdCounter++;
+    pendingRpcs[id] = { resolve, reject };
+
+    const payload = JSON.stringify({ type: "rpc", id, method, path, body });
+
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(payload);
+    } else {
+      const check = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          clearInterval(check);
+          ws.send(payload);
+        } else if (ws && ws.readyState === WebSocket.CLOSED) {
+          clearInterval(check);
+          reject(new Error("WebSocket closed"));
+          delete pendingRpcs[id];
+        }
+      }, 50);
+    }
   });
-  if (!res.ok) {
-    if (res.status === 401) window.location.href = '/login';
-    throw new Error(await res.text());
-  }
-  return res.json();
 }
 
 // ---- Tabs ----
@@ -162,17 +187,17 @@ function renderEngineBtn() {
 function renderStats() {
   document.getElementById('s-balance').innerText = state.account ? `$${state.account.balance.toFixed(2)}` : '—';
   document.getElementById('s-equity').innerText = state.account ? `$${state.account.equity.toFixed(2)}` : '—';
-  
+
   const unrealized = state.open_positions.reduce((sum, t) => sum + (t.pnl || 0), 0);
   const unEl = document.getElementById('s-unrealized');
   if (unEl) {
-      unEl.innerText = `${unrealized < 0 ? '-' : ''}$${Math.abs(unrealized).toFixed(2)}`;
-      unEl.className = `text-2xl ${unrealized > 0 ? 'text-emerald-400' : unrealized < 0 ? 'text-rose-400' : 'text-slate-100'}`;
+    unEl.innerText = `${unrealized < 0 ? '-' : ''}$${Math.abs(unrealized).toFixed(2)}`;
+    unEl.className = `text-2xl ${unrealized > 0 ? 'text-emerald-400' : unrealized < 0 ? 'text-rose-400' : 'text-slate-100'}`;
   }
-  
+
   const sToday = document.getElementById('s-today');
   if (sToday) {
-      sToday.innerText = `${state.today_pnl < 0 ? '-' : ''}$${Math.abs(state.today_pnl).toFixed(2)}`;
+    sToday.innerText = `${state.today_pnl < 0 ? '-' : ''}$${Math.abs(state.today_pnl).toFixed(2)}`;
   }
   document.getElementById('s-open').innerText = state.open_positions.length;
 }
@@ -183,10 +208,10 @@ function renderPositions() {
     tbody.innerHTML = '<tr><td colspan="9" class="text-center text-slate-500 py-10 uppercase tracking-widest text-xs">NO OPEN POSITIONS</td></tr>';
     return;
   }
-  
+
   const groups = {};
-  const sortedPos = [...state.open_positions].sort((a,b) => (a.ticket || 0) - (b.ticket || 0));
-  
+  const sortedPos = [...state.open_positions].sort((a, b) => (a.ticket || 0) - (b.ticket || 0));
+
   sortedPos.forEach(t => {
     const key = `${t.symbol}_${t.direction}`;
     if (!groups[key]) {
@@ -211,7 +236,7 @@ function renderPositions() {
   Object.values(groups).forEach(g => {
     g.avg_entry = g.avg_entry / g.total_lot;
     const gKey = `${g.symbol}_${g.direction}`;
-    
+
     html.push(`
       <tr class="group-row cursor-pointer hover:bg-white/[0.02] transition-colors group" onclick="document.querySelectorAll('.sub-${gKey}').forEach(e => e.classList.toggle('hidden'))">
         <td class="px-5 py-3 flex items-center gap-2">
@@ -231,7 +256,7 @@ function renderPositions() {
         </td>
       </tr>
     `);
-    
+
     if (g.count > 1) {
       g.positions.forEach((p, idx) => {
         const badge = idx === 0 ? 'BASE' : `DCA ${idx}`;
@@ -263,38 +288,38 @@ function renderTrades() {
   const tbody = document.getElementById('trades-body');
   const activeSub = document.querySelector('.sub-tab.active').dataset.sub;
   const list = activeSub === 'open' ? state.open_positions : state.closed_trades;
-  
+
   if (!list.length) {
     tbody.innerHTML = `<tr><td colspan="11" class="text-center text-slate-500 py-8 uppercase tracking-widest text-xs">NO ${activeSub.toUpperCase()} TRADES</td></tr>`;
     return;
   }
-  
-  if (activeSub === 'open') {
-      const groups = {};
-      list.forEach(t => {
-        const key = `${t.symbol}_${t.direction}`;
-        if (!groups[key]) {
-          groups[key] = {
-            symbol: t.symbol, direction: t.direction, total_lot: 0, total_pnl: 0,
-            avg_entry: 0, count: 0, sl: t.sl, tp: t.tp, current_price: t.current_price, note: t.note
-          };
-        }
-        const g = groups[key];
-        g.total_lot += t.quantity;
-        g.total_pnl += (t.pnl || 0);
-        g.avg_entry += (t.entry_price * t.quantity);
-        g.count += 1;
-        g.sl = t.sl || g.sl;
-        g.tp = t.tp || g.tp;
-        if (g.count > 1) g.note = 'DCA GROUP';
-      });
 
-      const html = [];
-      Object.values(groups).forEach(g => {
-        g.avg_entry = g.avg_entry / g.total_lot;
-        const gKey = `${g.symbol}_${g.direction}_trades`;
-        
-        html.push(`
+  if (activeSub === 'open') {
+    const groups = {};
+    list.forEach(t => {
+      const key = `${t.symbol}_${t.direction}`;
+      if (!groups[key]) {
+        groups[key] = {
+          symbol: t.symbol, direction: t.direction, total_lot: 0, total_pnl: 0,
+          avg_entry: 0, count: 0, sl: t.sl, tp: t.tp, current_price: t.current_price, note: t.note
+        };
+      }
+      const g = groups[key];
+      g.total_lot += t.quantity;
+      g.total_pnl += (t.pnl || 0);
+      g.avg_entry += (t.entry_price * t.quantity);
+      g.count += 1;
+      g.sl = t.sl || g.sl;
+      g.tp = t.tp || g.tp;
+      if (g.count > 1) g.note = 'DCA GROUP';
+    });
+
+    const html = [];
+    Object.values(groups).forEach(g => {
+      g.avg_entry = g.avg_entry / g.total_lot;
+      const gKey = `${g.symbol}_${g.direction}_trades`;
+
+      html.push(`
           <tr class="group-row cursor-pointer hover:bg-white/[0.02] transition-colors group" onclick="document.querySelectorAll('.sub-${gKey}').forEach(e => e.classList.toggle('hidden'))">
             <td class="px-5 py-3 font-mono text-slate-500">-</td>
             <td class="px-5 py-3 flex items-center gap-2">
@@ -313,10 +338,10 @@ function renderTrades() {
             <td class="px-5 py-3 text-right"><button class="px-3 py-1.5 border border-border_strong text-slate-300 text-[10px] font-bold tracking-widest uppercase hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/30 transition-all rounded" onclick="event.stopPropagation(); closeGroup('${g.symbol}', '${g.direction}')">CLOSE ${g.count > 1 ? 'ALL' : ''}</button></td>
           </tr>
         `);
-      });
-      tbody.innerHTML = html.join('');
+    });
+    tbody.innerHTML = html.join('');
   } else {
-      tbody.innerHTML = list.map(t => `
+    tbody.innerHTML = list.map(t => `
         <tr class="hover:bg-white/[0.02] transition-colors">
           <td class="px-5 py-3 font-mono text-slate-500 whitespace-nowrap">${new Date(t.opened_at || Date.now()).toLocaleTimeString()}</td>
           <td class="px-5 py-3 font-bold text-slate-200">${t.symbol}</td>
@@ -388,35 +413,35 @@ function updateScanStatus(data) {
 function renderScannerStatus() {
   const tbody = document.getElementById('scan-status-body');
   const items = Object.values(state.scanner_status);
-  
+
   // Sort items: FIRED > DCA_FIRED > WATCHING > SKIPPED > REJECTED > COOLDOWN
   const statusWeight = { 'FIRED': 6, 'DCA_FIRED': 5, 'WATCHING': 4, 'SKIPPED': 3, 'DCA_SKIPPED': 3, 'REJECTED': 2, 'COOLDOWN': 1 };
   items.sort((a, b) => (statusWeight[b.status] || 0) - (statusWeight[a.status] || 0));
-  
+
   if (!items.length) {
     tbody.innerHTML = '<tr><td colspan="6" class="text-center text-slate-500 py-10 uppercase tracking-widest text-xs">WAITING FOR SCAN...</td></tr>';
     return;
   }
-  
+
   const esc = (str) => String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-  
+
   const getStatusBadge = (status) => {
     let color = 'bg-white/5 text-slate-400 border-white/10'; // Default muted (REJECTED, COOLDOWN, SKIPPED, DCA_SKIPPED)
     if (status === 'FIRED') color = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
     else if (status === 'DCA_FIRED') color = 'bg-purple-500/20 text-purple-400 border-purple-500/30';
     else if (status === 'WATCHING') color = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
     else if (status === 'SKIPPED' || status === 'DCA_SKIPPED') color = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
-    
+
     return `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap border ${color}">${status}</span>`;
   };
-  
+
   tbody.innerHTML = items.map(s => {
     let reasonText = s.reason.msg || '';
     if (s.status === 'FIRED' || s.status === 'DCA_FIRED') reasonText = 'Signal Triggered!';
-    
+
     const rawReason = esc(JSON.stringify(s.reason));
     const isHighlight = s.status === 'FIRED' || s.status === 'DCA_FIRED';
-    
+
     return `
     <tr class="${isHighlight ? 'bg-emerald-500/5 hover:bg-emerald-500/10' : 'hover:bg-white/[0.02]'} transition-colors">
       <td class="px-5 py-3 flex items-center gap-2">
@@ -464,11 +489,11 @@ async function closeTrade(ticket) {
 async function closeGroup(symbol, direction) {
   const groupTrades = state.open_positions.filter(t => t.symbol === symbol && t.direction === direction);
   if (!groupTrades.length) return;
-  
-  const msg = groupTrades.length > 1 
-    ? `Close ALL ${groupTrades.length} grouped positions for ${symbol}?` 
+
+  const msg = groupTrades.length > 1
+    ? `Close ALL ${groupTrades.length} grouped positions for ${symbol}?`
     : `Close position for ${symbol}?`;
-    
+
   if (confirm(msg)) {
     for (const t of groupTrades) {
       try {
@@ -509,11 +534,11 @@ async function saveBinance() {
     document.getElementById('m-status').innerText = 'Success!';
     document.getElementById('m-status').className = 'text-emerald-500';
     setTimeout(() => {
-        closeBinanceModal();
-        api('GET', '/api/status').then(status => {
-            Object.assign(state, status);
-            renderTopbar(); renderStats();
-        });
+      closeBinanceModal();
+      api('GET', '/api/status').then(status => {
+        Object.assign(state, status);
+        renderTopbar(); renderStats();
+      });
     }, 1000);
   } catch (err) {
     document.getElementById('m-status').innerText = err.message;
@@ -536,7 +561,7 @@ async function loadConfig() {
     document.getElementById('c-signal_cooldown_minutes').value = cfg.signal_cooldown_minutes || 30;
     document.getElementById('c-reward_ratio').value = cfg.reward_ratio || 2.0;
     document.getElementById('c-dashboard_password').value = cfg.dashboard_password || 'admin';
-    
+
     document.getElementById('c-default_leverage').value = cfg.default_leverage || 10;
     document.getElementById('c-margin_type').value = cfg.margin_type || 'ISOLATED';
 
@@ -544,7 +569,7 @@ async function loadConfig() {
     document.getElementById('c-use_liquidity_tp').checked = cfg.use_liquidity_tp !== false;
     document.getElementById('c-breakeven_trigger_r').value = cfg.breakeven_trigger_r || 1.0;
     document.getElementById('c-trailing').checked = cfg.trailing !== false;
-    
+
     document.getElementById('c-enable_dca').checked = cfg.enable_dca === true;
     document.getElementById('c-max_dca_entries').value = cfg.max_dca_entries || 1;
     document.getElementById('c-max_dca_per_scan').value = cfg.max_dca_per_scan || 2;
@@ -552,12 +577,12 @@ async function loadConfig() {
     document.getElementById('c-dca_lot_multiplier').value = cfg.dca_lot_multiplier || 0.7;
     document.getElementById('c-dca_max_total_risk_r').value = cfg.dca_max_total_risk_r || 2.0;
     document.getElementById('c-dca_reanchor_sl').checked = cfg.dca_reanchor_sl !== false;
-    
+
     document.getElementById('c-enable_basket_trailing').checked = cfg.enable_basket_trailing === true;
     document.getElementById('c-basket_trailing_start_usd').value = cfg.basket_trailing_start_usd || 5.0;
     document.getElementById('c-basket_trailing_drawdown_usd').value = cfg.basket_trailing_drawdown_usd || 1.5;
     document.getElementById('c-basket_trailing_min_close_usd').value = cfg.basket_trailing_min_close_usd || 5.0;
-    
+
     document.getElementById('c-symbol_source_mode').value = cfg.symbol_source_mode || 'manual';
     document.getElementById('c-manual_symbols').value = (cfg.manual_symbols || ['BTCUSDT', 'ETHUSDT']).join(', ');
     document.getElementById('c-dynamic_symbol_limit').value = cfg.dynamic_symbol_limit || 10;
@@ -566,14 +591,14 @@ async function loadConfig() {
     document.getElementById('c-include_symbols').value = (cfg.include_symbols || []).join(', ');
     document.getElementById('c-use_only_usdt_perpetuals').checked = cfg.use_only_usdt_perpetuals !== false;
     document.getElementById('c-refresh_dynamic_symbols_minutes').value = cfg.refresh_dynamic_symbols_minutes || 15;
-    
+
     const combined = cfg.combined_sources || ["top_movers_24h", "top_volume_24h"];
     document.querySelectorAll('.c-combined_sources').forEach(cb => {
       cb.checked = combined.includes(cb.value);
     });
-    
+
     toggleSymbolMode();
-    
+
     const sessions = await api('GET', '/api/sessions');
     state.sessions = sessions;
     document.getElementById('sessions-list').innerHTML = '';
@@ -621,7 +646,7 @@ async function previewSymbols() {
 }
 
 // Sessions repeater
-const IANA_ZONES = ['UTC','Europe/London','America/New_York','Asia/Tokyo','Asia/Dubai','Asia/Karachi','Asia/Singapore','Australia/Sydney'];
+const IANA_ZONES = ['UTC', 'Europe/London', 'America/New_York', 'Asia/Tokyo', 'Asia/Dubai', 'Asia/Karachi', 'Asia/Singapore', 'Australia/Sydney'];
 function addSessionRow(session) {
   const id = session?.id ?? ('new-' + Date.now());
   const html = `
@@ -644,8 +669,8 @@ function addSessionRow(session) {
       </div>
       <div class="flex-1 flex flex-col gap-1.5 min-w-[120px]">
          <span class="text-[9px] uppercase tracking-widest text-slate-500 font-bold hidden md:block">Days</span>
-         <div class="day-checks flex gap-1 justify-between bg-black/10 border border-border_strong p-1 rounded">${['M','T','W','T','F','S','S'].map((d,i) => `
-           <label class="flex flex-col items-center gap-1 text-[9px] text-slate-500 cursor-pointer hover:text-slate-300 w-full text-center"><input type="checkbox" data-day="${i}" class="w-3 h-3 accent-cyan_neon cursor-pointer" ${!session || (session?.days_mask & (1<<i)) ? 'checked' : ''}>${d}</label>
+         <div class="day-checks flex gap-1 justify-between bg-black/10 border border-border_strong p-1 rounded">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => `
+           <label class="flex flex-col items-center gap-1 text-[9px] text-slate-500 cursor-pointer hover:text-slate-300 w-full text-center"><input type="checkbox" data-day="${i}" class="w-3 h-3 accent-cyan_neon cursor-pointer" ${!session || (session?.days_mask & (1 << i)) ? 'checked' : ''}>${d}</label>
          `).join('')}</div>
       </div>
       <div class="shrink-0 flex items-center justify-between md:flex-col md:items-end gap-2 w-full md:w-auto mt-2 md:mt-0">
@@ -686,13 +711,13 @@ function collectConfigInputs() {
     basket_trailing_start_usd: parseFloat(document.getElementById('c-basket_trailing_start_usd').value),
     basket_trailing_drawdown_usd: parseFloat(document.getElementById('c-basket_trailing_drawdown_usd').value),
     basket_trailing_min_close_usd: parseFloat(document.getElementById('c-basket_trailing_min_close_usd').value),
-    
+
     symbol_source_mode: document.getElementById('c-symbol_source_mode').value,
-    manual_symbols: document.getElementById('c-manual_symbols').value.split(',').map(s=>s.trim()).filter(Boolean),
+    manual_symbols: document.getElementById('c-manual_symbols').value.split(',').map(s => s.trim()).filter(Boolean),
     dynamic_symbol_limit: parseInt(document.getElementById('c-dynamic_symbol_limit').value),
     min_24h_quote_volume_usdt: parseFloat(document.getElementById('c-min_24h_quote_volume_usdt').value),
-    exclude_symbols: document.getElementById('c-exclude_symbols').value.split(',').map(s=>s.trim()).filter(Boolean),
-    include_symbols: document.getElementById('c-include_symbols').value.split(',').map(s=>s.trim()).filter(Boolean),
+    exclude_symbols: document.getElementById('c-exclude_symbols').value.split(',').map(s => s.trim()).filter(Boolean),
+    include_symbols: document.getElementById('c-include_symbols').value.split(',').map(s => s.trim()).filter(Boolean),
     use_only_usdt_perpetuals: document.getElementById('c-use_only_usdt_perpetuals').checked,
     refresh_dynamic_symbols_minutes: parseInt(document.getElementById('c-refresh_dynamic_symbols_minutes').value),
     combined_sources: Array.from(document.querySelectorAll('.c-combined_sources:checked')).map(cb => cb.value),
@@ -717,7 +742,7 @@ async function syncSessions() {
       enabled: row.querySelector('.s-on').checked
     };
   });
-  
+
   await api('PUT', '/api/sessions', payload);
 }
 
@@ -736,25 +761,25 @@ async function init() {
       api('GET', '/api/initial_data').catch(() => null)
     ]);
     Object.assign(state, status);
-    
+
     if (initData) {
       state.open_positions = initData.trades.filter(t => !t.closed_at);
       state.closed_trades = initData.trades.filter(t => t.closed_at);
       state.all_signals = initData.signals;
       state.recent_signals = initData.signals.slice(0, 5);
       state.events = initData.events;
-      
+
       const todayStr = new Date().toISOString().split('T')[0];
       state.today_pnl = state.closed_trades
         .filter(t => t.closed_at && t.closed_at.startsWith(todayStr))
         .reduce((sum, t) => sum + (t.pnl || 0), 0);
-        
+
       if (initData.current_universe && initData.current_universe.symbols && initData.current_universe.symbols.length > 0) {
         renderDynamicSymbols(initData.current_universe);
       }
     }
   } catch (err) { console.error("Init Error:", err); }
-  
+
   renderTopbar(); renderStats(); renderEngineBtn();
   renderPositions(); renderTrades(); renderSignals(); renderLogs();
 }
@@ -784,11 +809,11 @@ function applyImportedJSON() {
     // Re-render UI elements to show the updated values
     const mpanels = document.querySelectorAll('.m-panel');
     mpanels.forEach(p => {
-       const inputs = p.querySelectorAll('input');
-       inputs.forEach(inp => {
-          const ev = new Event('input', { bubbles: true });
-          inp.dispatchEvent(ev);
-       });
+      const inputs = p.querySelectorAll('input');
+      inputs.forEach(inp => {
+        const ev = new Event('input', { bubbles: true });
+        inp.dispatchEvent(ev);
+      });
     });
   } catch (e) {
     alert("Invalid JSON format:\n" + e.message);

@@ -40,6 +40,12 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             data = await websocket.receive_text()
-            pass
+            try:
+                msg = json.loads(data)
+                if msg.get("type") == "rpc":
+                    from app.ws.rpc_handler import handle_rpc
+                    await handle_rpc(websocket, msg)
+            except Exception:
+                pass
     except Exception:
         manager.disconnect(websocket)
