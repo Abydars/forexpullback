@@ -48,18 +48,27 @@ async def scan_loop():
             now_utc = datetime.now(pytz.utc)
             current_5m_slot = (now_utc.minute // 5) * 5
             
+            # Calculate exactly how many seconds are left until the next 5-minute boundary
+            seconds_in_5m = 300
+            current_seconds = (now_utc.minute % 5) * 60 + now_utc.second + (now_utc.microsecond / 1_000_000)
+            time_to_next = seconds_in_5m - current_seconds
+            
             # Ensure we only scan exactly ONCE right after a 5-minute candle closes
             if 'last_scan_slot' not in scanner_state:
                 # First run: set the slot and wait for the next close boundary
                 scanner_state['last_scan_slot'] = current_5m_slot
-                await asyncio.sleep(interval)
+                # Wake up 0.5s after the boundary to ensure MT5 has finalized the candle
+                sleep_duration = min(float(interval), time_to_next + 0.5)
+                await asyncio.sleep(sleep_duration)
                 continue
                 
             last_scan_slot = scanner_state['last_scan_slot']
             
             # If we haven't reached the next 5-minute boundary yet, skip
             if last_scan_slot == current_5m_slot:
-                await asyncio.sleep(interval)
+                # Wake up 0.5s after the boundary to ensure MT5 has finalized the candle
+                sleep_duration = min(float(interval), time_to_next + 0.5)
+                await asyncio.sleep(sleep_duration)
                 continue
                 
             scanner_state['last_scan_slot'] = current_5m_slot

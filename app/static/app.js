@@ -706,6 +706,77 @@ async function syncSessions() {
   await api('PUT', '/api/sessions', payload);
 }
 
+function applyJsonText() {
+  const text = document.getElementById('c-import_json').value;
+  if (!text.trim()) return;
+  
+  try {
+    const data = JSON.parse(text);
+    
+    const inputs = {
+      max_open_positions: 'c-max_open_positions',
+      max_signals_per_scan: 'c-max_signals_per_scan',
+      max_per_symbol: 'c-max_per_symbol',
+      max_per_direction: 'c-max_per_direction',
+      max_spread_pct: 'c-max_spread_pct',
+      signal_threshold: 'c-signal_threshold',
+      risk_percent: 'c-risk_percent',
+      scan_interval_seconds: 'c-scan_interval_seconds',
+      signal_cooldown_minutes: 'c-signal_cooldown_minutes',
+      reward_ratio: 'c-reward_ratio',
+      dashboard_password: 'c-dashboard_password',
+      atr_buffer_multiplier: 'c-atr_buffer_multiplier',
+      use_liquidity_tp: 'c-use_liquidity_tp',
+      breakeven_trigger_r: 'c-breakeven_trigger_r',
+      trailing: 'c-trailing',
+      enable_dca: 'c-enable_dca',
+      max_dca_entries: 'c-max_dca_entries',
+      max_dca_per_scan: 'c-max_dca_per_scan',
+      dca_trigger_sl_progress: 'c-dca_trigger_sl_progress',
+      dca_lot_multiplier: 'c-dca_lot_multiplier',
+      dca_max_total_risk_r: 'c-dca_max_total_risk_r',
+      dca_reanchor_sl: 'c-dca_reanchor_sl',
+      enable_basket_trailing: 'c-enable_basket_trailing',
+      basket_trailing_start_usd: 'c-basket_trailing_start_usd',
+      basket_trailing_drawdown_usd: 'c-basket_trailing_drawdown_usd',
+      basket_trailing_min_close_usd: 'c-basket_trailing_min_close_usd'
+    };
+    
+    for (const [key, id] of Object.entries(inputs)) {
+      if (data[key] !== undefined) {
+        const el = document.getElementById(id);
+        if (el) {
+          if (el.type === 'checkbox') el.checked = data[key];
+          else el.value = data[key];
+          if (el.type === 'range') el.dispatchEvent(new Event('input'));
+        }
+      }
+    }
+    
+    if (Array.isArray(data.symbols)) {
+      state.symbols = data.symbols.map(s => typeof s === 'string' ? {generic: s, resolved: null, status: 'pending'} : s);
+      renderChips();
+      resolveAllSymbols();
+    }
+    
+    if (Array.isArray(data.sessions)) {
+      document.getElementById('sessions-list').innerHTML = '';
+      data.sessions.forEach(s => addSessionRow(s));
+    }
+    
+    alert("JSON applied to form. Click 'SAVE CHANGES' to submit.");
+    document.getElementById('c-import_json').value = '';
+    
+    // switch to general tab to see changes
+    const generalTab = document.querySelector('.m-tab[data-mtab="general"]');
+    if (generalTab) generalTab.click();
+    
+  } catch (err) {
+    alert("Failed to parse JSON text. Ensure it is valid JSON.");
+    console.error(err);
+  }
+}
+
 async function saveConfig() {
   await api('PATCH', '/api/config', collectConfigInputs());
   await api('PATCH', '/api/config', { symbols: state.symbols.filter(s => s.status !== 'unresolved').map(s => s.generic) });

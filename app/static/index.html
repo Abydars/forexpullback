@@ -219,7 +219,7 @@
   </main>
 
   <!-- MT5 LINK MODAL -->
-  <dialog id="mt5-modal" class="bg-panel border border-border_strong rounded-md shadow-2xl min-w-[500px] text-slate-300 overflow-hidden outline-none">
+  <dialog id="mt5-modal" class="bg-panel border border-border_strong rounded-md shadow-2xl w-[95%] sm:w-[500px] max-w-full text-slate-300 overflow-hidden outline-none">
     <form method="dialog" class="flex flex-col">
       <div class="px-6 py-4 border-b border-border_light bg-bg/50">
         <div class="text-[11px] font-bold tracking-[0.15em] text-cyan_neon flex items-center gap-2 uppercase">
@@ -250,8 +250,8 @@
   </dialog>
 
   <!-- CONFIG MODAL -->
-  <dialog id="config-modal" class="bg-panel border border-border_strong rounded-md shadow-2xl min-w-[700px] max-w-[90vw] text-slate-300 overflow-hidden outline-none">
-    <form method="dialog" class="flex flex-col md:flex-row h-[70vh] min-h-[500px]">
+  <dialog id="config-modal" class="bg-panel border border-border_strong rounded-md shadow-2xl w-[95%] md:w-[750px] max-w-[95vw] text-slate-300 overflow-hidden outline-none">
+    <form method="dialog" class="flex flex-col md:flex-row h-[85vh] md:h-[70vh] md:min-h-[500px]">
       <div class="md:w-48 bg-bg border-r border-border_light flex flex-col shrink-0">
         <div class="p-6 border-b border-border_light">
           <div class="text-[11px] font-bold tracking-[0.15em] text-cyan_neon flex items-center gap-2 uppercase">
@@ -263,6 +263,7 @@
           <button type="button" class="m-tab px-6 py-4 text-[10px] font-bold tracking-[0.1em] uppercase text-left whitespace-nowrap transition-all border-l-2 text-slate-400 border-transparent hover:bg-white/[0.02]" data-mtab="symbols">SYMBOLS</button>
           <button type="button" class="m-tab px-6 py-4 text-[10px] font-bold tracking-[0.1em] uppercase text-left whitespace-nowrap transition-all border-l-2 text-slate-400 border-transparent hover:bg-white/[0.02]" data-mtab="sessions">SESSIONS</button>
           <button type="button" class="m-tab px-6 py-4 text-[10px] font-bold tracking-[0.1em] uppercase text-left whitespace-nowrap transition-all border-l-2 text-slate-400 border-transparent hover:bg-white/[0.02]" data-mtab="risk">RISK</button>
+          <button type="button" class="m-tab px-6 py-4 text-[10px] font-bold tracking-[0.1em] uppercase text-left whitespace-nowrap transition-all border-l-2 text-slate-400 border-transparent hover:bg-white/[0.02]" data-mtab="import">IMPORT</button>
         </nav>
       </div>
       
@@ -377,6 +378,13 @@
               <div class="text-[9px] text-slate-500 font-normal normal-case">Minimum profit required to execute close.</div>
             </div>
             
+          </div>
+          
+          <!-- Import -->
+          <div class="m-panel hidden flex-col gap-4 h-full" data-mpanel="import">
+            <label class="text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">PASTE JSON CONFIGURATION</label>
+            <textarea id="c-import_json" class="bg-black/20 border border-border_strong text-slate-200 text-xs p-4 rounded outline-none focus:border-cyan_neon transition-colors flex-1 resize-none font-mono w-full" placeholder='{"max_open_positions": 5, "reward_ratio": 2.5}'></textarea>
+            <button type="button" class="px-5 py-3 bg-panel border border-border_strong hover:border-cyan_neon text-cyan-400 font-bold text-[10px] tracking-[0.1em] uppercase transition-colors rounded-sm w-fit" onclick="applyJsonText()">APPLY TO FORM</button>
           </div>
         </div>
 
