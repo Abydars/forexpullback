@@ -1,3 +1,4 @@
+import time
 import asyncio
 import MetaTrader5 as mt5
 from datetime import datetime, timedelta
@@ -89,7 +90,32 @@ async def scan_loop():
                 
             await symbol_resolver.refresh()
                 
+            scan_start_ms = time.time() * 1000
+            
             symbols = cfg.get("symbols", [])
+            
+            # --- PRE-FETCH COOLDOWNS ---
+            cooldown_mins = int(cfg.get("signal_cooldown_minutes", 30))
+            cutoff = now_utc - timedelta(minutes=cooldown_mins)
+            
+            recent_closed_set = set()
+            recent_fired_set = set()
+            
+            async with AsyncSessionLocal() as db:
+                from app.db.models import Trade, Signal
+                recent_trades = await db.execute(select(Trade.symbol, Trade.direction).where(
+                    Trade.closed_at != None,
+                    Trade.closed_at >= cutoff
+                ))
+                for sym, dr in recent_trades:
+                    recent_closed_set.add((sym, dr))
+                    
+                recent_signals = await db.execute(select(Signal.symbol, Signal.direction).where(
+                    Signal.status == "FIRED",
+                    Signal.created_at >= cutoff
+                ))
+                for sym, dr in recent_signals:
+                    recent_fired_set.add((sym, dr))
             
             # --- RANKING CONFIG & POSITIONS ---
             max_signals_per_scan = int(cfg.get("max_signals_per_scan", 1))
@@ -106,10 +132,11 @@ async def scan_loop():
             candidates = []
             updates_to_broadcast = []
             
-            for generic in symbols:
+            async def scan_symbol(generic):
+                timings = {"scan_start": scan_start_ms, "symbol_scan_start": time.time() * 1000}
                 resolved = symbol_resolver.resolve(generic)
                 if not resolved:
-                    continue
+                    return [], []
                     
                 reason_full = {"htf": None, "zone": None, "trigger": None, "msg": ""}
                 status = "REJECTED"
@@ -129,6 +156,8 @@ async def scan_loop():
                     df_1h = await mt5_client.get_rates(resolved, mt5.TIMEFRAME_H1, 200)
                     df_15m = await mt5_client.get_rates(resolved, mt5.TIMEFRAME_M15, 300)
                     df_5m = await mt5_client.get_rates(resolved, mt5.TIMEFRAME_M5, 500)
+                    
+                    timings["data_fetch_done"] = time.time() * 1000
                     
                     if df_4h.empty or df_1h.empty or df_15m.empty or df_5m.empty: 
                         reason_full["msg"] = "Not enough data (need more bars)"
@@ -178,6 +207,7 @@ async def scan_loop():
                                     cfg.get("use_liquidity_tp", True),
                                     float(cfg.get("min_sl_atr_multiplier", 0.8))
                                 )
+                                timings["trigger_done"] = time.time() * 1000
                                 reason_full["trigger"] = ltf_trigger
                                 
                                 is_strong_trigger = ltf_trigger and ltf_trigger['strength'] >= 80
@@ -208,28 +238,9 @@ async def scan_loop():
                                     else:
                                         score = calculate_score(htf['strength'], mtf_zone['quality'], ltf_trigger['strength'], True)
                                         
-                                        # Smart Cooldown
-                                        cooldown_mins = int(cfg.get("signal_cooldown_minutes", 30))
-                                        cutoff = now_utc - timedelta(minutes=cooldown_mins)
-                                        
-                                        async with AsyncSessionLocal() as db:
-                                            # Check recent closed trades
-                                            recent_closed = await db.execute(select(Trade).where(
-                                                Trade.symbol == resolved,
-                                                Trade.direction == bias,
-                                                Trade.closed_at != None,
-                                                Trade.closed_at >= cutoff
-                                            ))
-                                            has_recent_closed = recent_closed.scalars().first()
-
-                                            # Also check recent duplicate signals
-                                            recent_fired = await db.execute(select(Signal).where(
-                                                Signal.symbol == resolved,
-                                                Signal.direction == bias,
-                                                Signal.status == "FIRED",
-                                                Signal.created_at >= cutoff
-                                            ))
-                                            has_recent_fired = recent_fired.scalars().first()
+                                        # Smart Cooldown Check via Pre-fetched sets
+                                        has_recent_closed = (resolved, bias) in recent_closed_set
+                                        has_recent_fired = (resolved, bias) in recent_fired_set
                                         
                                         state_key = f"{resolved}_{bias}"
                                         
@@ -350,7 +361,8 @@ async def scan_loop():
                                                     "reason_full": dict(reason_full),
                                                     "cfg": cfg,
                                                     "threshold": base_threshold,
-                                                    "state_key": state_key
+                                                    "state_key": state_key,
+                                                    "timings": dict(timings)
                                                 })
                                         else:
                                             status = "WATCHING"
@@ -368,7 +380,8 @@ async def scan_loop():
                                                 "cfg": cfg,
                                                 "threshold": base_threshold,
                                                 "state_key": state_key,
-                                                "is_dca": True
+                                                "is_dca": True,
+                                                "timings": dict(timings)
                                             })
 
                 if status != "FIRED":
@@ -381,6 +394,23 @@ async def scan_loop():
                         "reason": reason_full,
                         "updated_at": datetime.now(pytz.utc).isoformat()
                     })
+                    
+                return candidates, updates_to_broadcast
+
+            scan_concurrency = int(cfg.get("scan_concurrency", 5))
+            sem = asyncio.Semaphore(scan_concurrency)
+            
+            async def bounded_scan(generic):
+                async with sem:
+                    return await scan_symbol(generic)
+                    
+            scan_results = await asyncio.gather(*(bounded_scan(sym) for sym in symbols))
+            
+            candidates = []
+            updates_to_broadcast = []
+            for c_list, u_list in scan_results:
+                candidates.extend(c_list)
+                updates_to_broadcast.extend(u_list)
 
             # --- CANDIDATE RANKING ---
             dca_candidates = [c for c in candidates if c.get("is_dca")]
@@ -439,8 +469,9 @@ async def scan_loop():
                             }
                         })
                         
+                        c["timings"]["signal_saved"] = time.time() * 1000
                         from app.engine.order_manager import send_order
-                        await send_order(sig, res, bias, c["cfg"], is_dca=is_dca, dca_data=ltf_trigger if is_dca else None)
+                        await send_order(sig, res, bias, c["cfg"], is_dca=is_dca, dca_data=ltf_trigger if is_dca else None, timings=c.get("timings"))
                 else:
                     is_dca = c.get("is_dca", False)
                     status = "DCA_SKIPPED" if is_dca else "SKIPPED"

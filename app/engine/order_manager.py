@@ -8,7 +8,10 @@ from app.ws.manager import broadcast
 from sqlalchemy import select
 import pytz
 
-async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca_data=None):
+import time
+
+async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca_data=None, timings=None):
+    if timings is None: timings = {}
     try:
         magic = int(cfg.get("magic_number", 123456))
         positions = await mt5_client.get_positions()
@@ -136,8 +139,11 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
                 await broadcast({"type": "log.event", "level": "WARN", "component": "order_manager", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
             return
         
+        timings["order_send_called"] = time.time() * 1000
         res = await mt5_client.order_send(request)
-        if res.get('retcode') == mt5.TRADE_RETCODE_DONE:
+        timings["order_check_done"] = time.time() * 1000
+        
+        if res and res.get('retcode') == mt5.TRADE_RETCODE_DONE:
             order_ticket = res.get('order')
             deal_ticket = res.get('deal')
             
@@ -209,6 +215,24 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
                 })
                 
                 await db.commit()
+                
+                timings["order_done"] = time.time() * 1000
+                if "scan_start" in timings:
+                    t_scan = timings.get("symbol_scan_start", timings["scan_start"]) - timings["scan_start"]
+                    t_data = timings.get("data_fetch_done", timings["scan_start"]) - timings.get("symbol_scan_start", timings["scan_start"])
+                    t_trig = timings.get("trigger_done", timings["scan_start"]) - timings.get("data_fetch_done", timings["scan_start"])
+                    t_save = timings.get("signal_saved", timings["scan_start"]) - timings.get("trigger_done", timings["scan_start"])
+                    t_osend = timings.get("order_send_called", timings["scan_start"]) - timings.get("signal_saved", timings["scan_start"])
+                    t_ochk = timings.get("order_check_done", timings["scan_start"]) - timings.get("order_send_called", timings["scan_start"])
+                    t_odone = timings["order_done"] - timings.get("order_check_done", timings["scan_start"])
+                    total = timings["order_done"] - timings["scan_start"]
+                    
+                    t_msg = f"Latency [Sig {sig.id} - {resolved}]: ScanWait={t_scan:.0f}ms | Data={t_data:.0f}ms | Trig={t_trig:.0f}ms | DB_Save={t_save:.0f}ms | Prep={t_osend:.0f}ms | MT5_Send={t_ochk:.0f}ms | Finalize={t_odone:.0f}ms || TOTAL={total:.0f}ms"
+                    
+                    e = Event(level="INFO", component="latency", message=t_msg)
+                    db.add(e)
+                    await db.commit()
+                    await broadcast({"type": "log.event", "level": "INFO", "component": "latency", "message": t_msg, "created_at": datetime.now(pytz.utc).isoformat()})
         else:
             async with AsyncSessionLocal() as db:
                 err_msg = f"Order rejected (Retcode {res.get('retcode')}): {res.get('comment', 'Unknown')}"
