@@ -133,6 +133,8 @@ async def scan_loop():
             updates_to_broadcast = []
             
             async def scan_symbol(generic):
+                local_candidates = []
+                local_updates = []
                 timings = {"scan_start": scan_start_ms, "symbol_scan_start": time.time() * 1000}
                 resolved = symbol_resolver.resolve(generic)
                 if not resolved:
@@ -352,7 +354,7 @@ async def scan_loop():
                                                 status = "FIRED" # Temporary status
                                                 reason_full["msg"] = f"Candidate Accepted! Score: {score} >= {base_threshold}"
                                                 
-                                                candidates.append({
+                                                local_candidates.append({
                                                     "generic": generic,
                                                     "resolved": resolved,
                                                     "bias": bias,
@@ -370,7 +372,7 @@ async def scan_loop():
                                             scanner_state[state_key] = {"time": now_utc, "status": "WATCHING"}
                                             
                                         if is_dca_candidate:
-                                            candidates.append({
+                                            local_candidates.append({
                                                 "generic": generic,
                                                 "resolved": resolved,
                                                 "bias": bias,
@@ -385,7 +387,7 @@ async def scan_loop():
                                             })
 
                 if status != "FIRED":
-                    updates_to_broadcast.append({
+                    local_updates.append({
                         "symbol": generic,
                         "resolved": resolved,
                         "bias": bias,
@@ -395,7 +397,7 @@ async def scan_loop():
                         "updated_at": datetime.now(pytz.utc).isoformat()
                     })
                     
-                return candidates, updates_to_broadcast
+                return local_candidates, local_updates
 
             scan_concurrency = int(cfg.get("scan_concurrency", 5))
             sem = asyncio.Semaphore(scan_concurrency)

@@ -127,6 +127,7 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
             return mt5.order_check(request)
             
         check_result = await asyncio.to_thread(_check_order)
+        timings["order_check_done"] = time.time() * 1000
         # order_check() returns 0 on success, NOT TRADE_RETCODE_DONE (10009)
         if check_result is None or check_result.retcode != 0:
             async with AsyncSessionLocal() as db:
@@ -141,7 +142,7 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
         
         timings["order_send_called"] = time.time() * 1000
         res = await mt5_client.order_send(request)
-        timings["order_check_done"] = time.time() * 1000
+        timings["order_send_done"] = time.time() * 1000
         
         if res and res.get('retcode') == mt5.TRADE_RETCODE_DONE:
             order_ticket = res.get('order')
@@ -217,17 +218,18 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
                 await db.commit()
                 
                 timings["order_done"] = time.time() * 1000
-                if "scan_start" in timings:
+                if "scan_start" in timings and cfg.get("enable_latency_logs", True):
                     t_scan = timings.get("symbol_scan_start", timings["scan_start"]) - timings["scan_start"]
                     t_data = timings.get("data_fetch_done", timings["scan_start"]) - timings.get("symbol_scan_start", timings["scan_start"])
                     t_trig = timings.get("trigger_done", timings["scan_start"]) - timings.get("data_fetch_done", timings["scan_start"])
                     t_save = timings.get("signal_saved", timings["scan_start"]) - timings.get("trigger_done", timings["scan_start"])
-                    t_osend = timings.get("order_send_called", timings["scan_start"]) - timings.get("signal_saved", timings["scan_start"])
-                    t_ochk = timings.get("order_check_done", timings["scan_start"]) - timings.get("order_send_called", timings["scan_start"])
-                    t_odone = timings["order_done"] - timings.get("order_check_done", timings["scan_start"])
+                    t_ocheck = timings.get("order_check_done", timings["scan_start"]) - timings.get("signal_saved", timings["scan_start"])
+                    t_osend = timings.get("order_send_called", timings["scan_start"]) - timings.get("order_check_done", timings["scan_start"])
+                    t_mt5 = timings.get("order_send_done", timings["scan_start"]) - timings.get("order_send_called", timings["scan_start"])
+                    t_odone = timings["order_done"] - timings.get("order_send_done", timings["scan_start"])
                     total = timings["order_done"] - timings["scan_start"]
                     
-                    t_msg = f"Latency [Sig {sig.id} - {resolved}]: ScanWait={t_scan:.0f}ms | Data={t_data:.0f}ms | Trig={t_trig:.0f}ms | DB_Save={t_save:.0f}ms | Prep={t_osend:.0f}ms | MT5_Send={t_ochk:.0f}ms | Finalize={t_odone:.0f}ms || TOTAL={total:.0f}ms"
+                    t_msg = f"Latency [Sig {sig.id} - {resolved}]: ScanWait={t_scan:.0f}ms | Data={t_data:.0f}ms | Trig={t_trig:.0f}ms | DB_Save={t_save:.0f}ms | OrderCheck={t_ocheck:.0f}ms | Prep={t_osend:.0f}ms | MT5_Send={t_mt5:.0f}ms | Finalize={t_odone:.0f}ms || TOTAL={total:.0f}ms"
                     
                     e = Event(level="INFO", component="latency", message=t_msg)
                     db.add(e)
