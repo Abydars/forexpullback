@@ -247,21 +247,37 @@ async def monitor_loop():
                                     if not t.sl or t.sl > be_price:
                                         new_sl = round(be_price, digits)
                             
-                            # 2. Trailing Stop (Starts at 70% of TP)
-                            if cfg.get("trailing", True) and current_dist >= (tp_dist * 0.7):
+                            # 2. Trailing Stop
+                            trailing_start_tp_pct = float(cfg.get("trailing_start_tp_pct", 0.6))
+                            if cfg.get("trailing", True) and current_dist >= (tp_dist * trailing_start_tp_pct):
                                 if info:
-                                    # Fetch recent ATR for volatility-aware trailing distance
-                                    df_trail = await mt5_client.get_rates(t.symbol, mt5.TIMEFRAME_M15, 14)
-                                    if not df_trail.empty:
-                                        df_copy = df_trail.copy()
-                                        df_copy['tr'] = pd.concat([
-                                            df_copy['high'] - df_copy['low'],
-                                            abs(df_copy['high'] - df_copy['close'].shift(1)),
-                                            abs(df_copy['low'] - df_copy['close'].shift(1))
-                                        ], axis=1).max(axis=1)
-                                        atr_trail = df_copy['tr'].ewm(alpha=1/14, adjust=False).mean().iloc[-1]
-                                        dist_points = atr_trail * 1.5
-                                        
+                                    trailing_mode = cfg.get("trailing_mode", "atr")
+                                    dist_points = None
+                                    
+                                    if trailing_mode == "fixed_pips":
+                                        trailing_pips = float(cfg.get("trailing_distance_pips", 15.0))
+                                        if "JPY" in t.symbol:
+                                            pip_size = 0.01
+                                        elif digits in [3, 5]:
+                                            pip_size = info.point * 10
+                                        else:
+                                            pip_size = info.point
+                                        dist_points = trailing_pips * pip_size
+                                    else:
+                                        # ATR mode
+                                        df_trail = await mt5_client.get_rates(t.symbol, mt5.TIMEFRAME_M15, 14)
+                                        if not df_trail.empty:
+                                            df_copy = df_trail.copy()
+                                            df_copy['tr'] = pd.concat([
+                                                df_copy['high'] - df_copy['low'],
+                                                abs(df_copy['high'] - df_copy['close'].shift(1)),
+                                                abs(df_copy['low'] - df_copy['close'].shift(1))
+                                            ], axis=1).max(axis=1)
+                                            atr_trail = df_copy['tr'].ewm(alpha=1/14, adjust=False).mean().iloc[-1]
+                                            trailing_atr_mult = float(cfg.get("trailing_atr_multiplier", 1.5))
+                                            dist_points = atr_trail * trailing_atr_mult
+                                            
+                                    if dist_points is not None:
                                         if p['type'] == mt5.ORDER_TYPE_BUY:
                                             pot_sl = p['price_current'] - dist_points
                                             if pot_sl > t.entry_price and (not t.sl or pot_sl > t.sl) and (not new_sl or pot_sl > new_sl):

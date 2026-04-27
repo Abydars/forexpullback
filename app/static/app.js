@@ -681,6 +681,11 @@ function collectConfigInputs() {
     basket_trailing_start_usd: parseFloat(document.getElementById('c-basket_trailing_start_usd').value),
     basket_trailing_drawdown_usd: parseFloat(document.getElementById('c-basket_trailing_drawdown_usd').value),
     basket_trailing_min_close_usd: parseFloat(document.getElementById('c-basket_trailing_min_close_usd').value),
+    min_sl_atr_multiplier: parseFloat(document.getElementById('c-min_sl_atr_multiplier').value),
+    trailing_start_tp_pct: parseFloat(document.getElementById('c-trailing_start_tp_pct').value),
+    trailing_mode: document.getElementById('c-trailing_mode').value,
+    trailing_atr_multiplier: parseFloat(document.getElementById('c-trailing_atr_multiplier').value),
+    trailing_distance_pips: parseFloat(document.getElementById('c-trailing_distance_pips').value),
   };
 }
 
@@ -739,7 +744,12 @@ function applyJsonText() {
       enable_basket_trailing: 'c-enable_basket_trailing',
       basket_trailing_start_usd: 'c-basket_trailing_start_usd',
       basket_trailing_drawdown_usd: 'c-basket_trailing_drawdown_usd',
-      basket_trailing_min_close_usd: 'c-basket_trailing_min_close_usd'
+      basket_trailing_min_close_usd: 'c-basket_trailing_min_close_usd',
+      min_sl_atr_multiplier: 'c-min_sl_atr_multiplier',
+      trailing_start_tp_pct: 'c-trailing_start_tp_pct',
+      trailing_mode: 'c-trailing_mode',
+      trailing_atr_multiplier: 'c-trailing_atr_multiplier',
+      trailing_distance_pips: 'c-trailing_distance_pips'
     };
     
     for (const [key, id] of Object.entries(inputs)) {

@@ -175,7 +175,8 @@ async def scan_loop():
                                     df_5m, df_15m, atr, mtf_zone, bias, point, 
                                     float(cfg.get("reward_ratio", 2.0)),
                                     base_atr_mult,
-                                    cfg.get("use_liquidity_tp", True)
+                                    cfg.get("use_liquidity_tp", True),
+                                    float(cfg.get("min_sl_atr_multiplier", 0.8))
                                 )
                                 reason_full["trigger"] = ltf_trigger
                                 

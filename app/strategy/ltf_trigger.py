@@ -15,7 +15,7 @@ def find_htf_liquidity(df_15m: pd.DataFrame, bias: str, entry: float) -> float |
     else:
         return float(df_15m['low'].iloc[-50:].min())
 
-def find_ltf_trigger(df: pd.DataFrame, df_15m: pd.DataFrame, atr_15m: float, zone: dict, bias: str, point: float, reward_ratio: float = 2.0, atr_buffer_multiplier: float = 0.2, use_liquidity_tp: bool = True) -> dict | None:
+def find_ltf_trigger(df: pd.DataFrame, df_15m: pd.DataFrame, atr_15m: float, zone: dict, bias: str, point: float, reward_ratio: float = 2.0, atr_buffer_multiplier: float = 0.2, use_liquidity_tp: bool = True, min_sl_atr_multiplier: float = 0.8) -> dict | None:
     if len(df) < 20: return None
     
     df = df.copy()
@@ -79,8 +79,8 @@ def find_ltf_trigger(df: pd.DataFrame, df_15m: pd.DataFrame, atr_15m: float, zon
             
             sl = float(structural_low - atr_buffer)
             
-            # Ensure minimum SL distance based on ATR (e.g. 0.5 * ATR)
-            min_sl_dist = atr_15m * 0.5
+            # Ensure minimum SL distance based on ATR
+            min_sl_dist = atr_15m * min_sl_atr_multiplier
             if (entry - sl) < min_sl_dist:
                 sl = float(entry - min_sl_dist)
                 
@@ -134,7 +134,7 @@ def find_ltf_trigger(df: pd.DataFrame, df_15m: pd.DataFrame, atr_15m: float, zon
             sl = float(structural_high + atr_buffer)
             
             # Ensure minimum SL distance based on ATR
-            min_sl_dist = atr_15m * 0.5
+            min_sl_dist = atr_15m * min_sl_atr_multiplier
             if (sl - entry) < min_sl_dist:
                 sl = float(entry + min_sl_dist)
                 
