@@ -215,6 +215,14 @@ function renderPositions() {
     g.avg_entry = g.avg_entry / g.total_lot;
     const gKey = `${g.symbol}_${g.direction}`;
     const gPctStr = bal ? ` <span class="text-[10px] opacity-60 font-normal">(${g.total_pnl > 0 ? '+' : ''}${(g.total_pnl / bal * 100).toFixed(2)}%)</span>` : '';
+    const gSlPct = g.sl && g.avg_entry ? ` <span class="text-[9px] opacity-40 font-normal">(${Math.abs((g.sl - g.avg_entry) / g.avg_entry * 100).toFixed(2)}%)</span>` : '';
+    const gTpPct = g.tp && g.avg_entry ? ` <span class="text-[9px] opacity-40 font-normal">(${Math.abs((g.tp - g.avg_entry) / g.avg_entry * 100).toFixed(2)}%)</span>` : '';
+    
+    let gCpPctVal = 0;
+    if (g.current_price && g.avg_entry) {
+        gCpPctVal = g.direction === 'buy' ? (g.current_price - g.avg_entry) / g.avg_entry * 100 : (g.avg_entry - g.current_price) / g.avg_entry * 100;
+    }
+    const gCpPctStr = g.current_price && g.avg_entry ? ` <br><span class="text-[9px] ${gCpPctVal >= 0 ? 'text-emerald-400/70' : 'text-rose-400/70'} font-normal">(${gCpPctVal > 0 ? '+' : ''}${gCpPctVal.toFixed(2)}%)</span>` : '';
     
     html.push(`
       <tr class="group-row cursor-pointer hover:bg-white/[0.02] transition-colors group" onclick="document.querySelectorAll('.sub-${gKey}').forEach(e => e.classList.toggle('hidden'))">
@@ -226,10 +234,10 @@ function renderPositions() {
         <td class="px-5 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${g.direction === 'buy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${g.direction}</span></td>
         <td class="px-5 py-3 text-right font-mono">${g.total_lot.toFixed(2)}</td>
         <td class="px-5 py-3 text-right font-mono text-slate-400">${g.avg_entry.toFixed(5)}</td>
-        <td class="px-5 py-3 text-right font-mono text-slate-400">${g.current_price || '-'}</td>
+        <td class="px-5 py-3 text-right font-mono text-slate-400">${g.current_price ? g.current_price + gCpPctStr : '-'}</td>
         <td class="px-5 py-3 text-right font-mono font-bold ${g.total_pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${g.total_pnl >= 0 ? '+' : '-'}$${Math.abs(g.total_pnl).toFixed(2)}${gPctStr}</td>
-        <td class="px-5 py-3 text-right font-mono text-slate-400">${g.sl || '-'}</td>
-        <td class="px-5 py-3 text-right font-mono text-slate-400">${g.tp || '-'}</td>
+        <td class="px-5 py-3 text-right font-mono text-slate-400">${g.sl ? g.sl + gSlPct : '-'}</td>
+        <td class="px-5 py-3 text-right font-mono text-slate-400">${g.tp ? g.tp + gTpPct : '-'}</td>
         <td class="px-5 py-3 text-right">
           <button class="px-3 py-1.5 border border-border_strong text-slate-300 text-[10px] font-bold tracking-widest uppercase hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/30 transition-all rounded" onclick="event.stopPropagation(); closeGroup('${g.symbol}', '${g.direction}')">CLOSE ${g.count > 1 ? 'ALL' : ''}</button>
         </td>
@@ -241,6 +249,15 @@ function renderPositions() {
         const badge = idx === 0 ? 'BASE' : `DCA ${idx}`;
         const badgeColor = idx === 0 ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-purple-400 bg-purple-500/10 border-purple-500/20';
         const pPctStr = bal ? ` <span class="text-[9px] opacity-50 font-normal">(${p.pnl > 0 ? '+' : ''}${(p.pnl / bal * 100).toFixed(2)}%)</span>` : '';
+        const pSlPct = p.sl && p.entry_price ? ` <span class="text-[8px] opacity-40 font-normal">(${Math.abs((p.sl - p.entry_price) / p.entry_price * 100).toFixed(2)}%)</span>` : '';
+        const pTpPct = p.tp && p.entry_price ? ` <span class="text-[8px] opacity-40 font-normal">(${Math.abs((p.tp - p.entry_price) / p.entry_price * 100).toFixed(2)}%)</span>` : '';
+        
+        let pCpPctVal = 0;
+        if (p.current_price && p.entry_price) {
+            pCpPctVal = p.direction === 'buy' ? (p.current_price - p.entry_price) / p.entry_price * 100 : (p.entry_price - p.current_price) / p.entry_price * 100;
+        }
+        const pCpPctStr = p.current_price && p.entry_price ? ` <br><span class="text-[8px] ${pCpPctVal >= 0 ? 'text-emerald-400/60' : 'text-rose-400/60'} font-normal">(${pCpPctVal > 0 ? '+' : ''}${pCpPctVal.toFixed(2)}%)</span>` : '';
+        
         html.push(`
           <tr class="sub-${gKey} hidden bg-black/20 hover:bg-black/40 transition-colors text-[11px] border-b border-border_light/50">
             <td class="px-5 py-2 pl-10 flex items-center gap-2">
@@ -250,10 +267,10 @@ function renderPositions() {
             <td class="px-5 py-2"></td>
             <td class="px-5 py-2 text-right font-mono text-slate-400">${p.lot.toFixed(2)}</td>
             <td class="px-5 py-2 text-right font-mono text-slate-500">${p.entry_price.toFixed(5)}</td>
-            <td class="px-5 py-2"></td>
+            <td class="px-5 py-2 text-right font-mono text-slate-500">${p.current_price ? p.current_price + pCpPctStr : '-'}</td>
             <td class="px-5 py-2 text-right font-mono ${p.pnl >= 0 ? 'text-emerald-500/70' : 'text-rose-500/70'}">${p.pnl >= 0 ? '+' : '-'}$${Math.abs(p.pnl).toFixed(2)}${pPctStr}</td>
-            <td class="px-5 py-2 text-right font-mono text-slate-500">${p.sl || '-'}</td>
-            <td class="px-5 py-2 text-right font-mono text-slate-500">${p.tp || '-'}</td>
+            <td class="px-5 py-2 text-right font-mono text-slate-500">${p.sl ? p.sl + pSlPct : '-'}</td>
+            <td class="px-5 py-2 text-right font-mono text-slate-500">${p.tp ? p.tp + pTpPct : '-'}</td>
             <td class="px-5 py-2 text-right"></td>
           </tr>
         `);
