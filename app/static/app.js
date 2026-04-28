@@ -577,7 +577,7 @@ async function loadConfig() {
     state.sessions = sessions;
     document.getElementById('sessions-list').innerHTML = '';
     sessions.forEach(s => addSessionRow(s));
-  } catch (err) { console.error(err); }
+  } catch (err) { alert(err.message + "\n" + err.stack); console.error(err); }
 }
 
 function openConfigModal() { loadConfig(); document.getElementById('config-modal').showModal(); }
@@ -624,20 +624,30 @@ function toggleSymbol(sym, isChecked) {
   } else {
     state.symbols = state.symbols.filter(s => s.generic !== sym);
   }
+  renderCorrelationGroups();
 }
 
 function renderCorrelationGroups() {
-  const enabled = new Set(state.enabled_correlation_groups || []);
+  const enabledGrp = new Set(state.enabled_correlation_groups || []);
+  const enabledSyms = new Set(state.symbols.map(s => s.generic));
+  
   document.getElementById('corr-groups-list').innerHTML = Object.entries(CORRELATION_GROUPS).map(([group, syms]) => {
-    const isChecked = enabled.has(group);
+    const isChecked = enabledGrp.has(group);
+    
+    const symsHtml = syms.map(s => {
+      const isActive = enabledSyms.has(s);
+      const colorClass = isActive ? "text-cyan_neon bg-cyan_neon/10 border border-cyan_neon/30" : "text-slate-600 bg-black/20 border border-transparent";
+      return `<span class="px-1.5 py-0.5 rounded ${colorClass}">${s}</span>`;
+    }).join('');
+
     return `
       <label class="flex flex-col gap-2 p-3 border border-border_light bg-black/10 rounded cursor-pointer group hover:bg-white/5 transition-colors">
         <div class="flex items-center gap-2 text-[10px] font-bold tracking-[0.1em] text-cyan_neon uppercase">
           <input type="checkbox" value="${group}" class="corr-cb w-4 h-4 accent-cyan_neon cursor-pointer" ${isChecked ? 'checked' : ''} onchange="toggleCorrelationGroup('${group}', this.checked)">
           ${group}
         </div>
-        <div class="text-[9px] text-slate-500 font-mono flex flex-wrap gap-1">
-          ${syms.map(s => `<span class="px-1.5 py-0.5 bg-black/20 rounded">${s}</span>`).join('')}
+        <div class="text-[9px] font-mono flex flex-wrap gap-1">
+          ${symsHtml}
         </div>
       </label>
     `;
@@ -817,7 +827,7 @@ function applyJsonText() {
     
     if (Array.isArray(data.symbols)) {
       state.symbols = data.symbols.map(s => typeof s === 'string' ? {generic: s, resolved: null, status: 'pending'} : s);
-      renderChips();
+      renderPredefinedSymbols();
       resolveAllSymbols();
     }
     
