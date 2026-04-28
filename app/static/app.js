@@ -565,7 +565,12 @@ async function loadConfig() {
     document.getElementById('c-basket_trailing_min_close_usd').value = cfg.basket_trailing_min_close_usd || 5.0;
     
     state.symbols = (cfg.symbols || []).map(s => ({generic: s, resolved: null, status: 'pending'}));
-    renderChips();
+    document.getElementById('c-correlation_groups_enabled').checked = cfg.correlation_groups_enabled !== false;
+    document.getElementById('c-max_open_per_correlation_group').value = cfg.max_open_per_correlation_group || 1;
+    
+    state.enabled_correlation_groups = cfg.enabled_correlation_groups || ["indices", "metals", "jpy", "usd_majors", "oil"];
+    renderPredefinedSymbols();
+    renderCorrelationGroups();
     resolveAllSymbols();
     
     const sessions = await api('GET', '/api/sessions');
@@ -578,43 +583,84 @@ async function loadConfig() {
 function openConfigModal() { loadConfig(); document.getElementById('config-modal').showModal(); }
 function closeConfigModal() { document.getElementById('config-modal').close(); }
 
-// Symbols chips
-function addSymbols() {
-  const raw = document.getElementById('sym-input').value;
-  const parts = raw.split(/[,\n]/).map(s => s.trim().toUpperCase()).filter(Boolean);
-  parts.forEach(p => {
-    if (!state.symbols.find(s => s.generic === p))
-      state.symbols.push({generic: p, resolved: null, status: 'pending'});
-  });
-  document.getElementById('sym-input').value = '';
-  renderChips();
-  resolveAllSymbols();
+// Predefined Symbols and Groups
+const PREDEFINED_SYMBOLS = [
+  "US30", "US500", "USTEC", "XAUUSD", "XAGUSD", "USDJPY", "EURJPY", "GBPJPY", 
+  "EURUSD", "GBPUSD", "AUDUSD", "NZDUSD", "USDCAD", "USDCHF", "USOIL", "UKOIL",
+  "EURAUD", "EURCAD", "EURGBP", "EURCHF", "EURNZD", "GBPAUD", "GBPCAD", "GBPCHF", 
+  "GBPNZD", "AUDCAD", "AUDCHF", "AUDJPY", "AUDNZD", "CADCHF", "CADJPY", "CHFJPY", 
+  "NZDCAD", "NZDCHF", "NZDJPY"
+];
+
+const CORRELATION_GROUPS = {
+  "indices": ["US30", "US500", "USTEC"],
+  "metals": ["XAUUSD", "XAGUSD"],
+  "jpy": ["USDJPY", "EURJPY", "GBPJPY"],
+  "usd_majors": ["EURUSD", "GBPUSD", "AUDUSD", "NZDUSD", "USDCAD", "USDCHF"],
+  "oil": ["USOIL", "UKOIL"]
+};
+
+function renderPredefinedSymbols() {
+  const enabledSyms = new Set(state.symbols.map(s => s.generic));
+  document.getElementById('sym-checkboxes').innerHTML = PREDEFINED_SYMBOLS.map(sym => {
+    const isChecked = enabledSyms.has(sym);
+    const obj = state.symbols.find(s => s.generic === sym);
+    const statusLabel = obj && obj.resolved ? ` <span class="text-emerald-500 text-[9px] whitespace-nowrap">(✓ ${obj.resolved})</span>` : (obj && obj.status === 'unresolved' ? ` <span class="text-rose-500 text-[9px]">(✗)</span>` : '');
+    
+    return `
+      <label class="flex items-center gap-2 text-[10px] font-bold tracking-[0.1em] text-slate-300 cursor-pointer p-2 border border-border_light bg-black/10 hover:bg-white/5 rounded transition-colors group">
+        <input type="checkbox" value="${sym}" class="sym-cb w-4 h-4 accent-cyan_neon cursor-pointer shrink-0" ${isChecked ? 'checked' : ''} onchange="toggleSymbol('${sym}', this.checked)">
+        <span class="truncate">${sym}${statusLabel}</span>
+      </label>
+    `;
+  }).join('');
+}
+
+function toggleSymbol(sym, isChecked) {
+  if (isChecked) {
+    if (!state.symbols.find(s => s.generic === sym)) {
+      state.symbols.push({generic: sym, resolved: null, status: 'pending'});
+    }
+  } else {
+    state.symbols = state.symbols.filter(s => s.generic !== sym);
+  }
+}
+
+function renderCorrelationGroups() {
+  const enabled = new Set(state.enabled_correlation_groups || []);
+  document.getElementById('corr-groups-list').innerHTML = Object.entries(CORRELATION_GROUPS).map(([group, syms]) => {
+    const isChecked = enabled.has(group);
+    return `
+      <label class="flex flex-col gap-2 p-3 border border-border_light bg-black/10 rounded cursor-pointer group hover:bg-white/5 transition-colors">
+        <div class="flex items-center gap-2 text-[10px] font-bold tracking-[0.1em] text-cyan_neon uppercase">
+          <input type="checkbox" value="${group}" class="corr-cb w-4 h-4 accent-cyan_neon cursor-pointer" ${isChecked ? 'checked' : ''} onchange="toggleCorrelationGroup('${group}', this.checked)">
+          ${group}
+        </div>
+        <div class="text-[9px] text-slate-500 font-mono flex flex-wrap gap-1">
+          ${syms.map(s => `<span class="px-1.5 py-0.5 bg-black/20 rounded">${s}</span>`).join('')}
+        </div>
+      </label>
+    `;
+  }).join('');
+}
+
+function toggleCorrelationGroup(group, isChecked) {
+  let enabled = new Set(state.enabled_correlation_groups || []);
+  if (isChecked) enabled.add(group);
+  else enabled.delete(group);
+  state.enabled_correlation_groups = Array.from(enabled);
 }
 
 async function resolveAllSymbols() {
   const generics = state.symbols.map(s => s.generic);
-  if (!generics.length) return;
+  if (!generics.length) return renderPredefinedSymbols();
   try {
     const { map } = await api('POST', '/api/symbols/resolve', { generics });
     state.symbols = state.symbols.map(s => ({
       ...s, resolved: map[s.generic], status: map[s.generic] ? 'resolved' : 'unresolved'
     }));
-    renderChips();
+    renderPredefinedSymbols();
   } catch(err) { console.error(err); }
-}
-
-function renderChips() {
-  document.getElementById('sym-chips').innerHTML = state.symbols.map(s => `
-    <span class="flex items-center gap-2 px-3 py-1 rounded bg-panel border ${s.status === 'resolved' ? 'border-emerald-500/30 text-emerald-400' : s.status === 'pending' ? 'border-amber-500/30 text-amber-400' : 'border-rose-500/30 text-rose-400'} text-xs font-mono">
-      ${s.generic}${s.resolved ? ' → ' + s.resolved + ' ✓' : ' ✗'}
-      <span class="cursor-pointer text-slate-500 hover:text-white px-1" onclick="removeSymbol('${s.generic}')">×</span>
-    </span>
-  `).join('');
-}
-
-function removeSymbol(generic) {
-  state.symbols = state.symbols.filter(s => s.generic !== generic);
-  renderChips();
 }
 
 // Sessions repeater

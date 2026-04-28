@@ -293,13 +293,28 @@
           </div>
 
           <!-- Symbols -->
-          <div class="m-panel space-y-4" data-mpanel="symbols">
-            <div class="flex gap-2 items-center">
-              <input id="sym-input" placeholder="XAUUSD, EURUSD, ..." class="flex-1 bg-black/20 border border-border_strong text-slate-200 text-xs px-4 py-2.5 rounded outline-none focus:border-cyan_neon transition-colors">
-              <button type="button" class="px-5 py-2.5 border border-border_strong text-slate-300 text-[10px] font-bold tracking-[0.1em] uppercase hover:bg-white/5 transition-colors rounded shrink-0" onclick="addSymbols()">ADD</button>
-              <button type="button" class="px-5 py-2.5 border border-border_strong text-slate-300 text-[10px] font-bold tracking-[0.1em] uppercase hover:bg-white/5 transition-colors rounded shrink-0" onclick="resolveAllSymbols()">RESOLVE ALL</button>
+          <div class="m-panel space-y-6" data-mpanel="symbols">
+            <div class="flex gap-4">
+              <button type="button" class="px-5 py-2.5 border border-border_strong text-slate-300 text-[10px] font-bold tracking-[0.1em] uppercase hover:bg-white/5 transition-colors rounded" onclick="resolveAllSymbols()">VERIFY SYMBOLS ON BROKER</button>
             </div>
-            <div id="sym-chips" class="flex flex-wrap gap-2 p-4 border border-border_light min-h-[100px] bg-black/10 rounded"></div>
+            
+            <div class="space-y-3">
+              <div class="text-[10px] font-bold tracking-[0.1em] text-cyan_neon uppercase border-b border-border_light pb-2">PREDEFINED SYMBOLS</div>
+              <div id="sym-checkboxes" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+            </div>
+
+            <div class="space-y-3 pt-4">
+              <div class="flex justify-between items-center border-b border-border_light pb-2">
+                <div class="text-[10px] font-bold tracking-[0.1em] text-cyan_neon uppercase">CORRELATION GROUPS</div>
+                <label class="flex gap-2 items-center text-[10px] font-bold tracking-[0.1em] text-slate-300 uppercase cursor-pointer group">
+                  <input type="checkbox" id="c-correlation_groups_enabled" class="w-4 h-4 accent-cyan_neon cursor-pointer border-border_strong bg-black/20"> ENABLED
+                </label>
+              </div>
+              <div class="flex flex-col gap-1.5 w-full md:w-1/2">
+                <label class="text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">MAX OPEN PER GROUP <input type="number" id="c-max_open_per_correlation_group" value="1" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors mt-1.5"></label>
+              </div>
+              <div id="corr-groups-list" class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2"></div>
+            </div>
           </div>
 
           <!-- Sessions -->

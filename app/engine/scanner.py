@@ -129,6 +129,31 @@ async def scan_loop():
             if res_pos:
                 bot_positions = [p for p in res_pos if p.get('magic') == magic]
                 
+            correlation_groups_enabled = cfg.get("correlation_groups_enabled", True)
+            enabled_correlation_groups = cfg.get("enabled_correlation_groups", ["indices", "metals", "jpy", "usd_majors", "oil"])
+            max_corr = int(cfg.get("max_open_per_correlation_group", 1))
+
+            CORRELATION_GROUPS = {
+                "indices": ["US30", "US500", "USTEC"],
+                "metals": ["XAUUSD", "XAGUSD"],
+                "jpy": ["USDJPY", "EURJPY", "GBPJPY"],
+                "usd_majors": ["EURUSD", "GBPUSD", "AUDUSD", "NZDUSD", "USDCAD", "USDCHF"],
+                "oil": ["USOIL", "UKOIL"]
+            }
+            
+            generic_to_group = {}
+            for g, syms in CORRELATION_GROUPS.items():
+                for s in syms:
+                    generic_to_group[s] = g
+            
+            group_open_counts = {g: 0 for g in CORRELATION_GROUPS}
+            if correlation_groups_enabled:
+                for p in bot_positions:
+                    for g_sym in generic_to_group:
+                        if symbol_resolver.resolve(g_sym) == p['symbol']:
+                            group_open_counts[generic_to_group[g_sym]] += 1
+                            break
+                
             candidates = []
             updates_to_broadcast = []
             
@@ -351,8 +376,15 @@ async def scan_loop():
                                                 status = "SKIPPED"
                                                 reason_full["msg"] = "Skipped because position limit already reached"
                                             else:
-                                                status = "FIRED" # Temporary status
-                                                reason_full["msg"] = f"Candidate Accepted! Score: {score} >= {base_threshold}"
+                                                my_group = generic_to_group.get(generic)
+                                                if correlation_groups_enabled and my_group and my_group in enabled_correlation_groups:
+                                                    if group_open_counts[my_group] >= max_corr:
+                                                        status = "SKIPPED"
+                                                        reason_full["msg"] = f"Skipped: max open positions ({max_corr}) for group '{my_group}' reached"
+                                                
+                                                if status != "SKIPPED":
+                                                    status = "FIRED" # Temporary status
+                                                    reason_full["msg"] = f"Candidate Accepted! Score: {score} >= {base_threshold}"
                                                 
                                                 local_candidates.append({
                                                     "generic": generic,
@@ -424,8 +456,21 @@ async def scan_loop():
             max_dca_per_scan = int(cfg.get("max_dca_per_scan", 2))
             
             selected_dca = dca_candidates[:max_dca_per_scan]
-            selected_normal = normal_candidates[:max_signals_per_scan]
             
+            selected_normal = []
+            groups_used_this_scan = set()
+            for c in normal_candidates:
+                if len(selected_normal) >= max_signals_per_scan:
+                    break
+                my_group = generic_to_group.get(c["generic"])
+                if correlation_groups_enabled and my_group and my_group in enabled_correlation_groups:
+                    if my_group in groups_used_this_scan:
+                        c["status"] = "SKIPPED"
+                        c["reason_full"]["msg"] = f"Skipped: higher score candidate from group '{my_group}' selected"
+                        continue
+                    groups_used_this_scan.add(my_group)
+                selected_normal.append(c)
+                
             selected_candidates = selected_dca + selected_normal
             selected_symbols_dca = {c["resolved"] for c in selected_dca}
             selected_symbols_normal = {c["resolved"] for c in selected_normal}
@@ -476,8 +521,9 @@ async def scan_loop():
                         await send_order(sig, res, bias, c["cfg"], is_dca=is_dca, dca_data=ltf_trigger if is_dca else None, timings=c.get("timings"))
                 else:
                     is_dca = c.get("is_dca", False)
-                    status = "DCA_SKIPPED" if is_dca else "SKIPPED"
-                    reason_full["msg"] = "Skipped because higher-ranked signal selected"
+                    status = c.get("status", "DCA_SKIPPED" if is_dca else "SKIPPED")
+                    if not ("Skipped: higher score candidate from group" in c["reason_full"].get("msg", "")):
+                        reason_full["msg"] = "Skipped because higher-ranked signal selected"
                     
                     updates_to_broadcast.append({
                         "symbol": generic, "resolved": res, "bias": bias, "score": score,
