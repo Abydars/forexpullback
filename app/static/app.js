@@ -570,11 +570,20 @@ async function loadConfig() {
     document.getElementById('c-signal_cooldown_minutes').value = cfg.signal_cooldown_minutes || 30;
     document.getElementById('c-reward_ratio').value = cfg.reward_ratio || 2.0;
     document.getElementById('c-dashboard_password').value = cfg.dashboard_password || 'admin';
+    document.getElementById('c-scan_concurrency').value = cfg.scan_concurrency || 5;
+    document.getElementById('c-close_all_concurrency').value = cfg.close_all_concurrency || 2;
+    document.getElementById('c-enable_latency_logs').checked = cfg.enable_latency_logs !== false;
+    document.getElementById('c-magic_number').value = cfg.magic_number || 123456;
 
     document.getElementById('c-atr_buffer_multiplier').value = cfg.atr_buffer_multiplier || 0.2;
     document.getElementById('c-use_liquidity_tp').checked = cfg.use_liquidity_tp !== false;
+    document.getElementById('c-min_sl_atr_multiplier').value = cfg.min_sl_atr_multiplier || 0.8;
     document.getElementById('c-breakeven_trigger_r').value = cfg.breakeven_trigger_r || 1.0;
     document.getElementById('c-trailing').checked = cfg.trailing !== false;
+    document.getElementById('c-trailing_start_tp_pct').value = cfg.trailing_start_tp_pct || 0.6;
+    document.getElementById('c-trailing_mode').value = cfg.trailing_mode || 'atr';
+    document.getElementById('c-trailing_atr_multiplier').value = cfg.trailing_atr_multiplier || 1.5;
+    document.getElementById('c-trailing_distance_pips').value = cfg.trailing_distance_pips || 15.0;
     
     document.getElementById('c-enable_dca').checked = cfg.enable_dca === true;
     document.getElementById('c-max_dca_entries').value = cfg.max_dca_entries || 1;
@@ -754,6 +763,7 @@ function collectConfigInputs() {
     close_all_concurrency: parseInt(document.getElementById('c-close_all_concurrency').value),
     signal_cooldown_minutes: parseInt(document.getElementById('c-signal_cooldown_minutes').value),
     reward_ratio: parseFloat(document.getElementById('c-reward_ratio').value),
+    magic_number: parseInt(document.getElementById('c-magic_number').value),
     dashboard_password: document.getElementById('c-dashboard_password').value,
     enable_latency_logs: document.getElementById('c-enable_latency_logs').checked,
     atr_buffer_multiplier: parseFloat(document.getElementById('c-atr_buffer_multiplier').value),
@@ -823,6 +833,7 @@ function applyJsonText() {
       close_all_concurrency: 'c-close_all_concurrency',
       signal_cooldown_minutes: 'c-signal_cooldown_minutes',
       reward_ratio: 'c-reward_ratio',
+      magic_number: 'c-magic_number',
       dashboard_password: 'c-dashboard_password',
       enable_latency_logs: 'c-enable_latency_logs',
       atr_buffer_multiplier: 'c-atr_buffer_multiplier',
