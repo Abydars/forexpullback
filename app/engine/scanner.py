@@ -77,8 +77,8 @@ async def scan_loop():
             async with AsyncSessionLocal() as db:
                 result = await db.execute(select(SessionModel))
                 session_models = result.scalars().all()
-                sessions = [Session(id=s.id, name=s.name, start_time=datetime.strptime(s.start_time, "%H:%M").time(),
-                                   end_time=datetime.strptime(s.end_time, "%H:%M").time(), timezone=s.tz,
+                sessions = [Session(id=s.id, name=s.name, start_time=s.start_time,
+                                   end_time=s.end_time, timezone=s.tz,
                                    days_mask=s.days_mask, enabled=s.enabled) for s in session_models]
             
             is_active = any_active(sessions, now_utc)

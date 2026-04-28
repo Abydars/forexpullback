@@ -6,8 +6,8 @@ import pytz
 class Session:
     id: int
     name: str
-    start_time: time
-    end_time: time
+    start_time: str
+    end_time: str
     timezone: str
     days_mask: int
     enabled: bool
@@ -22,19 +22,22 @@ def active_sessions(sessions: list[Session], now_utc: datetime) -> list[Session]
             continue
             
         tz = pytz.timezone(s.timezone)
-        now_local = now_utc.astimezone(tz)
+        now_local = datetime.now(tz)
+        current_time = now_local.strftime("%H:%M")
         day_bit = 1 << now_local.weekday()
-        t = now_local.time()
         
-        if s.start_time <= s.end_time:
-            in_window = s.start_time <= t <= s.end_time
+        start_time = s.start_time
+        end_time = s.end_time
+        
+        if start_time <= end_time:
+            in_window = start_time <= current_time <= end_time
             if in_window and (s.days_mask & day_bit):
                 active.append(s)
         else:
-            if t >= s.start_time:
+            if current_time >= start_time:
                 if (s.days_mask & day_bit):
                     active.append(s)
-            elif t <= s.end_time:
+            elif current_time <= end_time:
                 prev_day_bit = 1 << ((now_local.weekday() - 1) % 7)
                 if (s.days_mask & prev_day_bit):
                     active.append(s)
