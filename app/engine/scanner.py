@@ -386,24 +386,24 @@ async def scan_loop():
                                                     status = "FIRED" # Temporary status
                                                     reason_full["msg"] = f"Candidate Accepted! Score: {score} >= {base_threshold}"
                                                 
-                                                local_candidates.append({
-                                                    "generic": generic,
-                                                    "resolved": resolved,
-                                                    "bias": bias,
-                                                    "score": score,
-                                                    "ltf_trigger": ltf_trigger,
-                                                    "reason_full": dict(reason_full),
-                                                    "cfg": cfg,
-                                                    "threshold": base_threshold,
-                                                    "state_key": state_key,
-                                                    "timings": dict(timings)
-                                                })
+                                                    local_candidates.append({
+                                                        "generic": generic,
+                                                        "resolved": resolved,
+                                                        "bias": bias,
+                                                        "score": score,
+                                                        "ltf_trigger": ltf_trigger,
+                                                        "reason_full": dict(reason_full),
+                                                        "cfg": cfg,
+                                                        "threshold": base_threshold,
+                                                        "state_key": state_key,
+                                                        "timings": dict(timings)
+                                                    })
                                         else:
                                             status = "WATCHING"
                                             reason_full["msg"] = f"Low Score ({score} < {base_threshold})"
                                             scanner_state[state_key] = {"time": now_utc, "status": "WATCHING"}
                                             
-                                        if is_dca_candidate:
+                                        if is_dca_candidate and status != "DCA_SKIPPED":
                                             local_candidates.append({
                                                 "generic": generic,
                                                 "resolved": resolved,
@@ -418,7 +418,7 @@ async def scan_loop():
                                                 "timings": dict(timings)
                                             })
 
-                if status != "FIRED":
+                if status not in ("FIRED", "DCA_FIRED"):
                     local_updates.append({
                         "symbol": generic,
                         "resolved": resolved,
