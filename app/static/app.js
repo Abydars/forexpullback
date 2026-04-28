@@ -161,8 +161,13 @@ function renderStats() {
   const unrealized = state.open_positions.reduce((sum, t) => sum + (t.pnl || 0), 0);
   const unEl = document.getElementById('s-unrealized');
   if (unEl) {
-      unEl.innerText = `${unrealized < 0 ? '-' : ''}$${Math.abs(unrealized).toFixed(2)}`;
-      unEl.className = `text-2xl ${unrealized > 0 ? 'text-emerald-400' : unrealized < 0 ? 'text-rose-400' : 'text-slate-100'}`;
+      let pctStr = '';
+      if (state.account && state.account.balance > 0) {
+          const pct = (unrealized / state.account.balance) * 100;
+          pctStr = ` <span class="text-[14px] opacity-60 font-normal tracking-wider">(${pct > 0 ? '+' : ''}${pct.toFixed(2)}%)</span>`;
+      }
+      unEl.innerHTML = `${unrealized < 0 ? '-' : ''}$${Math.abs(unrealized).toFixed(2)}${pctStr}`;
+      unEl.className = `text-2xl font-bold font-mono ${unrealized > 0 ? 'text-emerald-400' : unrealized < 0 ? 'text-rose-400' : 'text-slate-100'}`;
   }
   
   const sToday = document.getElementById('s-today');
@@ -204,10 +209,12 @@ function renderPositions() {
     g.positions.push(t);
   });
 
+  const bal = state.account && state.account.balance > 0 ? state.account.balance : null;
   const html = [];
   Object.values(groups).forEach(g => {
     g.avg_entry = g.avg_entry / g.total_lot;
     const gKey = `${g.symbol}_${g.direction}`;
+    const gPctStr = bal ? ` <span class="text-[10px] opacity-60 font-normal">(${g.total_pnl > 0 ? '+' : ''}${(g.total_pnl / bal * 100).toFixed(2)}%)</span>` : '';
     
     html.push(`
       <tr class="group-row cursor-pointer hover:bg-white/[0.02] transition-colors group" onclick="document.querySelectorAll('.sub-${gKey}').forEach(e => e.classList.toggle('hidden'))">
@@ -220,7 +227,7 @@ function renderPositions() {
         <td class="px-5 py-3 text-right font-mono">${g.total_lot.toFixed(2)}</td>
         <td class="px-5 py-3 text-right font-mono text-slate-400">${g.avg_entry.toFixed(5)}</td>
         <td class="px-5 py-3 text-right font-mono text-slate-400">${g.current_price || '-'}</td>
-        <td class="px-5 py-3 text-right font-mono font-bold ${g.total_pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${g.total_pnl >= 0 ? '+' : '-'}$${Math.abs(g.total_pnl).toFixed(2)}</td>
+        <td class="px-5 py-3 text-right font-mono font-bold ${g.total_pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${g.total_pnl >= 0 ? '+' : '-'}$${Math.abs(g.total_pnl).toFixed(2)}${gPctStr}</td>
         <td class="px-5 py-3 text-right font-mono text-slate-400">${g.sl || '-'}</td>
         <td class="px-5 py-3 text-right font-mono text-slate-400">${g.tp || '-'}</td>
         <td class="px-5 py-3 text-right">
@@ -233,6 +240,7 @@ function renderPositions() {
       g.positions.forEach((p, idx) => {
         const badge = idx === 0 ? 'BASE' : `DCA ${idx}`;
         const badgeColor = idx === 0 ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-purple-400 bg-purple-500/10 border-purple-500/20';
+        const pPctStr = bal ? ` <span class="text-[9px] opacity-50 font-normal">(${p.pnl > 0 ? '+' : ''}${(p.pnl / bal * 100).toFixed(2)}%)</span>` : '';
         html.push(`
           <tr class="sub-${gKey} hidden bg-black/20 hover:bg-black/40 transition-colors text-[11px] border-b border-border_light/50">
             <td class="px-5 py-2 pl-10 flex items-center gap-2">
@@ -243,7 +251,7 @@ function renderPositions() {
             <td class="px-5 py-2 text-right font-mono text-slate-400">${p.lot.toFixed(2)}</td>
             <td class="px-5 py-2 text-right font-mono text-slate-500">${p.entry_price.toFixed(5)}</td>
             <td class="px-5 py-2"></td>
-            <td class="px-5 py-2 text-right font-mono ${p.pnl >= 0 ? 'text-emerald-500/70' : 'text-rose-500/70'}">${p.pnl >= 0 ? '+' : '-'}$${Math.abs(p.pnl).toFixed(2)}</td>
+            <td class="px-5 py-2 text-right font-mono ${p.pnl >= 0 ? 'text-emerald-500/70' : 'text-rose-500/70'}">${p.pnl >= 0 ? '+' : '-'}$${Math.abs(p.pnl).toFixed(2)}${pPctStr}</td>
             <td class="px-5 py-2 text-right font-mono text-slate-500">${p.sl || '-'}</td>
             <td class="px-5 py-2 text-right font-mono text-slate-500">${p.tp || '-'}</td>
             <td class="px-5 py-2 text-right"></td>
