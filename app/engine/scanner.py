@@ -136,9 +136,12 @@ async def scan_loop():
             CORRELATION_GROUPS = {
                 "indices": ["US30", "US500", "USTEC"],
                 "metals": ["XAUUSD", "XAGUSD"],
-                "jpy": ["USDJPY", "EURJPY", "GBPJPY"],
+                "oil": ["USOIL", "UKOIL"],
                 "usd_majors": ["EURUSD", "GBPUSD", "AUDUSD", "NZDUSD", "USDCAD", "USDCHF"],
-                "oil": ["USOIL", "UKOIL"]
+                "jpy_pairs": ["USDJPY", "EURJPY", "GBPJPY", "AUDJPY", "CADJPY", "CHFJPY", "NZDJPY"],
+                "eur_crosses": ["EURAUD", "EURCAD", "EURGBP", "EURCHF", "EURNZD"],
+                "gbp_crosses": ["GBPAUD", "GBPCAD", "GBPCHF", "GBPNZD"],
+                "minor_crosses": ["AUDCAD", "AUDCHF", "AUDNZD", "CADCHF", "NZDCAD", "NZDCHF"]
             }
             
             generic_to_group = {}
