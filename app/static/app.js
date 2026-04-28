@@ -897,6 +897,12 @@ async function saveConfig() {
     await api('PATCH', '/api/config', payload2);
     
     await syncSessions();
+    
+    // Update local state config
+    state.config = { ...state.config, ...payload1, ...payload2 };
+    state.config.enabled_correlation_groups = state.enabled_correlation_groups;
+    
+    alert("Config saved successfully!");
     closeConfigModal();
   } catch (err) {
     alert("Error saving config: " + err.message);
