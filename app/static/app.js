@@ -739,6 +739,9 @@ function addSessionRow(session) {
 
 function collectConfigInputs() {
   return {
+    correlation_groups_enabled: document.getElementById('c-correlation_groups_enabled').checked,
+    max_open_per_correlation_group: parseInt(document.getElementById('c-max_open_per_correlation_group').value),
+    enabled_correlation_groups: state.enabled_correlation_groups || [],
     max_open_positions: parseInt(document.getElementById('c-max_open_positions').value),
     max_signals_per_scan: parseInt(document.getElementById('c-max_signals_per_scan').value),
     max_per_symbol: parseInt(document.getElementById('c-max_per_symbol').value),
@@ -806,6 +809,8 @@ function applyJsonText() {
     const data = JSON.parse(text);
     
     const inputs = {
+      correlation_groups_enabled: 'c-correlation_groups_enabled',
+      max_open_per_correlation_group: 'c-max_open_per_correlation_group',
       max_open_positions: 'c-max_open_positions',
       max_signals_per_scan: 'c-max_signals_per_scan',
       max_per_symbol: 'c-max_per_symbol',
@@ -858,6 +863,12 @@ function applyJsonText() {
       renderPredefinedSymbols();
       resolveAllSymbols();
     }
+    
+    if (Array.isArray(data.enabled_correlation_groups)) {
+      state.enabled_correlation_groups = data.enabled_correlation_groups;
+    }
+    
+    renderCorrelationGroups();
     
     if (Array.isArray(data.sessions)) {
       document.getElementById('sessions-list').innerHTML = '';
