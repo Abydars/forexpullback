@@ -889,10 +889,19 @@ function applyJsonText() {
 }
 
 async function saveConfig() {
-  await api('PATCH', '/api/config', collectConfigInputs());
-  await api('PATCH', '/api/config', { symbols: state.symbols.filter(s => s.status !== 'unresolved').map(s => s.generic) });
-  await syncSessions();
-  closeConfigModal();
+  try {
+    const payload1 = collectConfigInputs();
+    await api('PATCH', '/api/config', payload1);
+    
+    const payload2 = { symbols: state.symbols.filter(s => s.status !== 'unresolved').map(s => s.generic) };
+    await api('PATCH', '/api/config', payload2);
+    
+    await syncSessions();
+    closeConfigModal();
+  } catch (err) {
+    alert("Error saving config: " + err.message);
+    console.error(err);
+  }
 }
 
 // ---- Init ----
