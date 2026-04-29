@@ -111,11 +111,23 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
 
         if is_dca and dca_data:
             lot = dca_data.get('dca_lot', info.volume_min)
-            # Ensure DCA lot respects limits
-            steps = round(lot / info.volume_step)
+            # Ensure DCA lot respects limits safely
+            steps = math.floor(lot / info.volume_step)
             lot = steps * info.volume_step
             lot = max(info.volume_min, min(info.volume_max, lot))
             raw_lot = lot
+            
+            # Optional safety for DCA
+            dca_profit = await asyncio.to_thread(_calc_profit, lot)
+            dca_expected_loss = abs(dca_profit) if dca_profit is not None and dca_profit < 0 else 0
+            if dca_expected_loss > risk_amount * 1.5:
+                async with AsyncSessionLocal() as db:
+                    err_msg = f"Order {resolved} rejected: DCA expected loss ({dca_expected_loss:.2f}) exceeds 1.5x risk_amount limit ({risk_amount * 1.5:.2f})"
+                    e = Event(level="WARN", component="risk", message=err_msg)
+                    db.add(e)
+                    await db.commit()
+                    await broadcast({"type": "log.event", "level": "WARN", "component": "risk", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+                return
         else:
             # 4. Calculate raw lot
             raw_lot = risk_amount / risk_per_1_lot
