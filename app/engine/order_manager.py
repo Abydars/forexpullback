@@ -58,6 +58,15 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
                 await broadcast({"type": "log.event", "level": "WARN", "component": "order_manager", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
             return
         
+        if sl_distance <= 0:
+            async with AsyncSessionLocal() as db:
+                err_msg = f"Order {resolved} rejected: SL distance is zero or invalid"
+                e = Event(level="WARN", component="order_manager", message=err_msg)
+                db.add(e)
+                await db.commit()
+                await broadcast({"type": "log.event", "level": "WARN", "component": "order_manager", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+            return
+
         risk_pct = float(cfg.get("risk_percent", 1.0))
         risk_amount = balance * risk_pct / 100
         
@@ -67,23 +76,35 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
             
         profit_1_lot = await asyncio.to_thread(_calc_profit)
         
+        # Risk per 1 lot calculation without random 1.0 fallbacks
+        if profit_1_lot is not None and profit_1_lot < 0:
+            loss_for_1_lot = abs(profit_1_lot)
+        else:
+            sl_points = sl_distance / info.point if info.point else 0
+            if info.trade_tick_value and sl_points > 0:
+                loss_for_1_lot = sl_points * info.trade_tick_value
+            else:
+                async with AsyncSessionLocal() as db:
+                    err_msg = f"Order {resolved} rejected: Cannot calculate risk (profit_1_lot={profit_1_lot}, tick_value={info.trade_tick_value})"
+                    e = Event(level="WARN", component="order_manager", message=err_msg)
+                    db.add(e)
+                    await db.commit()
+                    await broadcast({"type": "log.event", "level": "WARN", "component": "order_manager", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+                return
+
         if is_dca and dca_data:
             lot = dca_data.get('dca_lot', info.volume_min)
         else:
-            if profit_1_lot is not None and profit_1_lot != 0:
-                loss_for_1_lot = abs(profit_1_lot)
-                lot = risk_amount / loss_for_1_lot
-            else:
-                # Fallback for when order_calc_profit fails
-                sl_points = abs(actual_price - sig.sl) / info.point if info.point else 1
-                lot = risk_amount / (sl_points * info.trade_tick_value) if info.trade_tick_value else info.volume_min
+            lot = risk_amount / loss_for_1_lot
             
             # precise volume calculation to prevent MT5 invalid volume errors
             steps = round(lot / info.volume_step)
             lot = steps * info.volume_step
             lot = max(info.volume_min, min(info.volume_max, lot))
             lot = float(f"{lot:.8f}".rstrip('0').rstrip('.')) if '.' in f"{lot:.8f}" else float(lot)
-        
+            
+        print(f"[{resolved}] ORDER LOT CALC: Balance={balance:.2f}, RiskAmt={risk_amount:.2f}, SL_Dist={sl_distance:.5f}, RiskPer1Lot={loss_for_1_lot:.2f}, FinalLot={lot}")
+
         action = mt5.TRADE_ACTION_DEAL
         type_ = mt5.ORDER_TYPE_BUY if bias == 'bullish' else mt5.ORDER_TYPE_SELL
         

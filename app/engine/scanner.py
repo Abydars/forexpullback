@@ -435,33 +435,40 @@ async def scan_loop():
                                                         def _calc_risk(action, symbol, vol, open_price, sl_price):
                                                             if not open_price or not sl_price or open_price == sl_price: return 0
                                                             profit = mt5.order_calc_profit(action, symbol, vol, open_price, sl_price)
-                                                            return abs(profit) if profit and profit < 0 else 1.0 # Fallback
+                                                            if profit and profit < 0:
+                                                                return abs(profit)
+                                                            sl_pts = abs(open_price - sl_price) / info.point if info.point else 0
+                                                            if info.trade_tick_value and sl_pts > 0:
+                                                                return (sl_pts * info.trade_tick_value) * vol
+                                                            return 0
                                                         
                                                         # Base 1R risk amount (original trade's initial risk)
                                                         base_1r_risk = await asyncio.to_thread(_calc_risk, ord_type, resolved, original_lot, base_entry, base_sl)
-                                                        if base_1r_risk == 0: base_1r_risk = 1.0
-                                                        
-                                                        total_new_risk = await asyncio.to_thread(_calc_risk, ord_type, resolved, dca_lot, current_price, new_sl)
-                                                        
-                                                        for p in same_dir_positions:
-                                                            p_entry = p.get('price_open')
-                                                            p_vol = p.get('volume')
-                                                            p_risk = await asyncio.to_thread(_calc_risk, ord_type, resolved, p_vol, p_entry, new_sl)
-                                                            total_new_risk += p_risk
-                                                        
-                                                        total_risk_r = total_new_risk / base_1r_risk
-                                                        
-                                                        if total_risk_r > dca_max_total_risk_r:
+                                                        if base_1r_risk == 0:
                                                             status = "DCA_SKIPPED"
-                                                            reason_full["msg"] = f"Skipped DCA: total risk cap exceeded ({total_risk_r:.2f} > {dca_max_total_risk_r})"
+                                                            reason_full["msg"] = "Skipped DCA: failed to calculate base 1R risk"
                                                         else:
-                                                            status = "DCA_FIRED"
-                                                            vol_txt = ""
-                                                            if "volume" in reason_full and reason_full["volume"]["status"] == "low":
-                                                                vol_txt = " (but volume is low)"
-                                                            reason_full["msg"] = f"DCA added: fresh signal while price near SL{vol_txt}"
-                                                            is_dca_allowed = True
-                                                            is_dca_candidate = True
+                                                            total_new_risk = await asyncio.to_thread(_calc_risk, ord_type, resolved, dca_lot, current_price, new_sl)
+                                                            
+                                                            for p in same_dir_positions:
+                                                                p_entry = p.get('price_open')
+                                                                p_vol = p.get('volume')
+                                                                p_risk = await asyncio.to_thread(_calc_risk, ord_type, resolved, p_vol, p_entry, new_sl)
+                                                                total_new_risk += p_risk
+                                                            
+                                                            total_risk_r = total_new_risk / base_1r_risk
+                                                            
+                                                            if total_risk_r > dca_max_total_risk_r:
+                                                                status = "DCA_SKIPPED"
+                                                                reason_full["msg"] = f"Skipped DCA: total risk cap exceeded ({total_risk_r:.2f} > {dca_max_total_risk_r})"
+                                                            else:
+                                                                status = "DCA_FIRED"
+                                                                vol_txt = ""
+                                                                if "volume" in reason_full and reason_full["volume"]["status"] == "low":
+                                                                    vol_txt = " (but volume is low)"
+                                                                reason_full["msg"] = f"DCA added: fresh signal while price near SL{vol_txt}"
+                                                                is_dca_allowed = True
+                                                                is_dca_candidate = True
                                                             
                                                             ltf_trigger['is_dca'] = True
                                                             ltf_trigger['dca_index'] = dca_count + 1
