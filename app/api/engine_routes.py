@@ -31,6 +31,7 @@ async def get_initial_data():
     from app.db.session import AsyncSessionLocal
     from app.db.models import Trade, Signal, Event
     from sqlalchemy import select
+    from app.engine.scanner import latest_scan_results
     
     async with AsyncSessionLocal() as db:
         trades_res = await db.execute(select(Trade).order_by(Trade.opened_at.desc()).limit(100))
@@ -55,5 +56,6 @@ async def get_initial_data():
             ],
             "events": [
                 {"level": e.level, "component": e.component, "message": e.message, "created_at": e.created_at.isoformat()} for e in events
-            ]
+            ],
+            "scanner_status": latest_scan_results
         }

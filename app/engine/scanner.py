@@ -20,6 +20,7 @@ from sqlalchemy import select
 symbol_resolver = SymbolResolver(mt5_client)
 
 scanner_state = {}
+latest_scan_results = {}
 
 def calc_adx(df: pd.DataFrame, period=14):
     df['up_move'] = df['high'] - df['high'].shift(1)
@@ -667,6 +668,7 @@ async def scan_loop():
 
             # Broadcast all states for UI
             for update in updates_to_broadcast:
+                latest_scan_results[update["symbol"]] = update
                 await broadcast({"type": "scan.update", "data": update})
 
             await asyncio.sleep(interval)

@@ -1107,11 +1107,13 @@ function exportConfig() {
 async function init() {
   connectWS();
   try {
-    const [status, initData] = await Promise.all([
+    const [status, initData, cfg] = await Promise.all([
       api('GET', '/api/status'),
-      api('GET', '/api/initial_data').catch(() => null)
+      api('GET', '/api/initial_data').catch(() => null),
+      api('GET', '/api/config').catch(() => ({}))
     ]);
     Object.assign(state, status);
+    state.config = cfg;
 
     if (initData) {
       state.open_positions = initData.trades.filter(t => !t.closed_at);
@@ -1119,6 +1121,9 @@ async function init() {
       state.all_signals = initData.signals;
       state.recent_signals = initData.signals.slice(0, 5);
       state.events = initData.events;
+      if (initData.scanner_status) {
+        state.scanner_status = initData.scanner_status;
+      }
 
       const todayStr = new Date().toISOString().split('T')[0];
       state.today_pnl = state.closed_trades
@@ -1129,5 +1134,6 @@ async function init() {
 
   renderTopbar(); renderStats(); renderEngineBtn(); renderNotice();
   renderPositions(); renderTrades(); renderSignals(); renderLogs();
+  renderScannerStatus();
 }
 init();
