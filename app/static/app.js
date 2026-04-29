@@ -2,7 +2,7 @@ function formatLocalTime(dateStr) {
   if (!dateStr) return new Date().toLocaleTimeString();
   let str = String(dateStr);
   if (!str.endsWith('Z') && !str.match(/(\+|-)\d{2}:\d{2}$/)) {
-      str += 'Z';
+    str += 'Z';
   }
   const date = new Date(str);
   return date.toLocaleString([], {
@@ -36,49 +36,49 @@ function connectWS() {
   ws.onopen = () => { setInterval(() => ws.readyState === 1 && ws.send('{"type":"ping"}'), 20000); };
   ws.onmessage = (e) => handleEvent(JSON.parse(e.data));
   ws.onclose = (e) => {
-      if (e.code === 1008) window.location.href = '/login';
-      else setTimeout(connectWS, 2000);
+    if (e.code === 1008) window.location.href = '/login';
+    else setTimeout(connectWS, 2000);
   };
 }
 
 function handleEvent(msg) {
   switch (msg.type) {
-    case 'mt5.connection':  state.mt5_connected = msg.state === 'connected'; renderTopbar(); break;
-    case 'account.tick':    state.account = msg; renderTopbar(); renderStats(); break;
-    case 'scan.update':     updateScanStatus(msg.data); break;
-    case 'signal.new':      state.recent_signals.unshift(msg.signal); state.all_signals.unshift(msg.signal); renderSignals(); break;
-    case 'trade.opened':    renderStats(); break;
-    case 'trade.closed':    moveToClosed(msg.trade); renderTrades(); renderStats(); break;
+    case 'mt5.connection': state.mt5_connected = msg.state === 'connected'; renderTopbar(); break;
+    case 'account.tick': state.account = msg; renderTopbar(); renderStats(); break;
+    case 'scan.update': updateScanStatus(msg.data); break;
+    case 'signal.new': state.recent_signals.unshift(msg.signal); state.all_signals.unshift(msg.signal); renderSignals(); break;
+    case 'trade.opened': renderStats(); break;
+    case 'trade.closed': moveToClosed(msg.trade); renderTrades(); renderStats(); break;
     case 'positions.update':
-        state.open_positions = msg.positions.map(p => ({
-            ticket: p.ticket,
-            symbol: p.symbol,
-            direction: p.type === 0 ? 'buy' : 'sell',
-            lot: p.volume,
-            entry_price: p.price_open,
-            current_price: p.price_current,
-            pnl: p.profit,
-            sl: p.sl,
-            tp: p.tp
-        }));
-        if (msg.exit_advice) state.exit_advice = msg.exit_advice;
-        if (msg.basket_state) {
-            const badge = document.getElementById('s-basket-badge');
-            if (badge) {
-                if (msg.basket_state.active) {
-                    badge.classList.remove('hidden');
-                    badge.innerText = `TRAIL: $${msg.basket_state.peak_pnl.toFixed(2)}`;
-                } else {
-                    badge.classList.add('hidden');
-                }
-            }
+      state.open_positions = msg.positions.map(p => ({
+        ticket: p.ticket,
+        symbol: p.symbol,
+        direction: p.type === 0 ? 'buy' : 'sell',
+        lot: p.volume,
+        entry_price: p.price_open,
+        current_price: p.price_current,
+        pnl: p.profit,
+        sl: p.sl,
+        tp: p.tp
+      }));
+      if (msg.exit_advice) state.exit_advice = msg.exit_advice;
+      if (msg.basket_state) {
+        const badge = document.getElementById('s-basket-badge');
+        if (badge) {
+          if (msg.basket_state.active) {
+            badge.classList.remove('hidden');
+            badge.innerText = `TRAIL: $${msg.basket_state.peak_pnl.toFixed(2)}`;
+          } else {
+            badge.classList.add('hidden');
+          }
         }
-        renderPositions();
-        renderStats();
-        break;
-    case 'log.event':       state.events.unshift(msg); renderLogs(); break;
-    case 'engine.status':   state.engine_running = msg.state === 'active'; renderEngineBtn(); renderNotice(); break;
-    case 'session.status':  state.active_sessions_count = msg.active_count; renderTopbar(); renderNotice(); break;
+      }
+      renderPositions();
+      renderStats();
+      break;
+    case 'log.event': state.events.unshift(msg); renderLogs(); break;
+    case 'engine.status': state.engine_running = msg.state === 'active'; renderEngineBtn(); renderNotice(); break;
+    case 'session.status': state.active_sessions_count = msg.active_count; renderTopbar(); renderNotice(); break;
   }
 }
 
@@ -95,7 +95,7 @@ function moveToClosed(trade) {
 async function api(method, path, body) {
   const res = await fetch(path, {
     method,
-    headers: body ? {'Content-Type': 'application/json'} : {},
+    headers: body ? { 'Content-Type': 'application/json' } : {},
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
@@ -168,27 +168,27 @@ function renderEngineBtn() {
 function renderStats() {
   const sBalance = document.getElementById('s-balance');
   if (sBalance) sBalance.innerText = state.account ? `$${state.account.balance.toFixed(2)}` : '—';
-  
+
   const sEquity = document.getElementById('s-equity');
   if (sEquity) sEquity.innerText = state.account ? `$${state.account.equity.toFixed(2)}` : '—';
-  
+
   const unrealized = state.open_positions.reduce((sum, t) => sum + (t.pnl || 0), 0);
   const unEl = document.getElementById('s-unrealized');
   if (unEl) {
-      let pctStr = '';
-      if (state.account && state.account.balance > 0) {
-          const pct = (unrealized / state.account.balance) * 100;
-          pctStr = ` <span class="text-[14px] opacity-60 font-normal tracking-wider">(${pct > 0 ? '+' : ''}${pct.toFixed(2)}%)</span>`;
-      }
-      unEl.innerHTML = `${unrealized < 0 ? '-' : ''}$${Math.abs(unrealized).toFixed(2)}${pctStr}`;
-      unEl.className = `text-2xl font-bold font-mono ${unrealized > 0 ? 'text-emerald-400' : unrealized < 0 ? 'text-rose-400' : 'text-slate-100'}`;
+    let pctStr = '';
+    if (state.account && state.account.balance > 0) {
+      const pct = (unrealized / state.account.balance) * 100;
+      pctStr = ` <span class="text-[14px] opacity-60 font-normal tracking-wider">(${pct > 0 ? '+' : ''}${pct.toFixed(2)}%)</span>`;
+    }
+    unEl.innerHTML = `${unrealized < 0 ? '-' : ''}$${Math.abs(unrealized).toFixed(2)}${pctStr}`;
+    unEl.className = `text-2xl font-bold font-mono ${unrealized > 0 ? 'text-emerald-400' : unrealized < 0 ? 'text-rose-400' : 'text-slate-100'}`;
   }
-  
+
   const sToday = document.getElementById('s-today');
   if (sToday) {
-      sToday.innerText = `${state.today_pnl < 0 ? '-' : ''}$${Math.abs(state.today_pnl).toFixed(2)}`;
+    sToday.innerText = `${state.today_pnl < 0 ? '-' : ''}$${Math.abs(state.today_pnl).toFixed(2)}`;
   }
-  
+
   const sOpen = document.getElementById('s-open');
   if (sOpen) sOpen.innerText = state.open_positions.length;
 }
@@ -196,13 +196,13 @@ function renderStats() {
 function renderPositions() {
   const tbody = document.getElementById('open-pos-body');
   if (!state.open_positions.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-slate-500 py-10 uppercase tracking-widest text-xs">NO OPEN POSITIONS</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="text-center text-slate-500 py-10 uppercase tracking-widest text-xs">NO OPEN POSITIONS</td></tr>';
     return;
   }
-  
+
   const groups = {};
-  const sortedPos = [...state.open_positions].sort((a,b) => (a.ticket || 0) - (b.ticket || 0));
-  
+  const sortedPos = [...state.open_positions].sort((a, b) => (a.ticket || 0) - (b.ticket || 0));
+
   sortedPos.forEach(t => {
     const key = `${t.symbol}_${t.direction}`;
     if (!groups[key]) {
@@ -225,7 +225,7 @@ function renderPositions() {
 
   const bal = state.account && state.account.balance > 0 ? state.account.balance : null;
   const html = [];
-  
+
   const renderAdviceCell = (adviceObj, isSub = false) => {
     const py = isSub ? 'py-1.5' : 'py-2.5';
     if (!adviceObj) return `<td class="px-4 ${py} text-right font-mono text-slate-500">-</td>`;
@@ -234,7 +234,7 @@ function renderPositions() {
     if (adviceObj.advice === 'WATCH') color = 'bg-amber-500/10 text-amber-400 border-amber-500/20 text-amber-400';
     if (adviceObj.advice === 'CONSIDER_CLOSE') color = 'bg-orange-500/10 text-orange-400 border-orange-500/20 text-orange-400';
     if (adviceObj.advice === 'CLOSE_SIGNAL') color = 'bg-rose-500/10 text-rose-400 border-rose-500/20 text-rose-400';
-    
+
     return `<td class="px-4 ${py} text-right">
         <div class="flex flex-col items-end gap-0.5">
             <span class="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-widest uppercase border ${color}">
@@ -251,25 +251,25 @@ function renderPositions() {
     const gPctStr = bal ? ` <span class="text-[10px] opacity-60 font-normal">(${g.total_pnl > 0 ? '+' : ''}${(g.total_pnl / bal * 100).toFixed(2)}%)</span>` : '';
     const gSlPct = g.sl && g.avg_entry ? ` <span class="text-[9px] opacity-40 font-normal">(${Math.abs((g.sl - g.avg_entry) / g.avg_entry * 100).toFixed(2)}%)</span>` : '';
     const gTpPct = g.tp && g.avg_entry ? ` <span class="text-[9px] opacity-40 font-normal">(${Math.abs((g.tp - g.avg_entry) / g.avg_entry * 100).toFixed(2)}%)</span>` : '';
-    
+
     let gCpPctVal = 0;
     if (g.current_price && g.avg_entry) {
-        gCpPctVal = g.direction === 'buy' ? (g.current_price - g.avg_entry) / g.avg_entry * 100 : (g.avg_entry - g.current_price) / g.avg_entry * 100;
+      gCpPctVal = g.direction === 'buy' ? (g.current_price - g.avg_entry) / g.avg_entry * 100 : (g.avg_entry - g.current_price) / g.avg_entry * 100;
     }
     const gCpPctStr = g.current_price && g.avg_entry ? ` <br><span class="text-[9px] ${gCpPctVal >= 0 ? 'text-emerald-400/70' : 'text-rose-400/70'} font-normal">(${gCpPctVal > 0 ? '+' : ''}${gCpPctVal.toFixed(2)}%)</span>` : '';
-    
+
     let groupAdvice = null;
     if (g.count === 1) {
-        groupAdvice = state.exit_advice[g.positions[0].ticket];
+      groupAdvice = state.exit_advice[g.positions[0].ticket];
     } else {
-        const scores = g.positions.map(p => state.exit_advice[p.ticket] ? state.exit_advice[p.ticket].risk_score : 0);
-        const maxScore = Math.max(...scores, 0);
-        if (maxScore > 0) {
-            const worstP = g.positions.find(p => state.exit_advice[p.ticket] && state.exit_advice[p.ticket].risk_score === maxScore);
-            if (worstP) groupAdvice = state.exit_advice[worstP.ticket];
-        }
+      const scores = g.positions.map(p => state.exit_advice[p.ticket] ? state.exit_advice[p.ticket].risk_score : 0);
+      const maxScore = Math.max(...scores, 0);
+      if (maxScore > 0) {
+        const worstP = g.positions.find(p => state.exit_advice[p.ticket] && state.exit_advice[p.ticket].risk_score === maxScore);
+        if (worstP) groupAdvice = state.exit_advice[worstP.ticket];
+      }
     }
-    
+
     html.push(`
       <tr class="group-row cursor-pointer hover:bg-white/[0.02] transition-colors group" onclick="document.querySelectorAll('.sub-${gKey}').forEach(e => e.classList.toggle('hidden'))">
         <td class="px-4 py-2.5 flex items-center gap-2">
@@ -290,7 +290,7 @@ function renderPositions() {
         </td>
       </tr>
     `);
-    
+
     if (g.count > 1) {
       g.positions.forEach((p, idx) => {
         const badge = idx === 0 ? 'BASE' : `DCA ${idx}`;
@@ -298,13 +298,13 @@ function renderPositions() {
         const pPctStr = bal ? ` <span class="text-[9px] opacity-50 font-normal">(${p.pnl > 0 ? '+' : ''}${(p.pnl / bal * 100).toFixed(2)}%)</span>` : '';
         const pSlPct = p.sl && p.entry_price ? ` <span class="text-[8px] opacity-40 font-normal">(${Math.abs((p.sl - p.entry_price) / p.entry_price * 100).toFixed(2)}%)</span>` : '';
         const pTpPct = p.tp && p.entry_price ? ` <span class="text-[8px] opacity-40 font-normal">(${Math.abs((p.tp - p.entry_price) / p.entry_price * 100).toFixed(2)}%)</span>` : '';
-        
+
         let pCpPctVal = 0;
         if (p.current_price && p.entry_price) {
-            pCpPctVal = p.direction === 'buy' ? (p.current_price - p.entry_price) / p.entry_price * 100 : (p.entry_price - p.current_price) / p.entry_price * 100;
+          pCpPctVal = p.direction === 'buy' ? (p.current_price - p.entry_price) / p.entry_price * 100 : (p.entry_price - p.current_price) / p.entry_price * 100;
         }
         const pCpPctStr = p.current_price && p.entry_price ? ` <br><span class="text-[8px] ${pCpPctVal >= 0 ? 'text-emerald-400/60' : 'text-rose-400/60'} font-normal">(${pCpPctVal > 0 ? '+' : ''}${pCpPctVal.toFixed(2)}%)</span>` : '';
-        
+
         html.push(`
           <tr class="sub-${gKey} hidden bg-black/20 hover:bg-black/40 transition-colors text-[11px] border-b border-border_light/50">
             <td class="px-4 py-1.5 pl-10 flex items-center gap-2">
@@ -333,38 +333,38 @@ function renderTrades() {
   const tbody = document.getElementById('trades-body');
   const activeSub = document.querySelector('.sub-tab.active').dataset.sub;
   const list = activeSub === 'open' ? state.open_positions : state.closed_trades;
-  
+
   if (!list.length) {
     tbody.innerHTML = `<tr><td colspan="11" class="text-center text-slate-500 py-8 uppercase tracking-widest text-xs">NO ${activeSub.toUpperCase()} TRADES</td></tr>`;
     return;
   }
-  
-  if (activeSub === 'open') {
-      const groups = {};
-      list.forEach(t => {
-        const key = `${t.symbol}_${t.direction}`;
-        if (!groups[key]) {
-          groups[key] = {
-            symbol: t.symbol, direction: t.direction, total_lot: 0, total_pnl: 0,
-            avg_entry: 0, count: 0, sl: t.sl, tp: t.tp, current_price: t.current_price, note: t.note
-          };
-        }
-        const g = groups[key];
-        g.total_lot += t.lot;
-        g.total_pnl += (t.pnl || 0);
-        g.avg_entry += (t.entry_price * t.lot);
-        g.count += 1;
-        g.sl = t.sl || g.sl;
-        g.tp = t.tp || g.tp;
-        if (g.count > 1) g.note = 'DCA GROUP';
-      });
 
-      const html = [];
-      Object.values(groups).forEach(g => {
-        g.avg_entry = g.avg_entry / g.total_lot;
-        const gKey = `${g.symbol}_${g.direction}_trades`;
-        
-        html.push(`
+  if (activeSub === 'open') {
+    const groups = {};
+    list.forEach(t => {
+      const key = `${t.symbol}_${t.direction}`;
+      if (!groups[key]) {
+        groups[key] = {
+          symbol: t.symbol, direction: t.direction, total_lot: 0, total_pnl: 0,
+          avg_entry: 0, count: 0, sl: t.sl, tp: t.tp, current_price: t.current_price, note: t.note
+        };
+      }
+      const g = groups[key];
+      g.total_lot += t.lot;
+      g.total_pnl += (t.pnl || 0);
+      g.avg_entry += (t.entry_price * t.lot);
+      g.count += 1;
+      g.sl = t.sl || g.sl;
+      g.tp = t.tp || g.tp;
+      if (g.count > 1) g.note = 'DCA GROUP';
+    });
+
+    const html = [];
+    Object.values(groups).forEach(g => {
+      g.avg_entry = g.avg_entry / g.total_lot;
+      const gKey = `${g.symbol}_${g.direction}_trades`;
+
+      html.push(`
           <tr class="group-row cursor-pointer hover:bg-white/[0.02] transition-colors group" onclick="document.querySelectorAll('.sub-${gKey}').forEach(e => e.classList.toggle('hidden'))">
             <td class="px-4 py-2.5 font-mono text-slate-500">-</td>
             <td class="px-4 py-2.5 flex items-center gap-2">
@@ -383,10 +383,10 @@ function renderTrades() {
             <td class="px-4 py-2.5 text-right"><button class="px-3 py-1 border border-border_strong text-slate-300 text-[10px] font-bold tracking-widest uppercase hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/30 transition-all rounded" onclick="event.stopPropagation(); closeGroup('${g.symbol}', '${g.direction}')">CLOSE ${g.count > 1 ? 'ALL' : ''}</button></td>
           </tr>
         `);
-      });
-      tbody.innerHTML = html.join('');
+    });
+    tbody.innerHTML = html.join('');
   } else {
-      tbody.innerHTML = list.map(t => `
+    tbody.innerHTML = list.map(t => `
         <tr class="hover:bg-white/[0.02] transition-colors">
           <td class="px-4 py-2.5 font-mono text-slate-500 whitespace-nowrap">${formatLocalTime(t.opened_at)}</td>
           <td class="px-4 py-2.5 font-bold text-slate-200">${t.symbol}</td>
@@ -458,35 +458,35 @@ function updateScanStatus(data) {
 function renderScannerStatus() {
   const tbody = document.getElementById('scan-status-body');
   const items = Object.values(state.scanner_status);
-  
+
   // Sort items: FIRED > DCA_FIRED > WATCHING > SKIPPED > REJECTED > COOLDOWN
   const statusWeight = { 'FIRED': 6, 'DCA_FIRED': 5, 'WATCHING': 4, 'SKIPPED': 3, 'DCA_SKIPPED': 3, 'REJECTED': 2, 'COOLDOWN': 1 };
   items.sort((a, b) => (statusWeight[b.status] || 0) - (statusWeight[a.status] || 0));
-  
+
   if (!items.length) {
     tbody.innerHTML = '<tr><td colspan="6" class="text-center text-slate-500 py-10 uppercase tracking-widest text-xs">WAITING FOR SCAN...</td></tr>';
     return;
   }
-  
+
   const esc = (str) => String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-  
+
   const getStatusBadge = (status) => {
     let color = 'bg-white/5 text-slate-400 border-white/10'; // Default muted (REJECTED, COOLDOWN, SKIPPED, DCA_SKIPPED)
     if (status === 'FIRED') color = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
     else if (status === 'DCA_FIRED') color = 'bg-purple-500/20 text-purple-400 border-purple-500/30';
     else if (status === 'WATCHING') color = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
     else if (status === 'SKIPPED' || status === 'DCA_SKIPPED') color = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
-    
+
     return `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap border ${color}">${status}</span>`;
   };
-  
+
   tbody.innerHTML = items.map(s => {
     let reasonText = s.reason.msg || '';
     if (s.status === 'FIRED' || s.status === 'DCA_FIRED') reasonText = 'Signal Triggered!';
-    
+
     const rawReason = esc(JSON.stringify(s.reason));
     const isHighlight = s.status === 'FIRED' || s.status === 'DCA_FIRED';
-    
+
     return `
     <tr class="${isHighlight ? 'bg-emerald-500/5 hover:bg-emerald-500/10' : 'hover:bg-white/[0.02]'} transition-colors">
       <td class="px-4 py-2.5 flex items-center gap-2">
@@ -534,11 +534,11 @@ async function closeTrade(ticket) {
 async function closeGroup(symbol, direction) {
   const groupTrades = state.open_positions.filter(t => t.symbol === symbol && t.direction === direction);
   if (!groupTrades.length) return;
-  
-  const msg = groupTrades.length > 1 
-    ? `Close ALL ${groupTrades.length} grouped positions for ${symbol}?` 
+
+  const msg = groupTrades.length > 1
+    ? `Close ALL ${groupTrades.length} grouped positions for ${symbol}?`
     : `Close position for ${symbol}?`;
-    
+
   if (confirm(msg)) {
     for (const t of groupTrades) {
       try {
@@ -573,7 +573,7 @@ async function loadSavedAccounts() {
         <span>${a.server}</span><span>${a.login}</span>
       </div>
     `).join('');
-  } catch(err) { console.error(err); }
+  } catch (err) { console.error(err); }
 }
 
 function openMt5Modal() { loadSavedAccounts(); document.getElementById('mt5-modal').showModal(); }
@@ -596,8 +596,8 @@ async function testMt5() {
     document.getElementById('m-status').className = 'r';
   }
 }
-async function saveMt5() { 
-  closeMt5Modal(); 
+async function saveMt5() {
+  closeMt5Modal();
   const status = await api('GET', '/api/status');
   Object.assign(state, status);
   renderTopbar(); renderStats();
@@ -632,7 +632,7 @@ async function loadConfig() {
     document.getElementById('c-trailing_mode').value = cfg.trailing_mode || 'atr';
     document.getElementById('c-trailing_atr_multiplier').value = cfg.trailing_atr_multiplier || 1.5;
     document.getElementById('c-trailing_distance_pips').value = cfg.trailing_distance_pips || 15.0;
-    
+
     document.getElementById('c-enable_dca').checked = cfg.enable_dca === true;
     document.getElementById('c-max_dca_entries').value = cfg.max_dca_entries || 1;
     document.getElementById('c-max_dca_per_scan').value = cfg.max_dca_per_scan || 2;
@@ -640,21 +640,21 @@ async function loadConfig() {
     document.getElementById('c-dca_lot_multiplier').value = cfg.dca_lot_multiplier || 0.7;
     document.getElementById('c-dca_max_total_risk_r').value = cfg.dca_max_total_risk_r || 2.0;
     document.getElementById('c-dca_reanchor_sl').checked = cfg.dca_reanchor_sl !== false;
-    
+
     document.getElementById('c-enable_basket_trailing').checked = cfg.enable_basket_trailing === true;
     document.getElementById('c-basket_trailing_start_usd').value = cfg.basket_trailing_start_usd || 5.0;
     document.getElementById('c-basket_trailing_drawdown_usd').value = cfg.basket_trailing_drawdown_usd || 1.5;
     document.getElementById('c-basket_trailing_min_close_usd').value = cfg.basket_trailing_min_close_usd || 5.0;
-    
-    state.symbols = (cfg.symbols || []).map(s => ({generic: s, resolved: null, status: 'pending'}));
+
+    state.symbols = (cfg.symbols || []).map(s => ({ generic: s, resolved: null, status: 'pending' }));
     document.getElementById('c-correlation_groups_enabled').checked = cfg.correlation_groups_enabled !== false;
     document.getElementById('c-max_open_per_correlation_group').value = cfg.max_open_per_correlation_group || 1;
-    
+
     state.enabled_correlation_groups = cfg.enabled_correlation_groups || ["indices", "metals", "jpy", "usd_majors", "oil"];
     renderPredefinedSymbols();
     renderCorrelationGroups();
     resolveAllSymbols();
-    
+
     const sessions = await api('GET', '/api/sessions');
     state.sessions = sessions;
     document.getElementById('sessions-list').innerHTML = '';
@@ -667,10 +667,10 @@ function closeConfigModal() { document.getElementById('config-modal').close(); }
 
 // Predefined Symbols and Groups
 const PREDEFINED_SYMBOLS = [
-  "US30", "US500", "USTEC", "XAUUSD", "XAGUSD", "USDJPY", "EURJPY", "GBPJPY", 
+  "US30", "US500", "USTEC", "XAUUSD", "XAGUSD", "USDJPY", "EURJPY", "GBPJPY",
   "EURUSD", "GBPUSD", "AUDUSD", "NZDUSD", "USDCAD", "USDCHF", "USOIL", "UKOIL",
-  "EURAUD", "EURCAD", "EURGBP", "EURCHF", "EURNZD", "GBPAUD", "GBPCAD", "GBPCHF", 
-  "GBPNZD", "AUDCAD", "AUDCHF", "AUDJPY", "AUDNZD", "CADCHF", "CADJPY", "CHFJPY", 
+  "EURAUD", "EURCAD", "EURGBP", "EURCHF", "EURNZD", "GBPAUD", "GBPCAD", "GBPCHF",
+  "GBPNZD", "AUDCAD", "AUDCHF", "AUDJPY", "AUDNZD", "CADCHF", "CADJPY", "CHFJPY",
   "NZDCAD", "NZDCHF", "NZDJPY"
 ];
 
@@ -691,7 +691,7 @@ function renderPredefinedSymbols() {
     const isChecked = enabledSyms.has(sym);
     const obj = state.symbols.find(s => s.generic === sym);
     const statusLabel = obj && obj.resolved ? ` <span class="text-emerald-500 text-[9px] whitespace-nowrap">(✓ ${obj.resolved})</span>` : (obj && obj.status === 'unresolved' ? ` <span class="text-rose-500 text-[9px]">(✗)</span>` : '');
-    
+
     return `
       <label class="flex items-center gap-2 text-[10px] font-bold tracking-[0.1em] text-slate-300 cursor-pointer p-2 border border-border_light bg-black/10 hover:bg-white/5 rounded transition-colors group">
         <input type="checkbox" value="${sym}" class="sym-cb w-4 h-4 accent-cyan_neon cursor-pointer shrink-0" ${isChecked ? 'checked' : ''} onchange="toggleSymbol('${sym}', this.checked)">
@@ -704,7 +704,7 @@ function renderPredefinedSymbols() {
 function toggleSymbol(sym, isChecked) {
   if (isChecked) {
     if (!state.symbols.find(s => s.generic === sym)) {
-      state.symbols.push({generic: sym, resolved: null, status: 'pending'});
+      state.symbols.push({ generic: sym, resolved: null, status: 'pending' });
     }
   } else {
     state.symbols = state.symbols.filter(s => s.generic !== sym);
@@ -715,10 +715,10 @@ function toggleSymbol(sym, isChecked) {
 function renderCorrelationGroups() {
   const enabledGrp = new Set(state.enabled_correlation_groups || []);
   const enabledSyms = new Set(state.symbols.map(s => s.generic));
-  
+
   document.getElementById('corr-groups-list').innerHTML = Object.entries(CORRELATION_GROUPS).map(([group, syms]) => {
     const isChecked = enabledGrp.has(group);
-    
+
     const symsHtml = syms.map(s => {
       const isActive = enabledSyms.has(s);
       const colorClass = isActive ? "text-cyan_neon bg-cyan_neon/10 border border-cyan_neon/30" : "text-slate-600 bg-black/20 border border-transparent";
@@ -755,11 +755,11 @@ async function resolveAllSymbols() {
       ...s, resolved: map[s.generic], status: map[s.generic] ? 'resolved' : 'unresolved'
     }));
     renderPredefinedSymbols();
-  } catch(err) { console.error(err); }
+  } catch (err) { console.error(err); }
 }
 
 // Sessions repeater
-const IANA_ZONES = ['UTC','Europe/London','America/New_York','Asia/Tokyo','Asia/Dubai','Asia/Karachi','Asia/Singapore','Australia/Sydney'];
+const IANA_ZONES = ['UTC', 'Europe/London', 'America/New_York', 'Asia/Tokyo', 'Asia/Dubai', 'Asia/Karachi', 'Asia/Singapore', 'Australia/Sydney'];
 function addSessionRow(session) {
   const id = session?.id ?? ('new-' + Date.now());
   const html = `
@@ -782,8 +782,8 @@ function addSessionRow(session) {
       </div>
       <div class="col-span-2 md:col-span-8 flex flex-col gap-1.5 mt-1">
          <span class="text-[9px] uppercase tracking-widest text-slate-500 font-bold">Days Active</span>
-         <div class="day-checks flex gap-1 justify-between bg-black/10 border border-border_strong p-1 rounded">${['M','T','W','T','F','S','S'].map((d,i) => `
-           <label class="flex flex-col items-center gap-1 text-[9px] font-bold text-slate-500 cursor-pointer hover:text-slate-300 w-full text-center"><input type="checkbox" data-day="${i}" class="w-3.5 h-3.5 accent-cyan_neon cursor-pointer" ${!session || (session?.days_mask & (1<<i)) ? 'checked' : ''}>${d}</label>
+         <div class="day-checks flex gap-1 justify-between bg-black/10 border border-border_strong p-1 rounded">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => `
+           <label class="flex flex-col items-center gap-1 text-[9px] font-bold text-slate-500 cursor-pointer hover:text-slate-300 w-full text-center"><input type="checkbox" data-day="${i}" class="w-3.5 h-3.5 accent-cyan_neon cursor-pointer" ${!session || (session?.days_mask & (1 << i)) ? 'checked' : ''}>${d}</label>
          `).join('')}</div>
       </div>
       <div class="col-span-2 md:col-span-4 flex items-end justify-end gap-4 mt-1 h-full pb-0.5">
@@ -855,17 +855,17 @@ async function syncSessions() {
       enabled: row.querySelector('.s-on').checked
     };
   });
-  
+
   await api('PUT', '/api/sessions', payload);
 }
 
 function applyJsonText() {
   const text = document.getElementById('c-import_json').value;
   if (!text.trim()) return;
-  
+
   try {
     const data = JSON.parse(text);
-    
+
     const inputs = {
       correlation_groups_enabled: 'c-correlation_groups_enabled',
       max_open_per_correlation_group: 'c-max_open_per_correlation_group',
@@ -905,7 +905,7 @@ function applyJsonText() {
       trailing_atr_multiplier: 'c-trailing_atr_multiplier',
       trailing_distance_pips: 'c-trailing_distance_pips'
     };
-    
+
     for (const [key, id] of Object.entries(inputs)) {
       if (data[key] !== undefined) {
         const el = document.getElementById(id);
@@ -916,31 +916,31 @@ function applyJsonText() {
         }
       }
     }
-    
+
     if (Array.isArray(data.symbols)) {
-      state.symbols = data.symbols.map(s => typeof s === 'string' ? {generic: s, resolved: null, status: 'pending'} : s);
+      state.symbols = data.symbols.map(s => typeof s === 'string' ? { generic: s, resolved: null, status: 'pending' } : s);
       renderPredefinedSymbols();
       resolveAllSymbols();
     }
-    
+
     if (Array.isArray(data.enabled_correlation_groups)) {
       state.enabled_correlation_groups = data.enabled_correlation_groups;
     }
-    
+
     renderCorrelationGroups();
-    
+
     if (Array.isArray(data.sessions)) {
       document.getElementById('sessions-list').innerHTML = '';
       data.sessions.forEach(s => addSessionRow(s));
     }
-    
+
     alert("JSON applied to form. Click 'SAVE CHANGES' to submit.");
     document.getElementById('c-import_json').value = '';
-    
+
     // switch to general tab to see changes
     const generalTab = document.querySelector('.m-tab[data-mtab="general"]');
     if (generalTab) generalTab.click();
-    
+
   } catch (err) {
     alert("Failed to parse JSON text. Ensure it is valid JSON.");
     console.error(err);
@@ -951,16 +951,16 @@ async function saveConfig() {
   try {
     const payload1 = collectConfigInputs();
     await api('PATCH', '/api/config', payload1);
-    
+
     const payload2 = { symbols: state.symbols.filter(s => s.status !== 'unresolved').map(s => s.generic) };
     await api('PATCH', '/api/config', payload2);
-    
+
     await syncSessions();
-    
+
     // Update local state config
     state.config = { ...state.config, ...payload1, ...payload2 };
     state.config.enabled_correlation_groups = state.enabled_correlation_groups;
-    
+
     alert("Config saved successfully!");
     closeConfigModal();
   } catch (err) {
@@ -978,21 +978,21 @@ async function init() {
       api('GET', '/api/initial_data').catch(() => null)
     ]);
     Object.assign(state, status);
-    
+
     if (initData) {
       state.open_positions = initData.trades.filter(t => !t.closed_at);
       state.closed_trades = initData.trades.filter(t => t.closed_at);
       state.all_signals = initData.signals;
       state.recent_signals = initData.signals.slice(0, 5);
       state.events = initData.events;
-      
+
       const todayStr = new Date().toISOString().split('T')[0];
       state.today_pnl = state.closed_trades
         .filter(t => t.closed_at && t.closed_at.startsWith(todayStr))
         .reduce((sum, t) => sum + (t.pnl || 0), 0);
     }
   } catch (err) { console.error("Init Error:", err); }
-  
+
   renderTopbar(); renderStats(); renderEngineBtn(); renderNotice();
   renderPositions(); renderTrades(); renderSignals(); renderLogs();
 }
