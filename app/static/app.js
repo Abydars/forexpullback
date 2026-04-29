@@ -654,7 +654,7 @@ async function loadConfig() {
     document.getElementById('c-volume_use_ema').checked = cfg.volume_use_ema !== false;
     document.getElementById('c-volume_low_downgrade_only').checked = cfg.volume_low_downgrade_only !== false;
 
-    state.symbols = (cfg.symbols || []).map(s => ({ generic: s, resolved: null, status: 'pending' }));
+    state.symbols = (cfg.symbols || []).map(s => ({ generic: s, original: s, resolved: null, status: 'pending' }));
     document.getElementById('c-correlation_groups_enabled').checked = cfg.correlation_groups_enabled !== false;
     document.getElementById('c-max_open_per_correlation_group').value = cfg.max_open_per_correlation_group || 1;
 
@@ -694,12 +694,19 @@ const CORRELATION_GROUPS = {
 };
 
 function renderPredefinedSymbols() {
-  const enabledSyms = new Set(state.symbols.map(s => s.generic));
-  document.getElementById('sym-checkboxes').innerHTML = PREDEFINED_SYMBOLS.map(sym => {
-    const isChecked = enabledSyms.has(sym);
-    const obj = state.symbols.find(s => s.generic === sym);
-    const statusLabel = obj && obj.resolved 
-      ? ` <span class="text-emerald-500 text-[9px] whitespace-nowrap">(✓ ${obj.resolved})</span>` 
+  const customSyms = state.symbols.map(s => s.original || s.generic).filter(s => !PREDEFINED_SYMBOLS.includes(s));
+  const displayList = [...PREDEFINED_SYMBOLS, ...customSyms];
+
+  document.getElementById('sym-checkboxes').innerHTML = displayList.map(sym => {
+    const obj = state.symbols.find(s => (s.original === sym) || (s.generic === sym));
+    const isChecked = !!obj;
+    
+    const displayName = (obj && obj.original && obj.generic && obj.original !== obj.generic) 
+      ? `${obj.original} &rarr; <span class="text-cyan-400">${obj.generic}</span>` 
+      : sym;
+
+    const statusLabel = obj && obj.status === 'resolved' 
+      ? ` <span class="text-emerald-500 text-[9px] whitespace-nowrap">(✓)</span>` 
       : (obj && obj.status === 'unresolved' 
         ? ` <span class="text-rose-500 text-[9px] cursor-help" title="${obj.error_reason || 'Unknown error'}">(✗ ${obj.error_reason ? 'ERR' : 'FAIL'})</span>` 
         : '');
@@ -707,7 +714,7 @@ function renderPredefinedSymbols() {
     return `
       <label class="flex items-center gap-2 text-[10px] font-bold tracking-[0.1em] text-slate-300 cursor-pointer p-2 border border-border_light bg-black/10 hover:bg-white/5 rounded transition-colors group">
         <input type="checkbox" value="${sym}" class="sym-cb w-4 h-4 accent-cyan_neon cursor-pointer shrink-0" ${isChecked ? 'checked' : ''} onchange="toggleSymbol('${sym}', this.checked)">
-        <span class="truncate">${sym}${statusLabel}</span>
+        <span class="truncate">${displayName}${statusLabel}</span>
       </label>
     `;
   }).join('');
@@ -715,24 +722,28 @@ function renderPredefinedSymbols() {
 
 function toggleSymbol(sym, isChecked) {
   if (isChecked) {
-    if (!state.symbols.find(s => s.generic === sym)) {
-      state.symbols.push({ generic: sym, resolved: null, status: 'pending' });
+    if (!state.symbols.find(s => s.original === sym || s.generic === sym)) {
+      state.symbols.push({ generic: sym, original: sym, resolved: null, status: 'pending' });
     }
   } else {
-    state.symbols = state.symbols.filter(s => s.generic !== sym);
+    state.symbols = state.symbols.filter(s => s.original !== sym && s.generic !== sym);
   }
   renderCorrelationGroups();
 }
 
 function renderCorrelationGroups() {
   const enabledGrp = new Set(state.enabled_correlation_groups || []);
-  const enabledSyms = new Set(state.symbols.map(s => s.generic));
+  const enabledSet = new Set();
+  state.symbols.forEach(s => {
+    enabledSet.add(s.generic);
+    if(s.original) enabledSet.add(s.original);
+  });
 
   document.getElementById('corr-groups-list').innerHTML = Object.entries(CORRELATION_GROUPS).map(([group, syms]) => {
     const isChecked = enabledGrp.has(group);
 
     const symsHtml = syms.map(s => {
-      const isActive = enabledSyms.has(s);
+      const isActive = enabledSet.has(s) || state.symbols.some(st => st.original === s || st.generic === s);
       const colorClass = isActive ? "text-cyan_neon bg-cyan_neon/10 border border-cyan_neon/30" : "text-slate-600 bg-black/20 border border-transparent";
       return `<span class="px-1.5 py-0.5 rounded ${colorClass}">${s}</span>`;
     }).join('');
@@ -766,8 +777,13 @@ async function resolveAllSymbols() {
     state.symbols = state.symbols.map(s => {
       const info = map[s.generic];
       const isResolved = info && info.exists && info.selected;
+      
+      const newGeneric = isResolved ? info.resolved : s.generic;
+      
       return {
         ...s, 
+        generic: newGeneric, 
+        original: s.original || s.generic,
         resolved: isResolved ? info.resolved : null, 
         status: isResolved ? 'resolved' : 'unresolved',
         error_reason: info ? info.error : null
