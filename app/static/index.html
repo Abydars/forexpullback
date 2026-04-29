@@ -228,24 +228,24 @@
   </main>
 
   <!-- MT5 LINK MODAL -->
-  <dialog id="mt5-modal" class="bg-panel border border-border_strong rounded-md shadow-2xl w-[95%] sm:w-[420px] max-w-full text-slate-300 overflow-hidden outline-none">
-    <form method="dialog" class="flex flex-col">
+  <dialog id="mt5-modal" class="bg-panel border border-border_strong rounded-md shadow-2xl w-[95%] sm:w-[420px] max-w-full max-h-[95vh] text-slate-300 overflow-hidden outline-none">
+    <form method="dialog" class="flex flex-col max-h-[90vh]">
       <div class="px-4 py-3 border-b border-border_light bg-bg/50">
         <div class="text-[11px] font-bold tracking-[0.15em] text-cyan_neon flex items-center gap-2 uppercase">
           <span class="text-[8px] opacity-70">■</span> MT5 LINK
         </div>
       </div>
-      <div class="p-4 space-y-3">
+      <div class="p-4 space-y-3 overflow-y-auto min-h-0">
         <div id="saved-accounts"></div>
         <datalist id="exness-servers">
           <option value="Exness-MT5Real">
           <option value="Exness-MT5Trial">
         </datalist>
         <div class="space-y-4">
-          <label class="flex flex-col gap-1 text-[9px] font-bold tracking-[0.1em] text-slate-400 uppercase">SERVER <input id="m-server" list="exness-servers" autocomplete="off" class="bg-black/20 border border-border_strong text-slate-200 text-[10px] px-2.5 py-1.5.5 rounded outline-none focus:border-cyan_neon w-full transition-colors"></label>
-          <label class="flex flex-col gap-1 text-[9px] font-bold tracking-[0.1em] text-slate-400 uppercase">LOGIN <input id="m-login" type="number" class="bg-black/20 border border-border_strong text-slate-200 text-[10px] px-2.5 py-1.5.5 rounded outline-none focus:border-cyan_neon w-full transition-colors"></label>
-          <label class="flex flex-col gap-1 text-[9px] font-bold tracking-[0.1em] text-slate-400 uppercase">PASSWORD <input id="m-password" type="password" class="bg-black/20 border border-border_strong text-slate-200 text-[10px] px-2.5 py-1.5.5 rounded outline-none focus:border-cyan_neon w-full transition-colors"></label>
-          <label class="flex flex-col gap-1 text-[9px] font-bold tracking-[0.1em] text-slate-400 uppercase">TERMINAL PATH (OPTIONAL) <input id="m-path" class="bg-black/20 border border-border_strong text-slate-200 text-[10px] px-2.5 py-1.5.5 rounded outline-none focus:border-cyan_neon w-full transition-colors"></label>
+          <label class="flex flex-col gap-1 text-[9px] font-bold tracking-[0.1em] text-slate-400 uppercase">SERVER <input id="m-server" list="exness-servers" autocomplete="off" class="bg-black/20 border border-border_strong text-slate-200 text-[10px] px-2.5 py-1.5 rounded outline-none focus:border-cyan_neon w-full transition-colors"></label>
+          <label class="flex flex-col gap-1 text-[9px] font-bold tracking-[0.1em] text-slate-400 uppercase">LOGIN <input id="m-login" type="number" class="bg-black/20 border border-border_strong text-slate-200 text-[10px] px-2.5 py-1.5 rounded outline-none focus:border-cyan_neon w-full transition-colors"></label>
+          <label class="flex flex-col gap-1 text-[9px] font-bold tracking-[0.1em] text-slate-400 uppercase">PASSWORD <input id="m-password" type="password" class="bg-black/20 border border-border_strong text-slate-200 text-[10px] px-2.5 py-1.5 rounded outline-none focus:border-cyan_neon w-full transition-colors"></label>
+          <label class="flex flex-col gap-1 text-[9px] font-bold tracking-[0.1em] text-slate-400 uppercase">TERMINAL PATH (OPTIONAL) <input id="m-path" class="bg-black/20 border border-border_strong text-slate-200 text-[10px] px-2.5 py-1.5 rounded outline-none focus:border-cyan_neon w-full transition-colors"></label>
         </div>
         <div id="m-status" class="text-xs"></div>
         <div id="m-preview" class="hidden text-xs"></div>
@@ -259,8 +259,8 @@
   </dialog>
 
   <!-- CONFIG MODAL -->
-  <dialog id="config-modal" class="bg-panel border border-border_strong rounded-md shadow-2xl w-[95%] md:w-[680px] max-w-[95vw] text-slate-300 overflow-hidden outline-none">
-    <form method="dialog" class="flex flex-col md:flex-row h-[85vh] md:h-[70vh] md:min-h-[500px]">
+  <dialog id="config-modal" class="bg-panel border border-border_strong rounded-md shadow-2xl w-[95%] md:w-[680px] max-w-[95vw] max-h-[95vh] md:max-h-[90vh] text-slate-300 overflow-hidden outline-none">
+    <form method="dialog" class="flex flex-col md:flex-row h-[85vh] md:h-[70vh] md:min-h-[500px] max-h-full">
       <div class="md:w-36 bg-bg border-r border-border_light flex flex-col shrink-0">
         <div class="p-4 border-b border-border_light">
           <div class="text-[11px] font-bold tracking-[0.15em] text-cyan_neon flex items-center gap-2 uppercase">
@@ -276,8 +276,8 @@
         </nav>
       </div>
       
-      <div class="flex-1 flex flex-col bg-panel relative h-full">
-        <div class="p-5 flex-1 overflow-y-auto">
+      <div class="flex-1 flex flex-col bg-panel relative h-full min-h-0">
+        <div class="p-5 flex-1 overflow-y-auto min-h-0">
           <!-- General -->
           <div class="m-panel active grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4" data-mpanel="general">
             <label class="flex flex-col gap-1 text-[9px] font-bold tracking-[0.1em] text-slate-400 uppercase">MAGIC NUMBER <input type="number" id="c-magic_number" value="123456" class="bg-black/20 border border-border_strong text-slate-200 text-[10px] px-2.5 py-1.5 rounded outline-none focus:border-cyan_neon transition-colors"></label>
