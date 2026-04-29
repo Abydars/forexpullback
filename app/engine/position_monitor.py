@@ -29,7 +29,9 @@ async def evaluate_exit_advice(p: dict) -> dict:
     df_copy['tr'] = df_copy['high'] - df_copy['low']
     atr = df_copy['tr'].mean()
     
-    trade_age_mins = (datetime.now().timestamp() - p['time']) / 60
+    # Use the latest candle time (broker time) to avoid local vs broker timezone mismatch
+    current_time_broker = df.iloc[-1]['time'].timestamp() + 300
+    trade_age_mins = (current_time_broker - p['time']) / 60.0
 
     res = None
     if p['profit'] <= 0:
