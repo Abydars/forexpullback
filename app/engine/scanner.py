@@ -156,9 +156,9 @@ async def scan_loop():
             max_corr = int(cfg.get("max_open_per_correlation_group", 1))
 
             CORRELATION_GROUPS = {
-                "indices": ["US30", "US500", "USTEC"],
+                "indices": ["US30", "US500", "SP500", "SPX500", "USTEC", "NAS100", "US100"],
                 "metals": ["XAUUSD", "XAGUSD"],
-                "oil": ["USOIL", "UKOIL"],
+                "oil": ["USOIL", "XTIUSD", "UKOIL", "XBRUSD"],
                 "usd_majors": ["EURUSD", "GBPUSD", "AUDUSD", "NZDUSD", "USDCAD", "USDCHF"],
                 "jpy_pairs": ["USDJPY", "EURJPY", "GBPJPY", "AUDJPY", "CADJPY", "CHFJPY", "NZDJPY"],
                 "eur_crosses": ["EURAUD", "EURCAD", "EURGBP", "EURCHF", "EURNZD"],
@@ -166,18 +166,24 @@ async def scan_loop():
                 "minor_crosses": ["AUDCAD", "AUDCHF", "AUDNZD", "CADCHF", "NZDCAD", "NZDCHF"]
             }
             
-            generic_to_group = {}
-            for g, syms in CORRELATION_GROUPS.items():
-                for s in syms:
-                    generic_to_group[s] = g
+            def get_correlation_group(sym: str):
+                # Direct generic match
+                for grp, syms in CORRELATION_GROUPS.items():
+                    if sym in syms:
+                        return grp
+                # Alias/Resolved match
+                for grp, syms in CORRELATION_GROUPS.items():
+                    for g_sym in syms:
+                        if symbol_resolver.resolve(g_sym) == sym:
+                            return grp
+                return None
             
             group_open_counts = {g: 0 for g in CORRELATION_GROUPS}
             if correlation_groups_enabled:
                 for p in bot_positions:
-                    for g_sym in generic_to_group:
-                        if symbol_resolver.resolve(g_sym) == p['symbol']:
-                            group_open_counts[generic_to_group[g_sym]] += 1
-                            break
+                    grp = get_correlation_group(p['symbol'])
+                    if grp:
+                        group_open_counts[grp] += 1
                 
             candidates = []
             updates_to_broadcast = []
@@ -494,7 +500,7 @@ async def scan_loop():
                                                 status = "SKIPPED"
                                                 reason_full["msg"] = "Skipped because position limit already reached"
                                             else:
-                                                my_group = generic_to_group.get(generic)
+                                                my_group = get_correlation_group(generic)
                                                 if correlation_groups_enabled and my_group and my_group in enabled_correlation_groups:
                                                     if group_open_counts[my_group] >= max_corr:
                                                         status = "SKIPPED"
@@ -587,7 +593,7 @@ async def scan_loop():
             for c in normal_candidates:
                 if len(selected_normal) >= max_signals_per_scan:
                     break
-                my_group = generic_to_group.get(c["generic"])
+                my_group = get_correlation_group(c["generic"])
                 if correlation_groups_enabled and my_group and my_group in enabled_correlation_groups:
                     if my_group in groups_used_this_scan:
                         c["status"] = "SKIPPED"
