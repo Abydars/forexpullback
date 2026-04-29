@@ -26,6 +26,7 @@ const state = {
   sessions: [],
   symbols: [],
   scanner_status: {},
+  exit_advice: {},
 };
 
 // ---- WS ----
@@ -60,6 +61,7 @@ function handleEvent(msg) {
             sl: p.sl,
             tp: p.tp
         }));
+        if (msg.exit_advice) state.exit_advice = msg.exit_advice;
         if (msg.basket_state) {
             const badge = document.getElementById('s-basket-badge');
             if (badge) {
@@ -223,6 +225,26 @@ function renderPositions() {
 
   const bal = state.account && state.account.balance > 0 ? state.account.balance : null;
   const html = [];
+  
+  const renderAdviceCell = (adviceObj, isSub = false) => {
+    const py = isSub ? 'py-1.5' : 'py-2.5';
+    if (!adviceObj) return `<td class="px-4 ${py} text-right font-mono text-slate-500">-</td>`;
+    let color = 'bg-slate-500/10 text-slate-400 border-slate-500/20';
+    if (adviceObj.advice === 'HOLD') color = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-emerald-400';
+    if (adviceObj.advice === 'WATCH') color = 'bg-amber-500/10 text-amber-400 border-amber-500/20 text-amber-400';
+    if (adviceObj.advice === 'CONSIDER_CLOSE') color = 'bg-orange-500/10 text-orange-400 border-orange-500/20 text-orange-400';
+    if (adviceObj.advice === 'CLOSE_SIGNAL') color = 'bg-rose-500/10 text-rose-400 border-rose-500/20 text-rose-400';
+    
+    return `<td class="px-4 ${py} text-right">
+        <div class="flex flex-col items-end gap-0.5">
+            <span class="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-widest uppercase border ${color}">
+                ${adviceObj.advice.replace('_', ' ')} <span class="opacity-70 ml-1">${Math.round(adviceObj.risk_score)}%</span>
+            </span>
+            <span class="text-[9px] text-slate-400 truncate max-w-[130px]" title="${adviceObj.reason}">${adviceObj.reason}</span>
+        </div>
+    </td>`;
+  };
+
   Object.values(groups).forEach(g => {
     g.avg_entry = g.avg_entry / g.total_lot;
     const gKey = `${g.symbol}_${g.direction}`;
@@ -235,6 +257,18 @@ function renderPositions() {
         gCpPctVal = g.direction === 'buy' ? (g.current_price - g.avg_entry) / g.avg_entry * 100 : (g.avg_entry - g.current_price) / g.avg_entry * 100;
     }
     const gCpPctStr = g.current_price && g.avg_entry ? ` <br><span class="text-[9px] ${gCpPctVal >= 0 ? 'text-emerald-400/70' : 'text-rose-400/70'} font-normal">(${gCpPctVal > 0 ? '+' : ''}${gCpPctVal.toFixed(2)}%)</span>` : '';
+    
+    let groupAdvice = null;
+    if (g.count === 1) {
+        groupAdvice = state.exit_advice[g.positions[0].ticket];
+    } else {
+        const scores = g.positions.map(p => state.exit_advice[p.ticket] ? state.exit_advice[p.ticket].risk_score : 0);
+        const maxScore = Math.max(...scores, 0);
+        if (maxScore > 0) {
+            const worstP = g.positions.find(p => state.exit_advice[p.ticket] && state.exit_advice[p.ticket].risk_score === maxScore);
+            if (worstP) groupAdvice = state.exit_advice[worstP.ticket];
+        }
+    }
     
     html.push(`
       <tr class="group-row cursor-pointer hover:bg-white/[0.02] transition-colors group" onclick="document.querySelectorAll('.sub-${gKey}').forEach(e => e.classList.toggle('hidden'))">
@@ -250,6 +284,7 @@ function renderPositions() {
         <td class="px-4 py-2.5 text-right font-mono font-bold ${g.total_pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${g.total_pnl >= 0 ? '+' : '-'}$${Math.abs(g.total_pnl).toFixed(2)}${gPctStr}</td>
         <td class="px-4 py-2.5 text-right font-mono text-slate-400">${g.sl ? g.sl + gSlPct : '-'}</td>
         <td class="px-4 py-2.5 text-right font-mono text-slate-400">${g.tp ? g.tp + gTpPct : '-'}</td>
+        ${renderAdviceCell(groupAdvice)}
         <td class="px-4 py-2.5 text-right">
           <button class="px-3 py-1.5 border border-border_strong text-slate-300 text-[10px] font-bold tracking-widest uppercase hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/30 transition-all rounded" onclick="event.stopPropagation(); closeGroup('${g.symbol}', '${g.direction}')">CLOSE ${g.count > 1 ? 'ALL' : ''}</button>
         </td>
@@ -283,6 +318,7 @@ function renderPositions() {
             <td class="px-4 py-1.5 text-right font-mono ${p.pnl >= 0 ? 'text-emerald-500/70' : 'text-rose-500/70'}">${p.pnl >= 0 ? '+' : '-'}$${Math.abs(p.pnl).toFixed(2)}${pPctStr}</td>
             <td class="px-4 py-1.5 text-right font-mono text-slate-500">${p.sl ? p.sl + pSlPct : '-'}</td>
             <td class="px-4 py-1.5 text-right font-mono text-slate-500">${p.tp ? p.tp + pTpPct : '-'}</td>
+            ${renderAdviceCell(state.exit_advice[p.ticket], true)}
             <td class="px-4 py-1.5 text-right"></td>
           </tr>
         `);

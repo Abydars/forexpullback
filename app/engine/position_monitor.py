@@ -10,6 +10,76 @@ import pytz
 import pandas as pd
 from app.core.config import get_config
 
+async def evaluate_exit_advice(p: dict, t, symbol: str) -> dict:
+    df = await mt5_client.get_rates(symbol, mt5.TIMEFRAME_M5, 15)
+    if df is None or df.empty or len(df) < 15:
+        return {"advice": "HOLD", "risk_score": 20.0, "reason": "Insufficient data"}
+    
+    last = df.iloc[-2]
+    prev = df.iloc[-3]
+    entry = t.entry_price
+    tp = t.tp
+    
+    body_last = abs(last['close'] - last['open'])
+    range_last = last['high'] - last['low']
+    is_strong = range_last > 0 and body_last > (range_last * 0.4)
+    
+    df_copy = df.copy()
+    df_copy['tr'] = df_copy['high'] - df_copy['low']
+    atr = df_copy['tr'].mean()
+    
+    opened_at = t.opened_at
+    if opened_at.tzinfo is None: opened_at = opened_at.replace(tzinfo=pytz.utc)
+    trade_age_mins = (datetime.now(pytz.utc) - opened_at).total_seconds() / 60
+
+    if p['profit'] <= 0:
+        if p['type'] == mt5.ORDER_TYPE_BUY:
+            if last['close'] < prev['low'] and is_strong and (entry - last['close'] > atr):
+                return {"advice": "CLOSE_SIGNAL", "risk_score": 85.0, "reason": "Trade invalidated"}
+            elif last['close'] < last['open'] and prev['close'] < prev['open'] and (entry - last['close'] > atr * 0.8):
+                return {"advice": "CONSIDER_CLOSE", "risk_score": 70.0, "reason": "Momentum against trade"}
+        else:
+            if last['close'] > prev['high'] and is_strong and (last['close'] - entry > atr):
+                return {"advice": "CLOSE_SIGNAL", "risk_score": 85.0, "reason": "Trade invalidated"}
+            elif last['close'] > last['open'] and prev['close'] > prev['open'] and (last['close'] - entry > atr * 0.8):
+                return {"advice": "CONSIDER_CLOSE", "risk_score": 70.0, "reason": "Momentum against trade"}
+                
+        if trade_age_mins > 60:
+            return {"advice": "WATCH", "risk_score": 50.0, "reason": "No momentum"}
+            
+        return {"advice": "HOLD", "risk_score": 20.0, "reason": "Holding position"}
+
+    if trade_age_mins < 20:
+        return {"advice": "HOLD", "risk_score": 20.0, "reason": "Trade too fresh (< 20m)"}
+        
+    if p['type'] == mt5.ORDER_TYPE_BUY:
+        if tp and tp > entry:
+            tp_dist = tp - entry
+            max_reached = max(last['high'], prev['high']) - entry
+            if max_reached >= tp_dist * 0.8 and (last['close'] - entry) <= tp_dist * 0.6:
+                return {"advice": "CLOSE_SIGNAL", "risk_score": 85.0, "reason": "Rejected after reaching 80% TP"}
+        
+        if last['close'] < last['open'] and last['close'] < prev['low']:
+            if is_strong or (prev['close'] < prev['open']):
+                return {"advice": "CONSIDER_CLOSE", "risk_score": 75.0, "reason": "Momentum reversal detected"}
+        elif last['close'] >= last['open'] and range_last > 0 and body_last < (0.2 * range_last):
+            return {"advice": "WATCH", "risk_score": 55.0, "reason": "Momentum slowing"}
+            
+    else:
+        if tp and tp < entry:
+            tp_dist = entry - tp
+            max_reached = entry - min(last['low'], prev['low'])
+            if max_reached >= tp_dist * 0.8 and (entry - last['close']) <= tp_dist * 0.6:
+                return {"advice": "CLOSE_SIGNAL", "risk_score": 85.0, "reason": "Rejected after reaching 80% TP"}
+        
+        if last['close'] > last['open'] and last['close'] > prev['high']:
+            if is_strong or (prev['close'] > prev['open']):
+                return {"advice": "CONSIDER_CLOSE", "risk_score": 75.0, "reason": "Momentum reversal detected"}
+        elif last['close'] <= last['open'] and range_last > 0 and body_last < (0.2 * range_last):
+            return {"advice": "WATCH", "risk_score": 55.0, "reason": "Momentum slowing"}
+
+    return {"advice": "HOLD", "risk_score": 25.0, "reason": "Holding position"}
+
 async def evaluate_smart_exit(p: dict, t, symbol: str) -> str | None:
     if p['profit'] <= 0:
         return None
@@ -189,15 +259,11 @@ async def monitor_loop():
                 basket_state["active"] = False
                 basket_state["peak_pnl"] = 0.0
                 
-            await broadcast({
-                "type": "positions.update",
-                "positions": positions,
-                "basket_state": basket_state
-            })
             
             async with AsyncSessionLocal() as db:
                 result = await db.execute(select(Trade).where(Trade.closed_at == None))
                 open_trades = result.scalars().all()
+                exit_advice_dict = {}
                 
                 for t in open_trades:
                     if t.ticket not in pos_dict:
@@ -248,6 +314,8 @@ async def monitor_loop():
                                 db.add(e)
                                 await broadcast({"type": "log.event", "level": "INFO", "component": "smart_tp", "message": e.message, "created_at": datetime.now(pytz.utc).isoformat()})
                                 continue
+                                
+                        exit_advice_dict[t.ticket] = await evaluate_exit_advice(p, t, t.symbol)
                                 
                         cfg = await get_config()
                         current_dist = p['price_current'] - t.entry_price if p['type'] == mt5.ORDER_TYPE_BUY else t.entry_price - p['price_current']
@@ -339,6 +407,14 @@ async def monitor_loop():
                                 t.sl = new_sl
                                 
                 await db.commit()
+
+            await broadcast({
+                "type": "positions.update",
+                "positions": positions,
+                "basket_state": basket_state,
+                "exit_advice": exit_advice_dict
+            })
+            
         except Exception as e:
             print("Monitor error:", e)
             
