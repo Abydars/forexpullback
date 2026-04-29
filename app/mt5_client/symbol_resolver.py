@@ -2,7 +2,20 @@ import asyncio
 import MetaTrader5 as mt5
 
 class SymbolResolver:
-    KNOWN_SUFFIXES = ["", "m", "c", "z", ".r", "_raw", ".m", ".c", "-pro", ".pro", "pro", ".ecn"]
+    KNOWN_SUFFIXES = ["", "m", "c", "z", ".r", "_raw", ".m", ".c", "-pro", ".pro", "pro", ".ecn", ".cash", "-cash"]
+    
+    ALIASES = {
+        "US500": ["US500", "SPX500", "SP500", "SPX"],
+        "USTEC": ["USTEC", "NAS100", "NDX100", "US100"],
+        "US30": ["US30", "WS30", "DJI30", "DOW"],
+        "DE40": ["DE40", "GER40", "DAX40", "DAX"],
+        "UK100": ["UK100", "UKX", "FTSE"],
+        "XAUUSD": ["XAUUSD", "GOLD"],
+        "XAGUSD": ["XAGUSD", "SILVER"],
+        "USOIL": ["USOIL", "WTI", "CRUDE"],
+        "UKOIL": ["UKOIL", "BRENT"],
+        "BTCUSD": ["BTCUSD", "BITCOIN"]
+    }
 
     def __init__(self, mt5_client):
         self._client = mt5_client
@@ -24,16 +37,46 @@ class SymbolResolver:
         if generic in self._cache:
             return self._cache[generic]
 
-        if generic in self._all_symbols:
-            self._cache[generic] = generic
-            return generic
+        search_terms = [generic]
+        if generic.upper() in self.ALIASES:
+            search_terms.extend(self.ALIASES[generic.upper()])
 
-        for suffix in self.KNOWN_SUFFIXES:
-            if not suffix: continue
-            candidate = generic + suffix
-            if candidate in self._all_symbols:
-                self._cache[generic] = candidate
-                return candidate
+        # 1. Exact match (case-insensitive)
+        for term in search_terms:
+            if term in self._all_symbols:
+                self._cache[generic] = term
+                return term
+            for sym in self._all_symbols:
+                if sym.upper() == term.upper():
+                    self._cache[generic] = sym
+                    return sym
+
+        # 2. Known Suffixes match
+        for term in search_terms:
+            for suffix in self.KNOWN_SUFFIXES:
+                if not suffix: continue
+                candidate = term + suffix
+                if candidate in self._all_symbols:
+                    self._cache[generic] = candidate
+                    return candidate
+                for sym in self._all_symbols:
+                    if sym.upper() == candidate.upper():
+                        self._cache[generic] = sym
+                        return sym
+
+        # 3. Startswith match
+        for term in search_terms:
+            for sym in self._all_symbols:
+                if sym.upper().startswith(term.upper()):
+                    self._cache[generic] = sym
+                    return sym
+                    
+        # 4. Contains match
+        for term in search_terms:
+            for sym in self._all_symbols:
+                if term.upper() in sym.upper():
+                    self._cache[generic] = sym
+                    return sym
                 
         return None
 
