@@ -457,25 +457,44 @@ function updateScanStatus(data) {
 
 function renderScannerStatus() {
   const tbody = document.getElementById('scan-status-body');
-  const items = Object.values(state.scanner_status);
+  
+  const itemsMap = { ...state.scanner_status };
+  const configuredSymbols = state.config.symbols || [];
+  
+  configuredSymbols.forEach(sym => {
+    if (!itemsMap[sym]) {
+      itemsMap[sym] = {
+        symbol: sym,
+        resolved: 'pending',
+        status: 'WAITING',
+        bias: null,
+        score: 0,
+        reason: { msg: "Waiting for first scan..." },
+        updated_at: null
+      };
+    }
+  });
 
-  // Sort items: FIRED > DCA_FIRED > WATCHING > SKIPPED > REJECTED > COOLDOWN
-  const statusWeight = { 'FIRED': 6, 'DCA_FIRED': 5, 'WATCHING': 4, 'SKIPPED': 3, 'DCA_SKIPPED': 3, 'REJECTED': 2, 'COOLDOWN': 1 };
+  const items = Object.values(itemsMap).filter(s => configuredSymbols.includes(s.symbol));
+
+  // Sort items: FIRED > DCA_FIRED > WATCHING > SKIPPED > REJECTED > COOLDOWN > WAITING
+  const statusWeight = { 'FIRED': 7, 'DCA_FIRED': 6, 'WATCHING': 5, 'SKIPPED': 4, 'DCA_SKIPPED': 4, 'REJECTED': 3, 'COOLDOWN': 2, 'WAITING': 1 };
   items.sort((a, b) => (statusWeight[b.status] || 0) - (statusWeight[a.status] || 0));
 
   if (!items.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-slate-500 py-10 uppercase tracking-widest text-xs">WAITING FOR SCAN...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-slate-500 py-10 uppercase tracking-widest text-xs">NO SYMBOLS CONFIGURED</td></tr>';
     return;
   }
 
   const esc = (str) => String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
   const getStatusBadge = (status) => {
-    let color = 'bg-white/5 text-slate-400 border-white/10'; // Default muted (REJECTED, COOLDOWN, SKIPPED, DCA_SKIPPED)
+    let color = 'bg-white/5 text-slate-400 border-white/10'; // Default muted
     if (status === 'FIRED') color = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
     else if (status === 'DCA_FIRED') color = 'bg-purple-500/20 text-purple-400 border-purple-500/30';
     else if (status === 'WATCHING') color = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
     else if (status === 'SKIPPED' || status === 'DCA_SKIPPED') color = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+    else if (status === 'WAITING') color = 'bg-white/10 text-slate-300 border-white/20';
 
     return `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap border ${color}">${status}</span>`;
   };
@@ -1022,6 +1041,8 @@ function applyJsonText() {
 }
 
 async function saveConfig() {
+  const btn = document.getElementById('save-config-btn');
+  if (btn) { btn.innerHTML = 'SAVING...'; btn.disabled = true; }
   try {
     const payload1 = collectConfigInputs();
     await api('PATCH', '/api/config', payload1);
@@ -1035,11 +1056,13 @@ async function saveConfig() {
     state.config = { ...state.config, ...payload1, ...payload2 };
     state.config.enabled_correlation_groups = state.enabled_correlation_groups;
 
-    alert("Config saved successfully!");
     closeConfigModal();
+    renderScannerStatus(); // Refresh scanner list to show/hide symbols immediately
   } catch (err) {
     alert("Error saving config: " + err.message);
     console.error(err);
+  } finally {
+    if (btn) { btn.innerHTML = 'SAVE CHANGES'; btn.disabled = false; }
   }
 }
 
