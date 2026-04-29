@@ -179,7 +179,9 @@ async def scan_loop():
                 
                 if not info or info.trade_mode != mt5.SYMBOL_TRADE_MODE_FULL:
                     reason_full["msg"] = "Market is CLOSED (Trading Disabled)"
-                elif not tick or (current_time - tick.time) > 300:
+                elif not tick:
+                    reason_full["msg"] = "Market is CLOSED (No tick data)"
+                elif getattr(tick, 'time_msc', 0) > 0 and (current_time - (tick.time_msc / 1000.0)) > 300:
                     reason_full["msg"] = "Market is CLOSED (Stale tick data)"
                 else:
                     df_4h = await mt5_client.get_rates(resolved, mt5.TIMEFRAME_H4, 200)
