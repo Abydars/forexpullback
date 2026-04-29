@@ -727,32 +727,32 @@ const IANA_ZONES = ['UTC','Europe/London','America/New_York','Asia/Tokyo','Asia/
 function addSessionRow(session) {
   const id = session?.id ?? ('new-' + Date.now());
   const html = `
-    <div class="session-row flex flex-col md:flex-row gap-3 items-start md:items-center p-3 border border-border_light bg-white/[0.02] rounded hover:bg-white/[0.04] transition-colors" data-id="${id}">
-      <div class="w-full md:w-[110px] shrink-0 flex flex-col gap-1">
-         <span class="text-[9px] uppercase tracking-widest text-slate-500 font-bold hidden md:block">Name</span>
-         <input placeholder="NAME" class="s-name bg-black/20 border border-border_strong text-slate-200 text-[11px] px-2 py-1.5 rounded outline-none focus:border-cyan_neon w-full" value="${session?.name ?? ''}">
+    <div class="session-row grid grid-cols-2 md:grid-cols-12 gap-x-4 gap-y-3 p-4 border border-border_light bg-white/[0.02] rounded hover:bg-white/[0.04] transition-colors" data-id="${id}">
+      <div class="col-span-2 md:col-span-4 flex flex-col gap-1.5">
+         <span class="text-[9px] uppercase tracking-widest text-slate-500 font-bold">Name</span>
+         <input placeholder="NAME" class="s-name bg-black/20 border border-border_strong text-slate-200 text-xs px-2.5 py-1.5 rounded outline-none focus:border-cyan_neon w-full" value="${session?.name ?? ''}">
       </div>
-      <div class="w-full md:w-[90px] shrink-0 flex flex-col gap-1">
-         <span class="text-[9px] uppercase tracking-widest text-slate-500 font-bold hidden md:block">Start</span>
-         <input type="time" class="s-start bg-black/20 border border-border_strong text-slate-200 text-[11px] px-2 py-1.5 rounded outline-none focus:border-cyan_neon w-full" value="${session?.start_time ?? '08:00'}">
+      <div class="col-span-1 md:col-span-2 flex flex-col gap-1.5">
+         <span class="text-[9px] uppercase tracking-widest text-slate-500 font-bold">Start</span>
+         <input type="time" class="s-start bg-black/20 border border-border_strong text-slate-200 text-xs px-2.5 py-1.5 rounded outline-none focus:border-cyan_neon w-full" value="${session?.start_time ?? '08:00'}">
       </div>
-      <div class="w-full md:w-[90px] shrink-0 flex flex-col gap-1">
-         <span class="text-[9px] uppercase tracking-widest text-slate-500 font-bold hidden md:block">End</span>
-         <input type="time" class="s-end bg-black/20 border border-border_strong text-slate-200 text-[11px] px-2 py-1.5 rounded outline-none focus:border-cyan_neon w-full" value="${session?.end_time ?? '12:00'}">
+      <div class="col-span-1 md:col-span-2 flex flex-col gap-1.5">
+         <span class="text-[9px] uppercase tracking-widest text-slate-500 font-bold">End</span>
+         <input type="time" class="s-end bg-black/20 border border-border_strong text-slate-200 text-xs px-2.5 py-1.5 rounded outline-none focus:border-cyan_neon w-full" value="${session?.end_time ?? '12:00'}">
       </div>
-      <div class="w-full md:w-[120px] shrink-0 flex flex-col gap-1">
-         <span class="text-[9px] uppercase tracking-widest text-slate-500 font-bold hidden md:block">Timezone</span>
-         <select class="s-tz bg-black/20 border border-border_strong text-slate-200 text-[10px] px-1 py-1.5 rounded outline-none focus:border-cyan_neon w-full truncate">${IANA_ZONES.map(z => `<option ${z === (session?.timezone ?? 'UTC') ? 'selected' : ''}>${z}</option>`).join('')}</select>
+      <div class="col-span-2 md:col-span-4 flex flex-col gap-1.5">
+         <span class="text-[9px] uppercase tracking-widest text-slate-500 font-bold">Timezone</span>
+         <select class="s-tz bg-black/20 border border-border_strong text-slate-200 text-[11px] px-2 py-1.5 rounded outline-none focus:border-cyan_neon w-full truncate">${IANA_ZONES.map(z => `<option ${z === (session?.timezone ?? 'UTC') ? 'selected' : ''}>${z}</option>`).join('')}</select>
       </div>
-      <div class="flex-1 flex flex-col gap-1 min-w-[100px]">
-         <span class="text-[9px] uppercase tracking-widest text-slate-500 font-bold hidden md:block">Days</span>
-         <div class="day-checks flex gap-0.5 justify-between bg-black/10 border border-border_strong p-1 rounded">${['M','T','W','T','F','S','S'].map((d,i) => `
-           <label class="flex flex-col items-center gap-1 text-[8px] font-bold text-slate-500 cursor-pointer hover:text-slate-300 w-full text-center"><input type="checkbox" data-day="${i}" class="w-3 h-3 accent-cyan_neon cursor-pointer" ${!session || (session?.days_mask & (1<<i)) ? 'checked' : ''}>${d}</label>
+      <div class="col-span-2 md:col-span-8 flex flex-col gap-1.5 mt-1">
+         <span class="text-[9px] uppercase tracking-widest text-slate-500 font-bold">Days Active</span>
+         <div class="day-checks flex gap-1 justify-between bg-black/10 border border-border_strong p-1 rounded">${['M','T','W','T','F','S','S'].map((d,i) => `
+           <label class="flex flex-col items-center gap-1 text-[9px] font-bold text-slate-500 cursor-pointer hover:text-slate-300 w-full text-center"><input type="checkbox" data-day="${i}" class="w-3.5 h-3.5 accent-cyan_neon cursor-pointer" ${!session || (session?.days_mask & (1<<i)) ? 'checked' : ''}>${d}</label>
          `).join('')}</div>
       </div>
-      <div class="shrink-0 flex items-center justify-between md:flex-col md:items-end gap-1.5 w-full md:w-auto mt-2 md:mt-0 md:ml-1">
-        <label class="flex items-center gap-1.5 text-[9px] font-bold text-slate-300 uppercase shrink-0 cursor-pointer group"><input type="checkbox" class="s-on w-3 h-3 accent-cyan_neon cursor-pointer bg-black/20 border-border_strong group-hover:border-cyan_neon" ${session?.enabled !== false ? 'checked' : ''}> ON</label>
-        <button type="button" class="px-2 py-1 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/30 rounded text-[9px] font-bold tracking-widest uppercase transition-all shrink-0" onclick="this.closest('.session-row').remove()">DEL</button>
+      <div class="col-span-2 md:col-span-4 flex items-end justify-end gap-4 mt-1 h-full pb-0.5">
+        <label class="flex items-center gap-2 text-[10px] font-bold text-slate-300 uppercase cursor-pointer group"><input type="checkbox" class="s-on w-4 h-4 accent-cyan_neon cursor-pointer bg-black/20 border-border_strong group-hover:border-cyan_neon" ${session?.enabled !== false ? 'checked' : ''}> ON</label>
+        <button type="button" class="px-3 py-1.5 text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 hover:border-rose-500/40 rounded text-[9px] font-bold tracking-widest uppercase transition-colors shrink-0" onclick="this.closest('.session-row').remove()">DELETE</button>
       </div>
     </div>`;
   document.getElementById('sessions-list').insertAdjacentHTML('beforeend', html);
