@@ -371,12 +371,8 @@ async def scan_loop():
                                                     "method": "ema" if vol_use_ema else "sma"
                                                 }
                                         
-                                        if status == "REJECTED":
-                                            # Handled below
-                                            pass
-                                        else:
-                                            # Smart Cooldown Check via Pre-fetched sets
-                                            has_recent_closed = (resolved, bias) in recent_closed_set
+                                        # Smart Cooldown Check via Pre-fetched sets
+                                        has_recent_closed = (resolved, bias) in recent_closed_set
                                         has_recent_fired = (resolved, bias) in recent_fired_set
                                         
                                         state_key = f"{resolved}_{bias}"
@@ -389,7 +385,9 @@ async def scan_loop():
                                         is_dca_allowed = False
                                         is_dca_candidate = False
                                         
-                                        if sym_count > 0:
+                                        if status == "REJECTED":
+                                            pass
+                                        elif sym_count > 0:
                                             enable_dca = cfg.get("enable_dca", False)
                                             same_dir_positions = [p for p in open_positions_for_sym if p.get('type') == ord_type]
                                             
