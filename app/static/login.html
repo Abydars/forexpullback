@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Terminal Auth</title>
     <link rel="stylesheet" href="/static/index.css">
     <style>
@@ -8,8 +10,10 @@
             display: flex; 
             justify-content: center; 
             align-items: center; 
-            height: 100vh; 
+            min-height: 100vh; 
             margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
             background: #0a0a0a; 
             color: #d0d0d0; 
             font-family: 'Inter', sans-serif; 
@@ -19,7 +23,9 @@
             padding: 40px 30px; 
             border: 1px solid #333; 
             border-radius: 4px; 
-            width: 320px; 
+            width: 100%; 
+            max-width: 320px; 
+            box-sizing: border-box;
             text-align: center; 
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
