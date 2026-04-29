@@ -238,19 +238,19 @@ function renderPositions() {
     
     html.push(`
       <tr class="group-row cursor-pointer hover:bg-white/[0.02] transition-colors group" onclick="document.querySelectorAll('.sub-${gKey}').forEach(e => e.classList.toggle('hidden'))">
-        <td class="px-5 py-3 flex items-center gap-2">
+        <td class="px-4 py-2.5 flex items-center gap-2">
           ${g.count > 1 ? `<span class="text-slate-500 group-hover:text-cyan-400 transition-colors text-[10px]">▶</span>` : ''}
           <span class="font-bold text-slate-200">${g.symbol}</span>
           ${g.count > 1 ? `<span class="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 text-[9px] font-bold tracking-widest border border-cyan-500/20">GROUP (${g.count})</span>` : ''}
         </td>
-        <td class="px-5 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${g.direction === 'buy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${g.direction}</span></td>
-        <td class="px-5 py-3 text-right font-mono">${g.total_lot.toFixed(2)}</td>
-        <td class="px-5 py-3 text-right font-mono text-slate-400">${g.avg_entry.toFixed(5)}</td>
-        <td class="px-5 py-3 text-right font-mono text-slate-400">${g.current_price ? g.current_price + gCpPctStr : '-'}</td>
-        <td class="px-5 py-3 text-right font-mono font-bold ${g.total_pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${g.total_pnl >= 0 ? '+' : '-'}$${Math.abs(g.total_pnl).toFixed(2)}${gPctStr}</td>
-        <td class="px-5 py-3 text-right font-mono text-slate-400">${g.sl ? g.sl + gSlPct : '-'}</td>
-        <td class="px-5 py-3 text-right font-mono text-slate-400">${g.tp ? g.tp + gTpPct : '-'}</td>
-        <td class="px-5 py-3 text-right">
+        <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${g.direction === 'buy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${g.direction}</span></td>
+        <td class="px-4 py-2.5 text-right font-mono">${g.total_lot.toFixed(2)}</td>
+        <td class="px-4 py-2.5 text-right font-mono text-slate-400">${g.avg_entry.toFixed(5)}</td>
+        <td class="px-4 py-2.5 text-right font-mono text-slate-400">${g.current_price ? g.current_price + gCpPctStr : '-'}</td>
+        <td class="px-4 py-2.5 text-right font-mono font-bold ${g.total_pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${g.total_pnl >= 0 ? '+' : '-'}$${Math.abs(g.total_pnl).toFixed(2)}${gPctStr}</td>
+        <td class="px-4 py-2.5 text-right font-mono text-slate-400">${g.sl ? g.sl + gSlPct : '-'}</td>
+        <td class="px-4 py-2.5 text-right font-mono text-slate-400">${g.tp ? g.tp + gTpPct : '-'}</td>
+        <td class="px-4 py-2.5 text-right">
           <button class="px-3 py-1.5 border border-border_strong text-slate-300 text-[10px] font-bold tracking-widest uppercase hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/30 transition-all rounded" onclick="event.stopPropagation(); closeGroup('${g.symbol}', '${g.direction}')">CLOSE ${g.count > 1 ? 'ALL' : ''}</button>
         </td>
       </tr>
@@ -272,18 +272,18 @@ function renderPositions() {
         
         html.push(`
           <tr class="sub-${gKey} hidden bg-black/20 hover:bg-black/40 transition-colors text-[11px] border-b border-border_light/50">
-            <td class="px-5 py-2 pl-10 flex items-center gap-2">
+            <td class="px-4 py-1.5 pl-10 flex items-center gap-2">
                <span class="px-1.5 py-0.5 rounded text-[8px] font-bold tracking-widest uppercase border ${badgeColor}">${badge}</span>
                <span class="text-slate-500 font-mono">#${p.ticket}</span>
             </td>
-            <td class="px-5 py-2"></td>
-            <td class="px-5 py-2 text-right font-mono text-slate-400">${p.lot.toFixed(2)}</td>
-            <td class="px-5 py-2 text-right font-mono text-slate-500">${p.entry_price.toFixed(5)}</td>
-            <td class="px-5 py-2 text-right font-mono text-slate-500">${p.current_price ? p.current_price + pCpPctStr : '-'}</td>
-            <td class="px-5 py-2 text-right font-mono ${p.pnl >= 0 ? 'text-emerald-500/70' : 'text-rose-500/70'}">${p.pnl >= 0 ? '+' : '-'}$${Math.abs(p.pnl).toFixed(2)}${pPctStr}</td>
-            <td class="px-5 py-2 text-right font-mono text-slate-500">${p.sl ? p.sl + pSlPct : '-'}</td>
-            <td class="px-5 py-2 text-right font-mono text-slate-500">${p.tp ? p.tp + pTpPct : '-'}</td>
-            <td class="px-5 py-2 text-right"></td>
+            <td class="px-4 py-1.5"></td>
+            <td class="px-4 py-1.5 text-right font-mono text-slate-400">${p.lot.toFixed(2)}</td>
+            <td class="px-4 py-1.5 text-right font-mono text-slate-500">${p.entry_price.toFixed(5)}</td>
+            <td class="px-4 py-1.5 text-right font-mono text-slate-500">${p.current_price ? p.current_price + pCpPctStr : '-'}</td>
+            <td class="px-4 py-1.5 text-right font-mono ${p.pnl >= 0 ? 'text-emerald-500/70' : 'text-rose-500/70'}">${p.pnl >= 0 ? '+' : '-'}$${Math.abs(p.pnl).toFixed(2)}${pPctStr}</td>
+            <td class="px-4 py-1.5 text-right font-mono text-slate-500">${p.sl ? p.sl + pSlPct : '-'}</td>
+            <td class="px-4 py-1.5 text-right font-mono text-slate-500">${p.tp ? p.tp + pTpPct : '-'}</td>
+            <td class="px-4 py-1.5 text-right"></td>
           </tr>
         `);
       });
@@ -330,21 +330,21 @@ function renderTrades() {
         
         html.push(`
           <tr class="group-row cursor-pointer hover:bg-white/[0.02] transition-colors group" onclick="document.querySelectorAll('.sub-${gKey}').forEach(e => e.classList.toggle('hidden'))">
-            <td class="px-5 py-3 font-mono text-slate-500">-</td>
-            <td class="px-5 py-3 flex items-center gap-2">
+            <td class="px-4 py-2.5 font-mono text-slate-500">-</td>
+            <td class="px-4 py-2.5 flex items-center gap-2">
               ${g.count > 1 ? `<span class="text-slate-500 group-hover:text-cyan-400 transition-colors text-[10px]">▶</span>` : ''}
               <span class="font-bold text-slate-200">${g.symbol}</span>
               ${g.count > 1 ? `<span class="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 text-[9px] font-bold tracking-widest border border-cyan-500/20">GROUP (${g.count})</span>` : ''}
             </td>
-            <td class="px-5 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${g.direction === 'buy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${g.direction}</span></td>
-            <td class="px-5 py-3 text-right font-mono">${g.total_lot.toFixed(2)}</td>
-            <td class="px-5 py-3 text-right font-mono text-slate-400">${g.avg_entry.toFixed(5)}</td>
-            <td class="px-5 py-3 text-right font-mono text-slate-400">${g.sl || '-'}</td>
-            <td class="px-5 py-3 text-right font-mono text-slate-400">${g.tp || '-'}</td>
-            <td class="px-5 py-3 text-right font-mono text-slate-500">-</td>
-            <td class="px-5 py-3 text-right font-mono font-bold ${g.total_pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${g.total_pnl >= 0 ? '+' : '-'}$${Math.abs(g.total_pnl).toFixed(2)}</td>
-            <td class="px-5 py-3 text-slate-400">${g.note || '-'}</td>
-            <td class="px-5 py-3 text-right"><button class="px-3 py-1.5 border border-border_strong text-slate-300 text-[10px] font-bold tracking-widest uppercase hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/30 transition-all rounded" onclick="event.stopPropagation(); closeGroup('${g.symbol}', '${g.direction}')">CLOSE ${g.count > 1 ? 'ALL' : ''}</button></td>
+            <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${g.direction === 'buy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${g.direction}</span></td>
+            <td class="px-4 py-2.5 text-right font-mono">${g.total_lot.toFixed(2)}</td>
+            <td class="px-4 py-2.5 text-right font-mono text-slate-400">${g.avg_entry.toFixed(5)}</td>
+            <td class="px-4 py-2.5 text-right font-mono text-slate-400">${g.sl || '-'}</td>
+            <td class="px-4 py-2.5 text-right font-mono text-slate-400">${g.tp || '-'}</td>
+            <td class="px-4 py-2.5 text-right font-mono text-slate-500">-</td>
+            <td class="px-4 py-2.5 text-right font-mono font-bold ${g.total_pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${g.total_pnl >= 0 ? '+' : '-'}$${Math.abs(g.total_pnl).toFixed(2)}</td>
+            <td class="px-4 py-2.5 text-slate-400">${g.note || '-'}</td>
+            <td class="px-4 py-2.5 text-right"><button class="px-3 py-1 border border-border_strong text-slate-300 text-[10px] font-bold tracking-widest uppercase hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/30 transition-all rounded" onclick="event.stopPropagation(); closeGroup('${g.symbol}', '${g.direction}')">CLOSE ${g.count > 1 ? 'ALL' : ''}</button></td>
           </tr>
         `);
       });
@@ -352,17 +352,17 @@ function renderTrades() {
   } else {
       tbody.innerHTML = list.map(t => `
         <tr class="hover:bg-white/[0.02] transition-colors">
-          <td class="px-5 py-3 font-mono text-slate-500 whitespace-nowrap">${formatLocalTime(t.opened_at)}</td>
-          <td class="px-5 py-3 font-bold text-slate-200">${t.symbol}</td>
-          <td class="px-5 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${t.direction === 'buy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${t.direction}</span></td>
-          <td class="px-5 py-3 text-right font-mono">${t.lot}</td>
-          <td class="px-5 py-3 text-right font-mono text-slate-400">${t.entry_price}</td>
-          <td class="px-5 py-3 text-right font-mono text-slate-400">${t.sl || '-'}</td>
-          <td class="px-5 py-3 text-right font-mono text-slate-400">${t.tp || '-'}</td>
-          <td class="px-5 py-3 text-right font-mono text-slate-300">${t.exit_price || '-'}</td>
-          <td class="px-5 py-3 text-right font-mono font-bold ${t.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${t.pnl >= 0 ? '+' : '-'}$${Math.abs(t.pnl || 0).toFixed(2)}</td>
-          <td class="px-5 py-3 text-slate-400">${t.note || '-'}</td>
-          <td class="px-5 py-3 text-right"></td>
+          <td class="px-4 py-2.5 font-mono text-slate-500 whitespace-nowrap">${formatLocalTime(t.opened_at)}</td>
+          <td class="px-4 py-2.5 font-bold text-slate-200">${t.symbol}</td>
+          <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${t.direction === 'buy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${t.direction}</span></td>
+          <td class="px-4 py-2.5 text-right font-mono">${t.lot}</td>
+          <td class="px-4 py-2.5 text-right font-mono text-slate-400">${t.entry_price}</td>
+          <td class="px-4 py-2.5 text-right font-mono text-slate-400">${t.sl || '-'}</td>
+          <td class="px-4 py-2.5 text-right font-mono text-slate-400">${t.tp || '-'}</td>
+          <td class="px-4 py-2.5 text-right font-mono text-slate-300">${t.exit_price || '-'}</td>
+          <td class="px-4 py-2.5 text-right font-mono font-bold ${t.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${t.pnl >= 0 ? '+' : '-'}$${Math.abs(t.pnl || 0).toFixed(2)}</td>
+          <td class="px-4 py-2.5 text-slate-400">${t.note || '-'}</td>
+          <td class="px-4 py-2.5 text-right"></td>
         </tr>
       `).join('');
   }
@@ -387,12 +387,12 @@ function renderSignals() {
     const isHighlight = s.status === 'FIRED' || s.status === 'DCA_FIRED';
     return `
       <tr class="${isHighlight ? 'bg-emerald-500/5 hover:bg-emerald-500/10' : 'hover:bg-white/[0.02]'} transition-colors">
-        <td class="px-5 py-3 font-mono text-slate-500 whitespace-nowrap">${formatLocalTime(s.created_at)}</td>
-        <td class="px-5 py-3 font-bold text-slate-200">${s.symbol}</td>
-        <td class="px-5 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${s.direction === 'buy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${s.direction}</span></td>
-        <td class="px-5 py-3 text-right font-mono ${s.score > 0 ? 'text-cyan-400 font-bold' : 'text-slate-500'}">${s.score}</td>
-        <td class="px-5 py-3">${getStatusBadge(s.status)}</td>
-        <td class="px-5 py-3 text-slate-300 w-full">${JSON.stringify(s.reason)}</td>
+        <td class="px-4 py-2.5 font-mono text-slate-500 whitespace-nowrap">${formatLocalTime(s.created_at)}</td>
+        <td class="px-4 py-2.5 font-bold text-slate-200">${s.symbol}</td>
+        <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${s.direction === 'buy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${s.direction}</span></td>
+        <td class="px-4 py-2.5 text-right font-mono ${s.score > 0 ? 'text-cyan-400 font-bold' : 'text-slate-500'}">${s.score}</td>
+        <td class="px-4 py-2.5">${getStatusBadge(s.status)}</td>
+        <td class="px-4 py-2.5 text-slate-300 w-full">${JSON.stringify(s.reason)}</td>
       </tr>
     `;
   }).join('');
@@ -406,10 +406,10 @@ function renderLogs() {
   }
   tbody.innerHTML = state.events.map(e => `
     <tr class="hover:bg-white/[0.02] transition-colors">
-      <td class="px-5 py-3 font-mono text-slate-500 whitespace-nowrap">${formatLocalTime(e.created_at)}</td>
-      <td class="px-5 py-3 font-bold ${e.level === 'ERROR' ? 'text-rose-400' : e.level === 'WARN' ? 'text-amber-400' : 'text-cyan-400'}">${e.level}</td>
-      <td class="px-5 py-3 text-slate-300">${e.component}</td>
-      <td class="px-5 py-3 text-slate-400 w-full">${e.message}</td>
+      <td class="px-4 py-2.5 font-mono text-slate-500 whitespace-nowrap">${formatLocalTime(e.created_at)}</td>
+      <td class="px-4 py-2.5 font-bold ${e.level === 'ERROR' ? 'text-rose-400' : e.level === 'WARN' ? 'text-amber-400' : 'text-cyan-400'}">${e.level}</td>
+      <td class="px-4 py-2.5 text-slate-300">${e.component}</td>
+      <td class="px-4 py-2.5 text-slate-400 w-full">${e.message}</td>
     </tr>
   `).join('');
 }
@@ -453,17 +453,17 @@ function renderScannerStatus() {
     
     return `
     <tr class="${isHighlight ? 'bg-emerald-500/5 hover:bg-emerald-500/10' : 'hover:bg-white/[0.02]'} transition-colors">
-      <td class="px-5 py-3 flex items-center gap-2">
+      <td class="px-4 py-2.5 flex items-center gap-2">
         <span class="font-bold text-slate-200">${s.symbol}</span> 
         <span class="text-slate-500 font-mono text-[9px] border border-border_strong px-1 rounded">${s.resolved}</span>
       </td>
-      <td class="px-5 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${s.bias === 'bullish' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : s.bias === 'bearish' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-white/5 text-slate-400 border border-white/10'}">${s.bias || 'NONE'}</span></td>
-      <td class="px-5 py-3 text-right font-mono ${s.score > 0 ? 'text-cyan-400 font-bold' : 'text-slate-500'}">${s.score}</td>
-      <td class="px-5 py-3">${getStatusBadge(s.status)}</td>
-      <td class="px-5 py-3 text-slate-300" style="max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${rawReason}">
+      <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${s.bias === 'bullish' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : s.bias === 'bearish' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-white/5 text-slate-400 border border-white/10'}">${s.bias || 'NONE'}</span></td>
+      <td class="px-4 py-2.5 text-right font-mono ${s.score > 0 ? 'text-cyan-400 font-bold' : 'text-slate-500'}">${s.score}</td>
+      <td class="px-4 py-2.5">${getStatusBadge(s.status)}</td>
+      <td class="px-4 py-2.5 text-slate-300" style="max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${rawReason}">
         ${esc(reasonText)}
       </td>
-      <td class="px-5 py-3 font-mono text-slate-500 text-right w-24 shrink-0">${formatLocalTime(s.updated_at)}</td>
+      <td class="px-4 py-2.5 font-mono text-slate-500 text-right w-24 shrink-0">${formatLocalTime(s.updated_at)}</td>
     </tr>
     `;
   }).join('');

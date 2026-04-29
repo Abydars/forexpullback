@@ -28,7 +28,7 @@
 <body class="bg-bg text-slate-300 font-mono h-screen flex flex-col text-[12px] antialiased">
   
   <!-- TOP BAR -->
-  <header class="flex flex-col md:flex-row items-center justify-between px-6 py-4 border-b border-border_light bg-panel shrink-0 gap-4 md:gap-0">
+  <header class="flex flex-col md:flex-row items-center justify-between px-4 py-3 border-b border-border_light bg-panel shrink-0 gap-3 md:gap-0">
     <div class="font-bold tracking-[0.15em] text-slate-100 text-sm flex-1">FOREX PULLBACK BOT</div>
     <div class="flex flex-wrap justify-center gap-3 md:gap-4 items-center text-slate-400 text-xs tracking-wide flex-1">
       <div class="flex items-center gap-2">
@@ -48,51 +48,51 @@
   </header>
 
   <!-- TABS -->
-  <nav class="flex border-b border-border_light bg-panel px-6 shrink-0 gap-2">
-    <button class="tab active px-5 py-3 text-[11px] font-bold tracking-[0.1em] uppercase border-b-2 text-white border-cyan-400 transition-colors" data-tab="dashboard">DASHBOARD</button>
-    <button class="tab px-5 py-3 text-[11px] font-bold tracking-[0.1em] uppercase border-b-2 text-slate-400 border-transparent hover:text-slate-200 transition-colors" data-tab="trades">TRADES</button>
-    <button class="tab px-5 py-3 text-[11px] font-bold tracking-[0.1em] uppercase border-b-2 text-slate-400 border-transparent hover:text-slate-200 transition-colors" data-tab="signals">SIGNALS</button>
-    <button class="tab px-5 py-3 text-[11px] font-bold tracking-[0.1em] uppercase border-b-2 text-slate-400 border-transparent hover:text-slate-200 transition-colors" data-tab="logs">LOGS</button>
+  <nav class="flex border-b border-border_light bg-panel px-4 shrink-0 gap-1">
+    <button class="tab active px-4 py-2.5 text-[11px] font-bold tracking-[0.1em] uppercase border-b-2 text-white border-cyan-400 transition-colors" data-tab="dashboard">DASHBOARD</button>
+    <button class="tab px-4 py-2.5 text-[11px] font-bold tracking-[0.1em] uppercase border-b-2 text-slate-400 border-transparent hover:text-slate-200 transition-colors" data-tab="trades">TRADES</button>
+    <button class="tab px-4 py-2.5 text-[11px] font-bold tracking-[0.1em] uppercase border-b-2 text-slate-400 border-transparent hover:text-slate-200 transition-colors" data-tab="signals">SIGNALS</button>
+    <button class="tab px-4 py-2.5 text-[11px] font-bold tracking-[0.1em] uppercase border-b-2 text-slate-400 border-transparent hover:text-slate-200 transition-colors" data-tab="logs">LOGS</button>
   </nav>
 
   <!-- PANELS -->
-  <main class="flex-1 overflow-y-auto p-6 min-w-0">
-    <section class="tab-panel active space-y-6" data-panel="dashboard">
+  <main class="flex-1 overflow-y-auto p-4 min-w-0">
+    <section class="tab-panel active space-y-4" data-panel="dashboard">
       <!-- Session Notice Banner -->
-      <div id="session-notice" class="hidden bg-rose-500/10 border border-rose-500/20 text-rose-400 px-4 py-3 rounded flex items-center gap-3">
+      <div id="session-notice" class="hidden mb-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 px-4 py-2.5 rounded flex items-center gap-3">
         <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
         <div>
           <div class="text-[11px] font-bold tracking-widest uppercase">OUT OF TRADING SESSION</div>
           <div class="text-[10px] opacity-80 mt-0.5">The system is currently out of configured trading sessions. No new trades will be opened. Open positions will continue to be managed.</div>
         </div>
       </div>
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="bg-panel border border-border_light p-5 rounded-sm flex flex-col justify-center h-24">
-          <div class="text-[10px] tracking-[0.15em] uppercase text-slate-500 mb-2 font-semibold">BALANCE</div>
-          <div class="text-2xl text-slate-100 font-mono" id="s-balance">—</div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="bg-panel border border-border_light p-4 rounded-sm flex flex-col justify-center h-20">
+          <div class="text-[10px] tracking-[0.15em] uppercase text-slate-500 mb-1.5 font-semibold">BALANCE</div>
+          <div class="text-xl text-slate-100 font-mono" id="s-balance">—</div>
         </div>
-        <div class="bg-panel border border-border_light p-5 rounded-sm flex flex-col justify-center h-24">
-          <div class="text-[10px] tracking-[0.15em] uppercase text-slate-500 mb-2 font-semibold">EQUITY</div>
-          <div class="text-2xl text-cyan_neon font-mono" id="s-equity">—</div>
+        <div class="bg-panel border border-border_light p-4 rounded-sm flex flex-col justify-center h-20">
+          <div class="text-[10px] tracking-[0.15em] uppercase text-slate-500 mb-1.5 font-semibold">EQUITY</div>
+          <div class="text-xl text-cyan_neon font-mono" id="s-equity">—</div>
         </div>
-        <div class="bg-panel border border-border_light p-5 rounded-sm flex flex-col justify-center h-24 relative">
-          <div class="text-[10px] tracking-[0.15em] uppercase text-slate-500 mb-2 font-semibold flex justify-between items-center gap-2">
+        <div class="bg-panel border border-border_light p-4 rounded-sm flex flex-col justify-center h-20 relative">
+          <div class="text-[10px] tracking-[0.15em] uppercase text-slate-500 mb-1.5 font-semibold flex justify-between items-center gap-2">
              <span>UNREALIZED PNL</span>
              <span id="s-basket-badge" class="hidden text-cyan-400 tracking-wider bg-cyan-400/10 px-1.5 py-0.5 rounded text-[9px] border border-cyan-400/20 whitespace-nowrap">TRAIL: $0.00</span>
           </div>
-          <div class="text-2xl text-slate-100 font-mono" id="s-unrealized">—</div>
+          <div class="text-xl text-slate-100 font-mono" id="s-unrealized">—</div>
         </div>
-        <div class="bg-panel border border-border_light p-5 rounded-sm flex flex-col justify-center h-24">
-          <div class="text-[10px] tracking-[0.15em] uppercase text-slate-500 mb-2 font-semibold flex justify-between">
+        <div class="bg-panel border border-border_light p-4 rounded-sm flex flex-col justify-center h-20">
+          <div class="text-[10px] tracking-[0.15em] uppercase text-slate-500 mb-1.5 font-semibold flex justify-between">
              <span>OPEN POSITIONS</span>
              <span class="text-amber-500/70 lowercase tracking-normal bg-amber-500/10 px-1.5 py-0.5 rounded text-[9px]">live</span>
           </div>
-          <div class="text-2xl text-slate-100 font-mono" id="s-open">0</div>
+          <div class="text-xl text-slate-100 font-mono" id="s-open">0</div>
         </div>
       </div>
       
       <div class="bg-panel border border-border_light rounded-sm overflow-hidden flex flex-col">
-        <div class="flex justify-between items-center px-5 py-4 border-b border-border_light bg-white/[0.02]">
+        <div class="flex justify-between items-center px-4 py-3 border-b border-border_light bg-white/[0.02]">
           <span class="text-[10px] tracking-[0.15em] font-bold text-slate-400 uppercase">OPEN POSITIONS</span>
           <button class="px-3 py-1 text-[10px] font-bold tracking-widest uppercase border border-border_strong text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/30 rounded-sm transition-colors" onclick="closeAllPositions()">CLOSE ALL</button>
         </div>
@@ -100,15 +100,15 @@
           <table class="w-full text-left whitespace-nowrap">
             <thead>
               <tr class="bg-bg text-[10px] tracking-[0.1em] text-slate-500 uppercase border-b border-border_light">
-                <th class="px-5 py-3 font-semibold">SYMBOL</th>
-                <th class="px-5 py-3 font-semibold">DIR</th>
-                <th class="px-5 py-3 font-semibold text-right">LOT</th>
-                <th class="px-5 py-3 font-semibold text-right">ENTRY</th>
-                <th class="px-5 py-3 font-semibold text-right">CUR</th>
-                <th class="px-5 py-3 font-semibold text-right">PNL</th>
-                <th class="px-5 py-3 font-semibold text-right">SL</th>
-                <th class="px-5 py-3 font-semibold text-right">TP</th>
-                <th class="px-5 py-3 font-semibold text-right">ACTION</th>
+                <th class="px-4 py-2.5 font-semibold">SYMBOL</th>
+                <th class="px-4 py-2.5 font-semibold">DIR</th>
+                <th class="px-4 py-2.5 font-semibold text-right">LOT</th>
+                <th class="px-4 py-2.5 font-semibold text-right">ENTRY</th>
+                <th class="px-4 py-2.5 font-semibold text-right">CUR</th>
+                <th class="px-4 py-2.5 font-semibold text-right">PNL</th>
+                <th class="px-4 py-2.5 font-semibold text-right">SL</th>
+                <th class="px-4 py-2.5 font-semibold text-right">TP</th>
+                <th class="px-4 py-2.5 font-semibold text-right">ACTION</th>
               </tr>
             </thead>
             <tbody id="open-pos-body" class="divide-y divide-border_light/50">
@@ -119,19 +119,19 @@
       </div>
       
       <div class="bg-panel border border-border_light rounded-sm overflow-hidden flex flex-col">
-        <div class="px-5 py-4 border-b border-border_light bg-white/[0.02]">
+        <div class="px-4 py-3 border-b border-border_light bg-white/[0.02]">
           <span class="text-[10px] tracking-[0.15em] font-bold text-slate-400 uppercase">LIVE SCANNER STATUS</span>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-left whitespace-nowrap">
             <thead>
               <tr class="bg-bg text-[10px] tracking-[0.1em] text-slate-500 uppercase border-b border-border_light">
-                <th class="px-5 py-3 font-semibold">SYMBOL</th>
-                <th class="px-5 py-3 font-semibold">BIAS</th>
-                <th class="px-5 py-3 font-semibold">SCORE</th>
-                <th class="px-5 py-3 font-semibold">STATUS</th>
-                <th class="px-5 py-3 font-semibold">REASON / REJECTION</th>
-                <th class="px-5 py-3 font-semibold">LAST UPDATE</th>
+                <th class="px-4 py-2.5 font-semibold">SYMBOL</th>
+                <th class="px-4 py-2.5 font-semibold">BIAS</th>
+                <th class="px-4 py-2.5 font-semibold">SCORE</th>
+                <th class="px-4 py-2.5 font-semibold">STATUS</th>
+                <th class="px-4 py-2.5 font-semibold">REASON / REJECTION</th>
+                <th class="px-4 py-2.5 font-semibold">LAST UPDATE</th>
               </tr>
             </thead>
             <tbody id="scan-status-body" class="divide-y divide-border_light/50">
@@ -142,13 +142,13 @@
       </div>
     </section>
 
-    <section class="tab-panel space-y-6" data-panel="trades">
+    <section class="tab-panel space-y-4" data-panel="trades">
       <div class="bg-panel border border-border_light rounded-sm overflow-hidden flex flex-col">
-        <div class="flex px-4 pt-4 pb-0 border-b border-border_light gap-2">
+        <div class="flex px-4 pt-3 pb-0 border-b border-border_light gap-2">
           <button class="sub-tab active px-4 py-2 text-[10px] font-bold tracking-[0.1em] uppercase border-b-2 text-cyan-400 border-cyan-400 transition-colors" data-sub="open">OPEN</button>
           <button class="sub-tab px-4 py-2 text-[10px] font-bold tracking-[0.1em] uppercase border-b-2 text-slate-500 border-transparent hover:text-slate-300 transition-colors" data-sub="closed">CLOSED</button>
         </div>
-        <div class="p-4 flex gap-4 items-center bg-bg/50 border-b border-border_light">
+        <div class="p-3 flex gap-4 items-center bg-bg/50 border-b border-border_light">
           <select id="f-symbol" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-1.5 rounded outline-none focus:border-cyan_neon"><option value="">ALL SYMBOLS</option></select>
           <input type="date" id="f-from" class="bg-black/20 border border-border_strong text-slate-200 text-[11px] px-3 py-1.5 rounded outline-none focus:border-cyan_neon">
           <input type="date" id="f-to" class="bg-black/20 border border-border_strong text-slate-200 text-[11px] px-3 py-1.5 rounded outline-none focus:border-cyan_neon">
@@ -157,17 +157,17 @@
           <table class="w-full text-left whitespace-nowrap" id="trades-table">
             <thead>
               <tr class="bg-bg text-[10px] tracking-[0.1em] text-slate-500 uppercase border-b border-border_light">
-                <th class="px-5 py-3 font-semibold">TIME</th>
-                <th class="px-5 py-3 font-semibold">SYMBOL</th>
-                <th class="px-5 py-3 font-semibold">DIR</th>
-                <th class="px-5 py-3 font-semibold text-right">LOT</th>
-                <th class="px-5 py-3 font-semibold text-right">ENTRY</th>
-                <th class="px-5 py-3 font-semibold text-right">SL</th>
-                <th class="px-5 py-3 font-semibold text-right">TP</th>
-                <th class="px-5 py-3 font-semibold text-right">EXIT</th>
-                <th class="px-5 py-3 font-semibold text-right">PNL</th>
-                <th class="px-5 py-3 font-semibold">NOTE</th>
-                <th class="px-5 py-3 font-semibold text-right">ACTION</th>
+                <th class="px-4 py-2.5 font-semibold">TIME</th>
+                <th class="px-4 py-2.5 font-semibold">SYMBOL</th>
+                <th class="px-4 py-2.5 font-semibold">DIR</th>
+                <th class="px-4 py-2.5 font-semibold text-right">LOT</th>
+                <th class="px-4 py-2.5 font-semibold text-right">ENTRY</th>
+                <th class="px-4 py-2.5 font-semibold text-right">SL</th>
+                <th class="px-4 py-2.5 font-semibold text-right">TP</th>
+                <th class="px-4 py-2.5 font-semibold text-right">EXIT</th>
+                <th class="px-4 py-2.5 font-semibold text-right">PNL</th>
+                <th class="px-4 py-2.5 font-semibold">NOTE</th>
+                <th class="px-4 py-2.5 font-semibold text-right">ACTION</th>
               </tr>
             </thead>
             <tbody id="trades-body" class="divide-y divide-border_light/50"></tbody>
@@ -176,21 +176,21 @@
       </div>
     </section>
 
-    <section class="tab-panel space-y-6" data-panel="signals">
+    <section class="tab-panel space-y-4" data-panel="signals">
       <div class="bg-panel border border-border_light rounded-sm overflow-hidden flex flex-col">
-        <div class="px-5 py-4 border-b border-border_light bg-white/[0.02]">
+        <div class="px-4 py-3 border-b border-border_light bg-white/[0.02]">
           <span class="text-[10px] tracking-[0.15em] font-bold text-slate-400 uppercase">ALL SIGNALS</span>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-left whitespace-nowrap">
             <thead>
               <tr class="bg-bg text-[10px] tracking-[0.1em] text-slate-500 uppercase border-b border-border_light">
-                <th class="px-5 py-3 font-semibold">TIME</th>
-                <th class="px-5 py-3 font-semibold">SYMBOL</th>
-                <th class="px-5 py-3 font-semibold">DIR</th>
-                <th class="px-5 py-3 font-semibold text-right">SCORE</th>
-                <th class="px-5 py-3 font-semibold">STATUS</th>
-                <th class="px-5 py-3 font-semibold w-full">REASON</th>
+                <th class="px-4 py-2.5 font-semibold">TIME</th>
+                <th class="px-4 py-2.5 font-semibold">SYMBOL</th>
+                <th class="px-4 py-2.5 font-semibold">DIR</th>
+                <th class="px-4 py-2.5 font-semibold text-right">SCORE</th>
+                <th class="px-4 py-2.5 font-semibold">STATUS</th>
+                <th class="px-4 py-2.5 font-semibold w-full">REASON</th>
               </tr>
             </thead>
             <tbody id="signals-body" class="divide-y divide-border_light/50"></tbody>
@@ -199,9 +199,9 @@
       </div>
     </section>
 
-    <section class="tab-panel space-y-6" data-panel="logs">
+    <section class="tab-panel space-y-4" data-panel="logs">
       <div class="bg-panel border border-border_light rounded-sm overflow-hidden flex flex-col">
-        <div class="p-4 flex gap-4 items-center bg-bg/50 border-b border-border_light">
+        <div class="p-3 flex gap-4 items-center bg-bg/50 border-b border-border_light">
           <select id="f-level" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-1.5 rounded outline-none focus:border-cyan_neon">
             <option value="">ALL LEVELS</option><option>INFO</option><option>WARN</option><option>ERROR</option>
           </select>
@@ -213,10 +213,10 @@
           <table class="w-full text-left whitespace-nowrap">
             <thead>
               <tr class="bg-bg text-[10px] tracking-[0.1em] text-slate-500 uppercase border-b border-border_light">
-                <th class="px-5 py-3 font-semibold">TIME</th>
-                <th class="px-5 py-3 font-semibold">LEVEL</th>
-                <th class="px-5 py-3 font-semibold">COMPONENT</th>
-                <th class="px-5 py-3 font-semibold w-full">MESSAGE</th>
+                <th class="px-4 py-2.5 font-semibold">TIME</th>
+                <th class="px-4 py-2.5 font-semibold">LEVEL</th>
+                <th class="px-4 py-2.5 font-semibold">COMPONENT</th>
+                <th class="px-4 py-2.5 font-semibold w-full">MESSAGE</th>
               </tr>
             </thead>
             <tbody id="logs-body" class="divide-y divide-border_light/50 font-mono"></tbody>
@@ -456,6 +456,6 @@
     </form>
   </dialog>
 
-  <script src="/static/app.js?v=15"></script>
+  <script src="/static/app.js?v=16"></script>
 </body>
 </html>
