@@ -42,4 +42,8 @@ async def websocket_endpoint(websocket: WebSocket):
             data = await websocket.receive_text()
             pass
     except Exception:
+        pass
+    except BaseException:
+        pass
+    finally:
         manager.disconnect(websocket)
