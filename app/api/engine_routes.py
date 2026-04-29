@@ -10,7 +10,8 @@ async def get_status():
     return {
         "engine_running": state.engine_running,
         "mt5_connected": mt5_client.is_connected(),
-        "today_pnl": state.today_pnl
+        "today_pnl": state.today_pnl,
+        "active_sessions_count": getattr(state, "active_sessions_count", 0)
     }
 
 @router.post("/engine/start")

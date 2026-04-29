@@ -75,7 +75,8 @@ function handleEvent(msg) {
         renderStats();
         break;
     case 'log.event':       state.events.unshift(msg); renderLogs(); break;
-    case 'engine.status':   state.engine_running = msg.state === 'active'; renderEngineBtn(); break;
+    case 'engine.status':   state.engine_running = msg.state === 'active'; renderEngineBtn(); renderNotice(); break;
+    case 'session.status':  state.active_sessions_count = msg.active_count; renderTopbar(); renderNotice(); break;
   }
 }
 
@@ -140,9 +141,20 @@ document.querySelectorAll('.sub-tab').forEach(t => t.onclick = () => {
 function renderTopbar() {
   document.getElementById('mt5-dot').className = `w-2 h-2 rounded-full inline-block ${state.mt5_connected ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]" : "bg-rose-500"}`;
   document.getElementById('mt5-info').innerText = state.mt5_connected ? (state.account?.server || 'Connected') : 'Not connected';
-  document.getElementById('active-sessions').innerText = state.sessions.filter(s => s.enabled).length;
+  document.getElementById('active-sessions').innerText = state.active_sessions_count !== undefined ? state.active_sessions_count : state.sessions.filter(s => s.enabled).length;
   document.getElementById('today-pnl').innerText = `${state.today_pnl < 0 ? '-' : ''}$${Math.abs(state.today_pnl).toFixed(2)}`;
   document.getElementById('today-pnl').className = state.today_pnl >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold';
+}
+
+function renderNotice() {
+  const notice = document.getElementById('session-notice');
+  if (notice) {
+    if (state.active_sessions_count === 0 && state.engine_running) {
+      notice.classList.remove('hidden');
+    } else {
+      notice.classList.add('hidden');
+    }
+  }
 }
 
 function renderEngineBtn() {
@@ -945,7 +957,7 @@ async function init() {
     }
   } catch (err) { console.error("Init Error:", err); }
   
-  renderTopbar(); renderStats(); renderEngineBtn();
+  renderTopbar(); renderStats(); renderEngineBtn(); renderNotice();
   renderPositions(); renderTrades(); renderSignals(); renderLogs();
 }
 init();

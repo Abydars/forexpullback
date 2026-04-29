@@ -82,8 +82,12 @@ async def scan_loop():
                                    days_mask=s.days_mask, enabled=s.enabled) for s in session_models]
             
             is_active = any_active(sessions, now_utc)
-            state.active_sessions_count = len(active_sessions(sessions, now_utc))
+            new_active_count = len(active_sessions(sessions, now_utc))
             
+            if getattr(state, "active_sessions_count", None) != new_active_count:
+                state.active_sessions_count = new_active_count
+                await broadcast({"type": "session.status", "active_count": new_active_count})
+                
             if not is_active:
                 await asyncio.sleep(interval)
                 continue
