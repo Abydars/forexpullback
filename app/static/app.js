@@ -953,7 +953,20 @@ function applyJsonText() {
 
     if (Array.isArray(data.sessions)) {
       document.getElementById('sessions-list').innerHTML = '';
-      data.sessions.forEach(s => addSessionRow(s));
+      data.sessions.forEach(s => {
+        if (Array.isArray(s.days)) {
+          const dayNames = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+          let mask = 0;
+          s.days.forEach(d => {
+            const idx = dayNames.indexOf(d.toLowerCase().trim());
+            if (idx !== -1) mask |= (1 << idx);
+          });
+          s.days_mask = mask;
+        } else if (s.days_mask === undefined) {
+          s.days_mask = 31; // Default Mon-Fri
+        }
+        addSessionRow(s);
+      });
     }
 
     alert("JSON applied to form. Click 'SAVE CHANGES' to submit.");
@@ -989,6 +1002,43 @@ async function saveConfig() {
     alert("Error saving config: " + err.message);
     console.error(err);
   }
+}
+
+function exportConfig() {
+  const payload = collectConfigInputs();
+  payload.symbols = state.symbols.filter(s => s.status !== 'unresolved').map(s => s.generic);
+  payload.enabled_correlation_groups = state.enabled_correlation_groups;
+  
+  const dayNames = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+  const rows = document.querySelectorAll('.session-row');
+  payload.sessions = Array.from(rows).map(row => {
+    let days_mask = 0;
+    const days = [];
+    row.querySelectorAll('.day-checks input:checked').forEach(cb => {
+      const idx = parseInt(cb.dataset.day);
+      days_mask |= (1 << idx);
+      days.push(dayNames[idx]);
+    });
+    const id = row.dataset.id.startsWith('new-') ? null : parseInt(row.dataset.id);
+    return {
+      id,
+      name: row.querySelector('.s-name').value,
+      start_time: row.querySelector('.s-start').value,
+      end_time: row.querySelector('.s-end').value,
+      timezone: row.querySelector('.s-tz').value,
+      days_mask,
+      days,
+      enabled: row.querySelector('.s-on').checked
+    };
+  });
+  
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(payload, null, 2));
+  const downloadAnchorNode = document.createElement('a');
+  downloadAnchorNode.setAttribute("href", dataStr);
+  downloadAnchorNode.setAttribute("download", "bot_config.json");
+  document.body.appendChild(downloadAnchorNode);
+  downloadAnchorNode.click();
+  downloadAnchorNode.remove();
 }
 
 // ---- Init ----

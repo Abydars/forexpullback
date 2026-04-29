@@ -22,7 +22,7 @@ def active_sessions(sessions: list[Session], now_utc: datetime) -> list[Session]
             continue
             
         tz = pytz.timezone(s.timezone)
-        now_local = datetime.now(tz)
+        now_local = now_utc.astimezone(tz)
         current_time = now_local.strftime("%H:%M")
         day_bit = 1 << now_local.weekday()
         
