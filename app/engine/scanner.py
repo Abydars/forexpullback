@@ -88,10 +88,6 @@ async def scan_loop():
                 state.active_sessions_count = new_active_count
                 await broadcast({"type": "session.status", "active_count": new_active_count})
                 
-            if not is_active:
-                await asyncio.sleep(interval)
-                continue
-                
             await symbol_resolver.refresh()
                 
             scan_start_ms = time.time() * 1000
@@ -549,10 +545,17 @@ async def scan_loop():
                 # Check if it was selected based on its list
                 if (is_dca and res in selected_symbols_dca) or (not is_dca and res in selected_symbols_normal):
                     status = "DCA_FIRED" if is_dca else "FIRED"
-                    if is_dca:
-                        reason_full["msg"] = f"DCA Executed! Rank 1 (Score: {score})"
+                    
+                    execute_entry = True
+                    if not is_active and not is_dca:
+                        execute_entry = False
+                        reason_full["msg"] = f"Signal Fired! (Score: {score}) - ENTRY BLOCKED (SESSION OFF)"
                     else:
-                        reason_full["msg"] = f"Executed! Rank 1 (Score: {score})"
+                        if is_dca:
+                            reason_full["msg"] = f"DCA Executed! Rank 1 (Score: {score})"
+                        else:
+                            reason_full["msg"] = f"Executed! Rank 1 (Score: {score})"
+                            
                     scanner_state[state_key] = {"time": now_utc, "status": status}
                     
                     updates_to_broadcast.append({
@@ -577,8 +580,9 @@ async def scan_loop():
                         })
                         
                         c["timings"]["signal_saved"] = time.time() * 1000
-                        from app.engine.order_manager import send_order
-                        await send_order(sig, res, bias, c["cfg"], is_dca=is_dca, dca_data=ltf_trigger if is_dca else None, timings=c.get("timings"))
+                        if execute_entry:
+                            from app.engine.order_manager import send_order
+                            await send_order(sig, res, bias, c["cfg"], is_dca=is_dca, dca_data=ltf_trigger if is_dca else None, timings=c.get("timings"))
                 else:
                     is_dca = c.get("is_dca", False)
                     status = c.get("status", "DCA_SKIPPED" if is_dca else "SKIPPED")
