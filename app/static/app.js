@@ -698,7 +698,11 @@ function renderPredefinedSymbols() {
   document.getElementById('sym-checkboxes').innerHTML = PREDEFINED_SYMBOLS.map(sym => {
     const isChecked = enabledSyms.has(sym);
     const obj = state.symbols.find(s => s.generic === sym);
-    const statusLabel = obj && obj.resolved ? ` <span class="text-emerald-500 text-[9px] whitespace-nowrap">(✓ ${obj.resolved})</span>` : (obj && obj.status === 'unresolved' ? ` <span class="text-rose-500 text-[9px]">(✗)</span>` : '');
+    const statusLabel = obj && obj.resolved 
+      ? ` <span class="text-emerald-500 text-[9px] whitespace-nowrap">(✓ ${obj.resolved})</span>` 
+      : (obj && obj.status === 'unresolved' 
+        ? ` <span class="text-rose-500 text-[9px] cursor-help" title="${obj.error_reason || 'Unknown error'}">(✗ ${obj.error_reason ? 'ERR' : 'FAIL'})</span>` 
+        : '');
 
     return `
       <label class="flex items-center gap-2 text-[10px] font-bold tracking-[0.1em] text-slate-300 cursor-pointer p-2 border border-border_light bg-black/10 hover:bg-white/5 rounded transition-colors group">
@@ -759,9 +763,16 @@ async function resolveAllSymbols() {
   if (!generics.length) return renderPredefinedSymbols();
   try {
     const { map } = await api('POST', '/api/symbols/resolve', { generics });
-    state.symbols = state.symbols.map(s => ({
-      ...s, resolved: map[s.generic], status: map[s.generic] ? 'resolved' : 'unresolved'
-    }));
+    state.symbols = state.symbols.map(s => {
+      const info = map[s.generic];
+      const isResolved = info && info.exists && info.selected;
+      return {
+        ...s, 
+        resolved: isResolved ? info.resolved : null, 
+        status: isResolved ? 'resolved' : 'unresolved',
+        error_reason: info ? info.error : null
+      };
+    });
     renderPredefinedSymbols();
   } catch (err) { console.error(err); }
 }
