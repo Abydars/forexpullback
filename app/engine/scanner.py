@@ -385,7 +385,7 @@ async def scan_loop():
                                         is_dca_allowed = False
                                         is_dca_candidate = False
                                         
-                                        if status == "REJECTED":
+                                        if status == "REJECTED" and reason_full["msg"] != "":
                                             pass
                                         elif sym_count > 0:
                                             enable_dca = cfg.get("enable_dca", False)
