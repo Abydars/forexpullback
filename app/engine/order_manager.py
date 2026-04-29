@@ -9,6 +9,7 @@ from sqlalchemy import select
 import pytz
 
 import time
+import math
 
 async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca_data=None, timings=None):
     if timings is None: timings = {}
@@ -32,7 +33,7 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
                 return
             
         acc = await mt5_client.account_info()
-        balance = acc['balance']
+        equity = acc['equity']
         
         info = mt5.symbol_info(resolved)
         if not info: return
@@ -41,6 +42,25 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
         if not tick: return
         actual_price = tick.ask if bias == 'bullish' else tick.bid
         
+        # 2. Validate SL before lot calc
+        if actual_price <= 0 or sig.sl <= 0 or sig.sl == actual_price:
+            async with AsyncSessionLocal() as db:
+                err_msg = f"Order {resolved} rejected: Invalid entry or SL (Entry: {actual_price}, SL: {sig.sl})"
+                e = Event(level="WARN", component="risk", message=err_msg)
+                db.add(e)
+                await db.commit()
+                await broadcast({"type": "log.event", "level": "WARN", "component": "risk", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+            return
+            
+        if (bias == 'bullish' and sig.sl >= actual_price) or (bias == 'bearish' and sig.sl <= actual_price):
+            async with AsyncSessionLocal() as db:
+                err_msg = f"Order {resolved} rejected: SL is on the wrong side of entry for {bias} (Entry: {actual_price}, SL: {sig.sl})"
+                e = Event(level="WARN", component="risk", message=err_msg)
+                db.add(e)
+                await db.commit()
+                await broadcast({"type": "log.event", "level": "WARN", "component": "risk", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+            return
+
         # Spread check (Dynamic Percentage of Stop Loss)
         spread = tick.ask - tick.bid
         sl_distance = abs(actual_price - sig.sl)
@@ -58,52 +78,96 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
                 await broadcast({"type": "log.event", "level": "WARN", "component": "order_manager", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
             return
         
-        if sl_distance <= 0:
+        risk_pct = float(cfg.get("risk_percent", 1.0))
+        risk_amount = equity * risk_pct / 100
+        
+        order_type = mt5.ORDER_TYPE_BUY if bias == 'bullish' else mt5.ORDER_TYPE_SELL
+        
+        # 3. Use order_calc_profit only
+        def _calc_profit(vol):
+            return mt5.order_calc_profit(order_type, resolved, float(vol), actual_price, sig.sl)
+            
+        profit_1_lot = await asyncio.to_thread(_calc_profit, 1.0)
+        
+        if profit_1_lot is None or profit_1_lot >= 0:
             async with AsyncSessionLocal() as db:
-                err_msg = f"Order {resolved} rejected: SL distance is zero or invalid"
-                e = Event(level="WARN", component="order_manager", message=err_msg)
+                err_msg = f"Order {resolved} rejected: order_calc_profit failed or returned non-negative for 1.0 lot (Result: {profit_1_lot})"
+                e = Event(level="WARN", component="risk", message=err_msg)
                 db.add(e)
                 await db.commit()
-                await broadcast({"type": "log.event", "level": "WARN", "component": "order_manager", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+                await broadcast({"type": "log.event", "level": "WARN", "component": "risk", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
             return
-
-        risk_pct = float(cfg.get("risk_percent", 1.0))
-        risk_amount = balance * risk_pct / 100
-        
-        def _calc_profit():
-            action_type = mt5.ORDER_TYPE_BUY if bias == 'bullish' else mt5.ORDER_TYPE_SELL
-            return mt5.order_calc_profit(action_type, resolved, 1.0, actual_price, sig.sl)
             
-        profit_1_lot = await asyncio.to_thread(_calc_profit)
+        risk_per_1_lot = abs(profit_1_lot)
         
-        # Risk per 1 lot calculation without random 1.0 fallbacks
-        if profit_1_lot is not None and profit_1_lot < 0:
-            loss_for_1_lot = abs(profit_1_lot)
-        else:
-            sl_points = sl_distance / info.point if info.point else 0
-            if info.trade_tick_value and sl_points > 0:
-                loss_for_1_lot = sl_points * info.trade_tick_value
-            else:
-                async with AsyncSessionLocal() as db:
-                    err_msg = f"Order {resolved} rejected: Cannot calculate risk (profit_1_lot={profit_1_lot}, tick_value={info.trade_tick_value})"
-                    e = Event(level="WARN", component="order_manager", message=err_msg)
-                    db.add(e)
-                    await db.commit()
-                    await broadcast({"type": "log.event", "level": "WARN", "component": "order_manager", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
-                return
+        if risk_per_1_lot <= 0:
+            async with AsyncSessionLocal() as db:
+                err_msg = f"Order {resolved} rejected: risk_per_1_lot is zero or negative ({risk_per_1_lot})"
+                e = Event(level="WARN", component="risk", message=err_msg)
+                db.add(e)
+                await db.commit()
+                await broadcast({"type": "log.event", "level": "WARN", "component": "risk", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+            return
 
         if is_dca and dca_data:
             lot = dca_data.get('dca_lot', info.volume_min)
-        else:
-            lot = risk_amount / loss_for_1_lot
-            
-            # precise volume calculation to prevent MT5 invalid volume errors
+            # Ensure DCA lot respects limits
             steps = round(lot / info.volume_step)
             lot = steps * info.volume_step
             lot = max(info.volume_min, min(info.volume_max, lot))
-            lot = float(f"{lot:.8f}".rstrip('0').rstrip('.')) if '.' in f"{lot:.8f}" else float(lot)
+            raw_lot = lot
+        else:
+            # 4. Calculate raw lot
+            raw_lot = risk_amount / risk_per_1_lot
             
-        print(f"[{resolved}] ORDER LOT CALC: Balance={balance:.2f}, RiskAmt={risk_amount:.2f}, SL_Dist={sl_distance:.5f}, RiskPer1Lot={loss_for_1_lot:.2f}, FinalLot={lot}")
+            # 5. Normalize lot DOWN only
+            steps = math.floor(raw_lot / info.volume_step)
+            lot = steps * info.volume_step
+            
+            # 6. Handle lot below min
+            if lot < info.volume_min:
+                lot = info.volume_min
+                min_lot_profit = await asyncio.to_thread(_calc_profit, lot)
+                expected_loss = abs(min_lot_profit) if min_lot_profit is not None else 0
+                if expected_loss > risk_amount * 1.20:
+                    async with AsyncSessionLocal() as db:
+                        err_msg = f"Order {resolved} rejected: Minimum lot ({lot}) exceeds risk_amount by >20% (Expected Loss: {expected_loss:.2f}, Max Allowed: {risk_amount * 1.20:.2f})"
+                        e = Event(level="WARN", component="risk", message=err_msg)
+                        db.add(e)
+                        await db.commit()
+                        await broadcast({"type": "log.event", "level": "WARN", "component": "risk", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+                    return
+            
+            # 7. Handle lot above max
+            if lot > info.volume_max:
+                lot = info.volume_max
+        
+        lot = float(f"{lot:.8f}".rstrip('0').rstrip('.')) if '.' in f"{lot:.8f}" else float(lot)
+        
+        # 8. Final risk validation
+        final_profit = await asyncio.to_thread(_calc_profit, lot)
+        expected_loss = abs(final_profit) if final_profit is not None and final_profit < 0 else 0
+        
+        if expected_loss <= 0:
+            async with AsyncSessionLocal() as db:
+                err_msg = f"Order {resolved} rejected: Final expected_loss calculation failed or is zero"
+                e = Event(level="WARN", component="risk", message=err_msg)
+                db.add(e)
+                await db.commit()
+                await broadcast({"type": "log.event", "level": "WARN", "component": "risk", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+            return
+            
+        if expected_loss > risk_amount * 1.05:
+            async with AsyncSessionLocal() as db:
+                err_msg = f"Order {resolved} rejected: Risk exceeds configured limit after lot normalization (Expected Loss: {expected_loss:.2f}, Risk Amount: {risk_amount:.2f})"
+                e = Event(level="WARN", component="risk", message=err_msg)
+                db.add(e)
+                await db.commit()
+                await broadcast({"type": "log.event", "level": "WARN", "component": "risk", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+            return
+            
+        # 9. Logging
+        print(f"[{resolved}] ORDER LOT CALC: Equity={equity:.2f}, RiskPct={risk_pct:.2f}%, RiskAmt={risk_amount:.2f}, Entry={actual_price}, SL={sig.sl}, SL_Dist={sl_distance:.5f}, RiskPer1Lot={risk_per_1_lot:.2f}, RawLot={raw_lot:.5f}, FinalLot={lot}, ExpectedLoss={expected_loss:.2f}")
 
         action = mt5.TRADE_ACTION_DEAL
         type_ = mt5.ORDER_TYPE_BUY if bias == 'bullish' else mt5.ORDER_TYPE_SELL
