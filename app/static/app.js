@@ -849,6 +849,12 @@ function collectConfigInputs() {
     volume_score_bonus: parseInt(document.getElementById('c-volume_score_bonus').value),
     volume_use_ema: document.getElementById('c-volume_use_ema').checked,
     volume_low_downgrade_only: document.getElementById('c-volume_low_downgrade_only').checked,
+    session_warmup_enabled: document.getElementById('c-session_warmup_enabled').checked,
+    session_min_warmup_minutes: parseInt(document.getElementById('c-session_min_warmup_minutes').value),
+    session_max_warmup_minutes: parseInt(document.getElementById('c-session_max_warmup_minutes').value),
+    session_warmup_require_closed_m5: document.getElementById('c-session_warmup_require_closed_m5').checked,
+    session_warmup_spread_multiplier: parseFloat(document.getElementById('c-session_warmup_spread_multiplier').value),
+    session_warmup_volatility_multiplier: parseFloat(document.getElementById('c-session_warmup_volatility_multiplier').value)
   };
 }
 
@@ -925,7 +931,13 @@ function applyJsonText() {
       strong_volume_ratio: 'c-strong_volume_ratio',
       volume_score_bonus: 'c-volume_score_bonus',
       volume_use_ema: 'c-volume_use_ema',
-      volume_low_downgrade_only: 'c-volume_low_downgrade_only'
+      volume_low_downgrade_only: 'c-volume_low_downgrade_only',
+      session_warmup_enabled: 'c-session_warmup_enabled',
+      session_min_warmup_minutes: 'c-session_min_warmup_minutes',
+      session_max_warmup_minutes: 'c-session_max_warmup_minutes',
+      session_warmup_require_closed_m5: 'c-session_warmup_require_closed_m5',
+      session_warmup_spread_multiplier: 'c-session_warmup_spread_multiplier',
+      session_warmup_volatility_multiplier: 'c-session_warmup_volatility_multiplier'
     };
 
     for (const [key, id] of Object.entries(inputs)) {

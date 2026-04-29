@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import time, datetime
+from datetime import time, datetime, timedelta
 import pytz
 
 @dataclass
@@ -43,3 +43,20 @@ def active_sessions(sessions: list[Session], now_utc: datetime) -> list[Session]
                     active.append(s)
                     
     return active
+
+def get_session_start_utc(s: Session, now_utc: datetime) -> datetime:
+    tz = pytz.timezone(s.timezone)
+    now_local = now_utc.astimezone(tz)
+    current_time = now_local.strftime("%H:%M")
+    
+    start_hour, start_minute = map(int, s.start_time.split(':'))
+    
+    if s.start_time <= s.end_time:
+        start_local = now_local.replace(hour=start_hour, minute=start_minute, second=0, microsecond=0)
+    else:
+        if current_time >= s.start_time:
+            start_local = now_local.replace(hour=start_hour, minute=start_minute, second=0, microsecond=0)
+        else:
+            start_local = (now_local - timedelta(days=1)).replace(hour=start_hour, minute=start_minute, second=0, microsecond=0)
+            
+    return start_local.astimezone(pytz.utc)

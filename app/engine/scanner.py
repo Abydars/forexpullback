@@ -13,7 +13,7 @@ from app.strategy.scoring import calculate_score
 from app.core.config import get_config
 from app.db.session import AsyncSessionLocal
 from app.db.models import Signal, Session as SessionModel, Trade
-from app.core.sessions import active_sessions, any_active, Session
+from app.core.sessions import active_sessions, any_active, Session, get_session_start_utc
 from app.ws.manager import broadcast
 from sqlalchemy import select
 
@@ -81,8 +81,30 @@ async def scan_loop():
                                    end_time=s.end_time, timezone=s.tz,
                                    days_mask=s.days_mask, enabled=s.enabled) for s in session_models]
             
-            is_active = any_active(sessions, now_utc)
-            new_active_count = len(active_sessions(sessions, now_utc))
+            active_sess_list = active_sessions(sessions, now_utc)
+            is_active = len(active_sess_list) > 0
+            new_active_count = len(active_sess_list)
+            
+            session_warmup_state = None
+            if is_active and cfg.get("session_warmup_enabled", True):
+                most_recent_start = None
+                for s in active_sess_list:
+                    start_utc = get_session_start_utc(s, now_utc)
+                    if not most_recent_start or start_utc > most_recent_start:
+                        most_recent_start = start_utc
+                
+                if most_recent_start:
+                    minutes_active = (now_utc - most_recent_start).total_seconds() / 60.0
+                    max_w = int(cfg.get("session_max_warmup_minutes", 15))
+                    if 0 <= minutes_active < max_w:
+                        session_warmup_state = {
+                            "minutes_active": minutes_active,
+                            "min_warmup": int(cfg.get("session_min_warmup_minutes", 5)),
+                            "max_warmup": max_w,
+                            "require_closed_m5": cfg.get("session_warmup_require_closed_m5", True),
+                            "spread_mult": float(cfg.get("session_warmup_spread_multiplier", 1.2)),
+                            "vol_mult": float(cfg.get("session_warmup_volatility_multiplier", 1.5))
+                        }
             
             if getattr(state, "active_sessions_count", None) != new_active_count:
                 state.active_sessions_count = new_active_count
@@ -241,6 +263,42 @@ async def scan_loop():
                                 )
                                 timings["trigger_done"] = time.time() * 1000
                                 reason_full["trigger"] = ltf_trigger
+                                
+                                warmup_failed = False
+                                warmup_reason = ""
+                                if session_warmup_state:
+                                    wm_mins = session_warmup_state["minutes_active"]
+                                    min_w = session_warmup_state["min_warmup"]
+                                    max_w = session_warmup_state["max_warmup"]
+                                    
+                                    if session_warmup_state["require_closed_m5"] and min_w < 5:
+                                        min_w = 5
+                                        
+                                    if wm_mins < min_w:
+                                        warmup_failed = True
+                                        warmup_reason = f"Session warm-up: waiting for market to stabilize ({wm_mins:.1f}m < {min_w}m)"
+                                    elif wm_mins < max_w:
+                                        m5_spreads = df_5m['spread'].iloc[-10:-1]
+                                        avg_spread = m5_spreads.mean() if not m5_spreads.empty else spread_points
+                                        
+                                        m5_trs = pd.concat([
+                                            df_5m['high'] - df_5m['low'],
+                                            abs(df_5m['high'] - df_5m['close'].shift(1)),
+                                            abs(df_5m['low'] - df_5m['close'].shift(1))
+                                        ], axis=1).max(axis=1)
+                                        
+                                        latest_closed_tr = m5_trs.iloc[-2]
+                                        avg_tr = m5_trs.iloc[-10:-2].mean()
+                                        
+                                        sp_mult = session_warmup_state["spread_mult"]
+                                        vol_mult = session_warmup_state["vol_mult"]
+                                        
+                                        if spread_points > avg_spread * sp_mult:
+                                            warmup_failed = True
+                                            warmup_reason = f"Session warm-up: Spread too high ({spread_points:.1f} > avg {avg_spread:.1f}*{sp_mult})"
+                                        elif latest_closed_tr > avg_tr * vol_mult:
+                                            warmup_failed = True
+                                            warmup_reason = f"Session warm-up: Volatility too high (TR {latest_closed_tr:.5f} > avg {avg_tr:.5f}*{vol_mult})"
                                 
                                 is_strong_trigger = ltf_trigger and ltf_trigger['strength'] >= 80
                                 
@@ -454,7 +512,9 @@ async def scan_loop():
                                                         "cfg": cfg,
                                                         "threshold": base_threshold,
                                                         "state_key": state_key,
-                                                        "timings": dict(timings)
+                                                        "timings": dict(timings),
+                                                        "warmup_failed": warmup_failed,
+                                                        "warmup_reason": warmup_reason
                                                     })
                                         else:
                                             status = "WATCHING"
@@ -473,7 +533,9 @@ async def scan_loop():
                                                 "threshold": base_threshold,
                                                 "state_key": state_key,
                                                 "is_dca": True,
-                                                "timings": dict(timings)
+                                                "timings": dict(timings),
+                                                "warmup_failed": warmup_failed,
+                                                "warmup_reason": warmup_reason
                                             })
 
                 if status not in ("FIRED", "DCA_FIRED"):
@@ -552,6 +614,9 @@ async def scan_loop():
                     if not is_active and not is_dca:
                         execute_entry = False
                         reason_full["msg"] = f"Signal Fired! (Score: {score}) - ENTRY BLOCKED (SESSION OFF)"
+                    elif c.get("warmup_failed") and not is_dca:
+                        execute_entry = False
+                        reason_full["msg"] = f"Signal Fired! (Score: {score}) - ENTRY BLOCKED ({c['warmup_reason']})"
                     else:
                         if is_dca:
                             reason_full["msg"] = f"DCA Executed! Rank 1 (Score: {score})"
