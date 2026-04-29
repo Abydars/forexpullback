@@ -646,6 +646,14 @@ async function loadConfig() {
     document.getElementById('c-basket_trailing_drawdown_usd').value = cfg.basket_trailing_drawdown_usd || 1.5;
     document.getElementById('c-basket_trailing_min_close_usd').value = cfg.basket_trailing_min_close_usd || 5.0;
 
+    document.getElementById('c-volume_filter_enabled').checked = cfg.volume_filter_enabled !== false;
+    document.getElementById('c-volume_lookback').value = cfg.volume_lookback || 20;
+    document.getElementById('c-min_volume_ratio').value = cfg.min_volume_ratio || 0.85;
+    document.getElementById('c-strong_volume_ratio').value = cfg.strong_volume_ratio || 1.3;
+    document.getElementById('c-volume_score_bonus').value = cfg.volume_score_bonus || 5;
+    document.getElementById('c-volume_use_ema').checked = cfg.volume_use_ema !== false;
+    document.getElementById('c-volume_low_downgrade_only').checked = cfg.volume_low_downgrade_only !== false;
+
     state.symbols = (cfg.symbols || []).map(s => ({ generic: s, resolved: null, status: 'pending' }));
     document.getElementById('c-correlation_groups_enabled').checked = cfg.correlation_groups_enabled !== false;
     document.getElementById('c-max_open_per_correlation_group').value = cfg.max_open_per_correlation_group || 1;
@@ -834,6 +842,13 @@ function collectConfigInputs() {
     trailing_mode: document.getElementById('c-trailing_mode').value,
     trailing_atr_multiplier: parseFloat(document.getElementById('c-trailing_atr_multiplier').value),
     trailing_distance_pips: parseFloat(document.getElementById('c-trailing_distance_pips').value),
+    volume_filter_enabled: document.getElementById('c-volume_filter_enabled').checked,
+    volume_lookback: parseInt(document.getElementById('c-volume_lookback').value),
+    min_volume_ratio: parseFloat(document.getElementById('c-min_volume_ratio').value),
+    strong_volume_ratio: parseFloat(document.getElementById('c-strong_volume_ratio').value),
+    volume_score_bonus: parseInt(document.getElementById('c-volume_score_bonus').value),
+    volume_use_ema: document.getElementById('c-volume_use_ema').checked,
+    volume_low_downgrade_only: document.getElementById('c-volume_low_downgrade_only').checked,
   };
 }
 
@@ -903,7 +918,14 @@ function applyJsonText() {
       trailing_start_tp_pct: 'c-trailing_start_tp_pct',
       trailing_mode: 'c-trailing_mode',
       trailing_atr_multiplier: 'c-trailing_atr_multiplier',
-      trailing_distance_pips: 'c-trailing_distance_pips'
+      trailing_distance_pips: 'c-trailing_distance_pips',
+      volume_filter_enabled: 'c-volume_filter_enabled',
+      volume_lookback: 'c-volume_lookback',
+      min_volume_ratio: 'c-min_volume_ratio',
+      strong_volume_ratio: 'c-strong_volume_ratio',
+      volume_score_bonus: 'c-volume_score_bonus',
+      volume_use_ema: 'c-volume_use_ema',
+      volume_low_downgrade_only: 'c-volume_low_downgrade_only'
     };
 
     for (const [key, id] of Object.entries(inputs)) {

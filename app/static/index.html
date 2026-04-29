@@ -381,6 +381,34 @@
             </div>
             <div></div> <!-- empty grid cell -->
             
+            <div class="col-span-1 md:col-span-2 mt-6 mb-2 text-[11px] font-bold tracking-[0.15em] text-cyan_neon border-b border-border_light pb-3 uppercase flex items-center gap-2"><span class="opacity-70 text-[8px]">■</span> VOLUME FILTER SETTINGS</div>
+            
+            <div class="flex flex-col gap-3 col-span-1 md:col-span-2">
+               <label class="flex gap-3 items-center text-[10px] font-bold tracking-[0.1em] text-slate-300 uppercase cursor-pointer group w-fit"><input type="checkbox" id="c-volume_filter_enabled" checked class="w-4 h-4 accent-cyan_neon cursor-pointer border-border_strong bg-black/20 group-hover:border-cyan_neon transition-colors"> ENABLE VOLUME FILTER</label>
+               <label class="flex gap-3 items-center text-[10px] font-bold tracking-[0.1em] text-slate-300 uppercase cursor-pointer group w-fit"><input type="checkbox" id="c-volume_use_ema" checked class="w-4 h-4 accent-cyan_neon cursor-pointer border-border_strong bg-black/20 group-hover:border-cyan_neon transition-colors"> USE EMA INSTEAD OF SMA</label>
+               <label class="flex gap-3 items-center text-[10px] font-bold tracking-[0.1em] text-slate-300 uppercase cursor-pointer group w-fit"><input type="checkbox" id="c-volume_low_downgrade_only" checked class="w-4 h-4 accent-cyan_neon cursor-pointer border-border_strong bg-black/20 group-hover:border-cyan_neon transition-colors"> LOW VOLUME DOWNGRADES SCORE ONLY</label>
+            </div>
+            
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">VOLUME LOOKBACK (CANDLES)</label>
+              <input type="number" id="c-volume_lookback" value="20" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors">
+            </div>
+
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">MIN VOLUME RATIO</label>
+              <input type="number" step="0.05" id="c-min_volume_ratio" value="0.85" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors">
+            </div>
+            
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">STRONG VOLUME RATIO</label>
+              <input type="number" step="0.05" id="c-strong_volume_ratio" value="1.3" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors">
+            </div>
+            
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">STRONG VOLUME BONUS SCORE</label>
+              <input type="number" id="c-volume_score_bonus" value="5" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors">
+            </div>
+            
             <div class="col-span-1 md:col-span-2 mt-6 mb-2 text-[11px] font-bold tracking-[0.15em] text-cyan_neon border-b border-border_light pb-3 uppercase flex items-center gap-2"><span class="opacity-70 text-[8px]">■</span> DCA SETTINGS</div>
             
             <label class="flex flex-col gap-1.5 text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase">MAX DCA ENTRIES (PER TRADE) <input type="number" id="c-max_dca_entries" value="1" class="bg-black/20 border border-border_strong text-slate-200 text-xs px-3 py-2 rounded outline-none focus:border-cyan_neon transition-colors"></label>

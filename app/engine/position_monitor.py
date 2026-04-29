@@ -12,8 +12,8 @@ from app.core.config import get_config
 
 async def evaluate_exit_advice(p: dict) -> dict:
     symbol = p['symbol']
-    df = await mt5_client.get_rates(symbol, mt5.TIMEFRAME_M5, 15)
-    if df is None or df.empty or len(df) < 15:
+    df = await mt5_client.get_rates(symbol, mt5.TIMEFRAME_M5, 35)
+    if df is None or df.empty or len(df) < 35:
         return {"advice": "HOLD", "risk_score": 20.0, "reason": "Insufficient data"}
     
     last = df.iloc[-2]
@@ -31,53 +31,90 @@ async def evaluate_exit_advice(p: dict) -> dict:
     
     trade_age_mins = (datetime.now().timestamp() - p['time']) / 60
 
+    res = None
     if p['profit'] <= 0:
         if p['type'] == mt5.ORDER_TYPE_BUY:
             if last['close'] < prev['low'] and is_strong and (entry - last['close'] > atr):
-                return {"advice": "CLOSE_SIGNAL", "risk_score": 85.0, "reason": "Trade invalidated"}
+                res = {"advice": "CLOSE_SIGNAL", "risk_score": 85.0, "reason": "Trade invalidated"}
             elif last['close'] < last['open'] and prev['close'] < prev['open'] and (entry - last['close'] > atr * 0.8):
-                return {"advice": "CONSIDER_CLOSE", "risk_score": 70.0, "reason": "Momentum against trade"}
+                res = {"advice": "CONSIDER_CLOSE", "risk_score": 70.0, "reason": "Momentum against trade"}
         else:
             if last['close'] > prev['high'] and is_strong and (last['close'] - entry > atr):
-                return {"advice": "CLOSE_SIGNAL", "risk_score": 85.0, "reason": "Trade invalidated"}
+                res = {"advice": "CLOSE_SIGNAL", "risk_score": 85.0, "reason": "Trade invalidated"}
             elif last['close'] > last['open'] and prev['close'] > prev['open'] and (last['close'] - entry > atr * 0.8):
-                return {"advice": "CONSIDER_CLOSE", "risk_score": 70.0, "reason": "Momentum against trade"}
+                res = {"advice": "CONSIDER_CLOSE", "risk_score": 70.0, "reason": "Momentum against trade"}
                 
-        if trade_age_mins > 60:
-            return {"advice": "WATCH", "risk_score": 50.0, "reason": "No momentum"}
+        if not res and trade_age_mins > 60:
+            res = {"advice": "WATCH", "risk_score": 50.0, "reason": "No momentum"}
             
-        return {"advice": "HOLD", "risk_score": 20.0, "reason": "Holding position"}
+        if not res:
+            res = {"advice": "HOLD", "risk_score": 20.0, "reason": "Holding position"}
 
-    if trade_age_mins < 20:
-        return {"advice": "HOLD", "risk_score": 20.0, "reason": "Trade too fresh (< 20m)"}
+    elif trade_age_mins < 20:
+        res = {"advice": "HOLD", "risk_score": 20.0, "reason": "Trade too fresh (< 20m)"}
         
-    if p['type'] == mt5.ORDER_TYPE_BUY:
+    elif p['type'] == mt5.ORDER_TYPE_BUY:
         if tp and tp > entry:
             tp_dist = tp - entry
             max_reached = max(last['high'], prev['high']) - entry
             if max_reached >= tp_dist * 0.8 and (last['close'] - entry) <= tp_dist * 0.6:
-                return {"advice": "CLOSE_SIGNAL", "risk_score": 85.0, "reason": "Rejected after reaching 80% TP"}
+                res = {"advice": "CLOSE_SIGNAL", "risk_score": 85.0, "reason": "Rejected after reaching 80% TP"}
         
-        if last['close'] < last['open'] and last['close'] < prev['low']:
+        if not res and last['close'] < last['open'] and last['close'] < prev['low']:
             if is_strong or (prev['close'] < prev['open']):
-                return {"advice": "CONSIDER_CLOSE", "risk_score": 75.0, "reason": "Momentum reversal detected"}
-        elif last['close'] >= last['open'] and range_last > 0 and body_last < (0.2 * range_last):
-            return {"advice": "WATCH", "risk_score": 55.0, "reason": "Momentum slowing"}
+                res = {"advice": "CONSIDER_CLOSE", "risk_score": 75.0, "reason": "Momentum reversal detected"}
+        elif not res and last['close'] >= last['open'] and range_last > 0 and body_last < (0.2 * range_last):
+            res = {"advice": "WATCH", "risk_score": 55.0, "reason": "Momentum slowing"}
             
     else:
         if tp and tp < entry:
             tp_dist = entry - tp
             max_reached = entry - min(last['low'], prev['low'])
             if max_reached >= tp_dist * 0.8 and (entry - last['close']) <= tp_dist * 0.6:
-                return {"advice": "CLOSE_SIGNAL", "risk_score": 85.0, "reason": "Rejected after reaching 80% TP"}
+                res = {"advice": "CLOSE_SIGNAL", "risk_score": 85.0, "reason": "Rejected after reaching 80% TP"}
         
-        if last['close'] > last['open'] and last['close'] > prev['high']:
+        if not res and last['close'] > last['open'] and last['close'] > prev['high']:
             if is_strong or (prev['close'] > prev['open']):
-                return {"advice": "CONSIDER_CLOSE", "risk_score": 75.0, "reason": "Momentum reversal detected"}
-        elif last['close'] <= last['open'] and range_last > 0 and body_last < (0.2 * range_last):
-            return {"advice": "WATCH", "risk_score": 55.0, "reason": "Momentum slowing"}
+                res = {"advice": "CONSIDER_CLOSE", "risk_score": 75.0, "reason": "Momentum reversal detected"}
+        elif not res and last['close'] <= last['open'] and range_last > 0 and body_last < (0.2 * range_last):
+            res = {"advice": "WATCH", "risk_score": 55.0, "reason": "Momentum slowing"}
 
-    return {"advice": "HOLD", "risk_score": 25.0, "reason": "Holding position"}
+    if not res:
+        res = {"advice": "HOLD", "risk_score": 25.0, "reason": "Holding position"}
+        
+    cfg = await get_config()
+    vol_enabled = cfg.get("volume_filter_enabled", True)
+    if vol_enabled and 'tick_volume' in df.columns:
+        vol_lookback = int(cfg.get("volume_lookback", 20))
+        strong_vol_ratio = float(cfg.get("strong_volume_ratio", 1.3))
+        min_vol_ratio = float(cfg.get("min_volume_ratio", 0.85))
+        vol_use_ema = cfg.get("volume_use_ema", True)
+        
+        last_vol = df.iloc[-2]['tick_volume']
+        vol_hist = df.iloc[-(vol_lookback+2):-2]['tick_volume']
+        
+        if len(vol_hist) >= vol_lookback:
+            if vol_use_ema:
+                vol_avg = vol_hist.ewm(span=vol_lookback, adjust=False).mean().iloc[-1]
+            else:
+                vol_avg = vol_hist.mean()
+                
+            vol_ratio = float(last_vol / vol_avg) if vol_avg > 0 else 1.0
+            
+            if res["advice"] in ["CLOSE_SIGNAL", "CONSIDER_CLOSE", "WATCH"]:
+                if vol_ratio >= strong_vol_ratio:
+                    res["risk_score"] = min(100.0, res["risk_score"] + 10.0)
+                    if not res["reason"].endswith("with strong volume)"):
+                        res["reason"] += " (with strong volume)"
+                elif vol_ratio < min_vol_ratio:
+                    if res["advice"] == "CLOSE_SIGNAL":
+                        res["advice"] = "CONSIDER_CLOSE"
+                    elif res["advice"] == "CONSIDER_CLOSE":
+                        res["advice"] = "WATCH"
+                    if not res["reason"].endswith("but volume is weak)"):
+                        res["reason"] += " (but volume is weak)"
+                        
+    return res
 
 async def evaluate_smart_exit(p: dict, t, symbol: str) -> str | None:
     if p['profit'] <= 0:

@@ -272,8 +272,55 @@ async def scan_loop():
                                     else:
                                         score = calculate_score(htf['strength'], mtf_zone['quality'], ltf_trigger['strength'], True)
                                         
-                                        # Smart Cooldown Check via Pre-fetched sets
-                                        has_recent_closed = (resolved, bias) in recent_closed_set
+                                        # TICK VOLUME CONFIRMATION
+                                        volume_filter_enabled = cfg.get("volume_filter_enabled", True)
+                                        if volume_filter_enabled and 'tick_volume' in df_5m.columns:
+                                            vol_lookback = int(cfg.get("volume_lookback", 20))
+                                            min_vol_ratio = float(cfg.get("min_volume_ratio", 0.85))
+                                            strong_vol_ratio = float(cfg.get("strong_volume_ratio", 1.3))
+                                            vol_bonus = int(cfg.get("volume_score_bonus", 5))
+                                            vol_use_ema = cfg.get("volume_use_ema", True)
+                                            vol_downgrade_only = cfg.get("volume_low_downgrade_only", True)
+                                            
+                                            last_vol = df_5m.iloc[-2]['tick_volume']
+                                            vol_hist = df_5m.iloc[-(vol_lookback+2):-2]['tick_volume']
+                                            
+                                            if len(vol_hist) >= vol_lookback:
+                                                if vol_use_ema:
+                                                    vol_avg = vol_hist.ewm(span=vol_lookback, adjust=False).mean().iloc[-1]
+                                                else:
+                                                    vol_avg = vol_hist.mean()
+                                                    
+                                                vol_ratio = float(last_vol / vol_avg) if vol_avg > 0 else 1.0
+                                                vol_status = "normal"
+                                                
+                                                if vol_ratio < min_vol_ratio:
+                                                    vol_status = "low"
+                                                    if vol_downgrade_only:
+                                                        score -= 5
+                                                    else:
+                                                        status = "REJECTED"
+                                                        reason_full["msg"] = "Rejected due to low tick volume"
+                                                elif vol_ratio >= strong_vol_ratio:
+                                                    vol_status = "strong"
+                                                    score += vol_bonus
+                                                    
+                                                score = int(max(0, min(100, score)))
+                                                
+                                                reason_full["volume"] = {
+                                                    "last": float(last_vol),
+                                                    "avg": float(vol_avg),
+                                                    "ratio": float(vol_ratio),
+                                                    "status": vol_status,
+                                                    "method": "ema" if vol_use_ema else "sma"
+                                                }
+                                        
+                                        if status == "REJECTED":
+                                            # Handled below
+                                            pass
+                                        else:
+                                            # Smart Cooldown Check via Pre-fetched sets
+                                            has_recent_closed = (resolved, bias) in recent_closed_set
                                         has_recent_fired = (resolved, bias) in recent_fired_set
                                         
                                         state_key = f"{resolved}_{bias}"
@@ -355,7 +402,10 @@ async def scan_loop():
                                                             reason_full["msg"] = f"Skipped DCA: total risk cap exceeded ({total_risk_r:.2f} > {dca_max_total_risk_r})"
                                                         else:
                                                             status = "DCA_FIRED"
-                                                            reason_full["msg"] = "DCA added: fresh signal while price near SL"
+                                                            vol_txt = ""
+                                                            if "volume" in reason_full and reason_full["volume"]["status"] == "low":
+                                                                vol_txt = " (but volume is low)"
+                                                            reason_full["msg"] = f"DCA added: fresh signal while price near SL{vol_txt}"
                                                             is_dca_allowed = True
                                                             is_dca_candidate = True
                                                             
@@ -391,7 +441,10 @@ async def scan_loop():
                                                 
                                                 if status != "SKIPPED":
                                                     status = "FIRED" # Temporary status
-                                                    reason_full["msg"] = f"Candidate Accepted! Score: {score} >= {base_threshold}"
+                                                    vol_txt = ""
+                                                    if "volume" in reason_full and reason_full["volume"]["status"] == "low":
+                                                        vol_txt = " (but volume is low)"
+                                                    reason_full["msg"] = f"Candidate Accepted! Score: {score} >= {base_threshold}{vol_txt}"
                                                 
                                                     local_candidates.append({
                                                         "generic": generic,
