@@ -10,15 +10,16 @@ import pytz
 import pandas as pd
 from app.core.config import get_config
 
-async def evaluate_exit_advice(p: dict, t, symbol: str) -> dict:
+async def evaluate_exit_advice(p: dict) -> dict:
+    symbol = p['symbol']
     df = await mt5_client.get_rates(symbol, mt5.TIMEFRAME_M5, 15)
     if df is None or df.empty or len(df) < 15:
         return {"advice": "HOLD", "risk_score": 20.0, "reason": "Insufficient data"}
     
     last = df.iloc[-2]
     prev = df.iloc[-3]
-    entry = t.entry_price
-    tp = t.tp
+    entry = p['price_open']
+    tp = p.get('tp', 0.0)
     
     body_last = abs(last['close'] - last['open'])
     range_last = last['high'] - last['low']
@@ -28,9 +29,7 @@ async def evaluate_exit_advice(p: dict, t, symbol: str) -> dict:
     df_copy['tr'] = df_copy['high'] - df_copy['low']
     atr = df_copy['tr'].mean()
     
-    opened_at = t.opened_at
-    if opened_at.tzinfo is None: opened_at = opened_at.replace(tzinfo=pytz.utc)
-    trade_age_mins = (datetime.now(pytz.utc) - opened_at).total_seconds() / 60
+    trade_age_mins = (datetime.now().timestamp() - p['time']) / 60
 
     if p['profit'] <= 0:
         if p['type'] == mt5.ORDER_TYPE_BUY:
@@ -259,11 +258,16 @@ async def monitor_loop():
                 basket_state["active"] = False
                 basket_state["peak_pnl"] = 0.0
                 
+            exit_advice_dict = {}
+            for pos in positions:
+                try:
+                    exit_advice_dict[pos['ticket']] = await evaluate_exit_advice(pos)
+                except Exception as e:
+                    print(f"Advice Error {pos.get('ticket')}: {e}")
             
             async with AsyncSessionLocal() as db:
                 result = await db.execute(select(Trade).where(Trade.closed_at == None))
                 open_trades = result.scalars().all()
-                exit_advice_dict = {}
                 
                 for t in open_trades:
                     if t.ticket not in pos_dict:
@@ -314,8 +318,6 @@ async def monitor_loop():
                                 db.add(e)
                                 await broadcast({"type": "log.event", "level": "INFO", "component": "smart_tp", "message": e.message, "created_at": datetime.now(pytz.utc).isoformat()})
                                 continue
-                                
-                        exit_advice_dict[t.ticket] = await evaluate_exit_advice(p, t, t.symbol)
                                 
                         cfg = await get_config()
                         current_dist = p['price_current'] - t.entry_price if p['type'] == mt5.ORDER_TYPE_BUY else t.entry_price - p['price_current']
