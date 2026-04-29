@@ -57,12 +57,8 @@ async def scan_loop():
             
             # Ensure we only scan exactly ONCE right after a 5-minute candle closes
             if 'last_scan_slot' not in scanner_state:
-                # First run: set the slot and wait for the next close boundary
-                scanner_state['last_scan_slot'] = current_5m_slot
-                # Wake up 0.5s after the boundary to ensure MT5 has finalized the candle
-                sleep_duration = min(float(interval), time_to_next + 0.5)
-                await asyncio.sleep(sleep_duration)
-                continue
+                # First run: DO NOT WAIT! Scan immediately to get current market state.
+                scanner_state['last_scan_slot'] = current_5m_slot - 5
                 
             last_scan_slot = scanner_state['last_scan_slot']
             

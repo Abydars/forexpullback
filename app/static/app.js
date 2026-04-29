@@ -673,6 +673,13 @@ async function loadConfig() {
     document.getElementById('c-volume_use_ema').checked = cfg.volume_use_ema !== false;
     document.getElementById('c-volume_low_downgrade_only').checked = cfg.volume_low_downgrade_only !== false;
 
+    document.getElementById('c-session_warmup_enabled').checked = cfg.session_warmup_enabled !== false;
+    document.getElementById('c-session_min_warmup_minutes').value = cfg.session_min_warmup_minutes || 5;
+    document.getElementById('c-session_max_warmup_minutes').value = cfg.session_max_warmup_minutes || 15;
+    document.getElementById('c-session_warmup_require_closed_m5').checked = cfg.session_warmup_require_closed_m5 !== false;
+    document.getElementById('c-session_warmup_spread_multiplier').value = cfg.session_warmup_spread_multiplier || 1.2;
+    document.getElementById('c-session_warmup_volatility_multiplier').value = cfg.session_warmup_volatility_multiplier || 1.5;
+
     state.symbols = (cfg.symbols || []).map(s => ({ generic: s, original: s, resolved: null, status: 'pending' }));
     document.getElementById('c-correlation_groups_enabled').checked = cfg.correlation_groups_enabled !== false;
     document.getElementById('c-max_open_per_correlation_group').value = cfg.max_open_per_correlation_group || 1;
