@@ -1291,6 +1291,9 @@ async function init() {
     ]);
     Object.assign(state, status);
     state.config = cfg;
+    if (cfg && Object.keys(cfg).length) {
+      updateConfigUI(cfg);
+    }
 
     if (initData) {
       state.open_positions = initData.trades.filter(t => !t.closed_at);
