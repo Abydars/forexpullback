@@ -598,7 +598,8 @@ function renderSignals() {
     if (s.result) {
       if (lr && lr.debug) {
         const d = lr.debug;
-        const hitTime = formatLocalTime(d.hit_time);
+        const hitTimeStr = d.hit_time_utc || d.hit_time;
+        const hitTime = formatLocalTime(hitTimeStr);
         const dec = getDecimals ? getDecimals(s.symbol) : 5;
         const effTp = d.effective_tp ? d.effective_tp.toFixed(dec) : '-';
         const h = d.candle_high ? d.candle_high.toFixed(dec) : '-';

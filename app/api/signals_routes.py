@@ -64,18 +64,18 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
         
         tp_buffer_mult = float(cfg.get("signal_result_tp_buffer_spread_mult", 1.5))
         sl_buffer_mult = float(cfg.get("signal_result_sl_buffer_spread_mult", 0.0))
-        now_dt = datetime.now(timezone.utc).replace(tzinfo=None)
+        now_dt = datetime.now(timezone.utc)
         
         for sym in symbols:
             info_cache[sym] = await asyncio.to_thread(mt5.symbol_info, sym)
             tick_cache[sym] = await asyncio.to_thread(mt5.symbol_info_tick, sym)
             
             sym_signals = [s for s in signals if s.symbol == sym]
-            oldest_dt = min([s.created_at for s in sym_signals])
+            oldest_dt_utc = min([s.created_at.replace(tzinfo=timezone.utc) if s.created_at.tzinfo is None else s.created_at for s in sym_signals])
             
             # Calculate approx minutes since the oldest signal. 
             # We add a 120 min buffer for Smart TP lookback history
-            mins_diff = int((now_dt - oldest_dt).total_seconds() / 60)
+            mins_diff = int((now_dt - oldest_dt_utc).total_seconds() / 60)
             count = max(3000, mins_diff + 120)
             
             df = await mt5_client.get_rates(sym, mt5.TIMEFRAME_M1, count)
@@ -92,11 +92,13 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                 continue
                 
             # Filter candles that occurred AFTER the signal was created
-            # df['time'] is already UTC tz-naive because pd.to_datetime(unit='s') returns naive UTC
-            # s.created_at is also naive UTC
             from datetime import timedelta
-            replay_start = s.created_at + timedelta(minutes=1)
-            future_df = df[df['time'] >= replay_start]
+            created_at = s.created_at
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=timezone.utc)
+                
+            replay_start = created_at + timedelta(minutes=1)
+            future_df = df[df['time'] >= pd.Timestamp(replay_start)]
             
             if future_df.empty:
                 continue
@@ -137,7 +139,7 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                     if low <= sl:
                         res = "SL HIT"
                         debug_info = {
-                            "signal_id": s.id, "result": res, "hit_time": row['time'].isoformat(),
+                            "signal_id": s.id, "result": res, "hit_time_utc": row['time'].isoformat(),
                             "hit_candle_time": row['time'].isoformat(), "candle_high": high, "candle_low": low,
                             "entry": entry, "sl": sl, "tp": tp, "effective_tp": tp_effective,
                             "spread_price": spread_price, "replay_start": replay_start.isoformat(), "direction": s.direction
@@ -146,7 +148,7 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                     elif high >= tp_effective:
                         res = "TP HIT"
                         debug_info = {
-                            "signal_id": s.id, "result": res, "hit_time": row['time'].isoformat(),
+                            "signal_id": s.id, "result": res, "hit_time_utc": row['time'].isoformat(),
                             "hit_candle_time": row['time'].isoformat(), "candle_high": high, "candle_low": low,
                             "entry": entry, "sl": sl, "tp": tp, "effective_tp": tp_effective,
                             "spread_price": spread_price, "replay_start": replay_start.isoformat(), "direction": s.direction
@@ -159,7 +161,7 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                     if high >= sl:
                         res = "SL HIT"
                         debug_info = {
-                            "signal_id": s.id, "result": res, "hit_time": row['time'].isoformat(),
+                            "signal_id": s.id, "result": res, "hit_time_utc": row['time'].isoformat(),
                             "hit_candle_time": row['time'].isoformat(), "candle_high": high, "candle_low": low,
                             "entry": entry, "sl": sl, "tp": tp, "effective_tp": tp_effective,
                             "spread_price": spread_price, "replay_start": replay_start.isoformat(), "direction": s.direction
@@ -168,7 +170,7 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                     elif low <= tp_effective:
                         res = "TP HIT"
                         debug_info = {
-                            "signal_id": s.id, "result": res, "hit_time": row['time'].isoformat(),
+                            "signal_id": s.id, "result": res, "hit_time_utc": row['time'].isoformat(),
                             "hit_candle_time": row['time'].isoformat(), "candle_high": high, "candle_low": low,
                             "entry": entry, "sl": sl, "tp": tp, "effective_tp": tp_effective,
                             "spread_price": spread_price, "replay_start": replay_start.isoformat(), "direction": s.direction
@@ -203,7 +205,7 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                                 if smart_tp_reason:
                                     res = "SMART TP HIT"
                                     debug_info = {
-                                        "signal_id": s.id, "result": res, "hit_time": row['time'].isoformat(),
+                                        "signal_id": s.id, "result": res, "hit_time_utc": row['time'].isoformat(),
                                         "hit_candle_time": row['time'].isoformat(), "candle_high": high, "candle_low": low,
                                         "entry": entry, "sl": sl, "tp": tp, "effective_tp": tp_effective if 'tp_effective' in locals() else tp,
                                         "spread_price": spread_price, "replay_start": replay_start.isoformat(), "direction": s.direction
