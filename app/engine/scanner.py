@@ -574,7 +574,8 @@ async def scan_loop():
                                 "updated_at": datetime.now(pytz.utc).isoformat()
                             })
                             await broadcast({"type": "signal.new", "signal": local_updates[-1]})
-                elif status not in ("FIRED", "DCA_FIRED", "WATCHING", "REJECTED"):
+                has_update = any(u.get("symbol") == generic and u.get("bias") == bias for u in local_updates)
+                if not has_update:
                     local_updates.append({
                         "symbol": generic,
                         "resolved": resolved,
