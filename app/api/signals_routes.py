@@ -33,10 +33,8 @@ async def clear_signal_results():
 
 def next_closed_m1_open_time(dt):
     ts = pd.Timestamp(dt)
-    if ts.tzinfo is None:
-        ts = ts.tz_localize("UTC")
-    else:
-        ts = ts.tz_convert("UTC")
+    if ts.tzinfo is not None:
+        ts = ts.tz_localize(None)
 
     replay = ts.floor("min")
     if ts.second > 0 or ts.microsecond > 0 or ts.nanosecond > 0:
