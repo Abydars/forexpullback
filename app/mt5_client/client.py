@@ -46,7 +46,7 @@ class MT5Client:
             if rates is None:
                 return pd.DataFrame()
             df = pd.DataFrame(rates)
-            df['time'] = pd.to_datetime(df['time'], unit='s', utc=True)
+            df['time'] = pd.to_datetime(df['time'], unit='s')
             return df
         return await asyncio.to_thread(_rates)
 
@@ -56,7 +56,7 @@ class MT5Client:
             if rates is None:
                 return pd.DataFrame()
             df = pd.DataFrame(rates)
-            df['time'] = pd.to_datetime(df['time'], unit='s', utc=True)
+            df['time'] = pd.to_datetime(df['time'], unit='s')
             return df
         return await asyncio.to_thread(_rates)
 

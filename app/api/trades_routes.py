@@ -67,7 +67,7 @@ async def close_all_trades():
     async with AsyncSessionLocal() as db:
         db.add(Event(level="INFO" if failed_count == 0 else "WARN", component="order_manager", message=log_msg))
         await db.commit()
-    await broadcast({"type": "log.event", "level": "INFO" if failed_count == 0 else "WARN", "component": "order_manager", "message": log_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+    await broadcast({"type": "log.event", "level": "INFO" if failed_count == 0 else "WARN", "component": "order_manager", "message": log_msg, "created_at": datetime.now().isoformat()})
     
     return {
         "status": "ok" if failed_count == 0 else "partial",

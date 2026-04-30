@@ -49,7 +49,7 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
                 e = Event(level="WARN", component="risk", message=err_msg)
                 db.add(e)
                 await db.commit()
-                await broadcast({"type": "log.event", "level": "WARN", "component": "risk", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+                await broadcast({"type": "log.event", "level": "WARN", "component": "risk", "message": err_msg, "created_at": datetime.now().isoformat()})
             return
             
         if (bias == 'bullish' and sig.sl >= actual_price) or (bias == 'bearish' and sig.sl <= actual_price):
@@ -58,7 +58,7 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
                 e = Event(level="WARN", component="risk", message=err_msg)
                 db.add(e)
                 await db.commit()
-                await broadcast({"type": "log.event", "level": "WARN", "component": "risk", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+                await broadcast({"type": "log.event", "level": "WARN", "component": "risk", "message": err_msg, "created_at": datetime.now().isoformat()})
             return
 
         # Spread check (Dynamic Percentage of Stop Loss)
@@ -75,7 +75,7 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
                 e = Event(level="WARN", component="order_manager", message=err_msg)
                 db.add(e)
                 await db.commit()
-                await broadcast({"type": "log.event", "level": "WARN", "component": "order_manager", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+                await broadcast({"type": "log.event", "level": "WARN", "component": "order_manager", "message": err_msg, "created_at": datetime.now().isoformat()})
             return
         
         risk_pct = float(cfg.get("risk_percent", 1.0))
@@ -95,7 +95,7 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
                 e = Event(level="WARN", component="risk", message=err_msg)
                 db.add(e)
                 await db.commit()
-                await broadcast({"type": "log.event", "level": "WARN", "component": "risk", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+                await broadcast({"type": "log.event", "level": "WARN", "component": "risk", "message": err_msg, "created_at": datetime.now().isoformat()})
             return
             
         risk_per_1_lot = abs(profit_1_lot)
@@ -106,7 +106,7 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
                 e = Event(level="WARN", component="risk", message=err_msg)
                 db.add(e)
                 await db.commit()
-                await broadcast({"type": "log.event", "level": "WARN", "component": "risk", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+                await broadcast({"type": "log.event", "level": "WARN", "component": "risk", "message": err_msg, "created_at": datetime.now().isoformat()})
             return
 
         if is_dca and dca_data:
@@ -126,7 +126,7 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
                     e = Event(level="WARN", component="risk", message=err_msg)
                     db.add(e)
                     await db.commit()
-                    await broadcast({"type": "log.event", "level": "WARN", "component": "risk", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+                    await broadcast({"type": "log.event", "level": "WARN", "component": "risk", "message": err_msg, "created_at": datetime.now().isoformat()})
                 return
         else:
             # 4. Calculate raw lot
@@ -147,7 +147,7 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
                         e = Event(level="WARN", component="risk", message=err_msg)
                         db.add(e)
                         await db.commit()
-                        await broadcast({"type": "log.event", "level": "WARN", "component": "risk", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+                        await broadcast({"type": "log.event", "level": "WARN", "component": "risk", "message": err_msg, "created_at": datetime.now().isoformat()})
                     return
             
             # 7. Handle lot above max
@@ -166,7 +166,7 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
                 e = Event(level="WARN", component="risk", message=err_msg)
                 db.add(e)
                 await db.commit()
-                await broadcast({"type": "log.event", "level": "WARN", "component": "risk", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+                await broadcast({"type": "log.event", "level": "WARN", "component": "risk", "message": err_msg, "created_at": datetime.now().isoformat()})
             return
             
         if expected_loss > risk_amount * 1.05:
@@ -175,7 +175,7 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
                 e = Event(level="WARN", component="risk", message=err_msg)
                 db.add(e)
                 await db.commit()
-                await broadcast({"type": "log.event", "level": "WARN", "component": "risk", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+                await broadcast({"type": "log.event", "level": "WARN", "component": "risk", "message": err_msg, "created_at": datetime.now().isoformat()})
             return
             
         # 9. Logging
@@ -216,7 +216,7 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
                 e = Event(level="WARN", component="order_manager", message=err_msg)
                 db.add(e)
                 await db.commit()
-                await broadcast({"type": "log.event", "level": "WARN", "component": "order_manager", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+                await broadcast({"type": "log.event", "level": "WARN", "component": "order_manager", "message": err_msg, "created_at": datetime.now().isoformat()})
             return
             
         # 2. Dry-run Order Check
@@ -234,7 +234,7 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
                 e = Event(level="WARN", component="order_manager", message=err_msg)
                 db.add(e)
                 await db.commit()
-                await broadcast({"type": "log.event", "level": "WARN", "component": "order_manager", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+                await broadcast({"type": "log.event", "level": "WARN", "component": "order_manager", "message": err_msg, "created_at": datetime.now().isoformat()})
             return
         
         timings["order_send_called"] = time.time() * 1000
@@ -257,7 +257,7 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
             async with AsyncSessionLocal() as db:
                 t = Trade(signal_id=sig.id, ticket=ticket, symbol=resolved, direction=bias,
                          lot=lot, entry_price=res.get('price'), sl=sig.sl, tp=sig.tp,
-                         opened_at=datetime.now(pytz.utc))
+                         opened_at=datetime.now())
                 
                 if is_dca and dca_data:
                     t.parent_trade_id = dca_data.get('parent_ticket')
@@ -331,7 +331,7 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
                     e = Event(level="INFO", component="latency", message=t_msg)
                     db.add(e)
                     await db.commit()
-                    await broadcast({"type": "log.event", "level": "INFO", "component": "latency", "message": t_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+                    await broadcast({"type": "log.event", "level": "INFO", "component": "latency", "message": t_msg, "created_at": datetime.now().isoformat()})
         else:
             async with AsyncSessionLocal() as db:
                 err_msg = f"Order rejected (Retcode {res.get('retcode')}): {res.get('comment', 'Unknown')}"
@@ -339,7 +339,7 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
                 db.add(e)
                 await db.commit()
                 await broadcast({
-                    "type": "log.event", "level": "ERROR", "component": "order_manager", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()
+                    "type": "log.event", "level": "ERROR", "component": "order_manager", "message": err_msg, "created_at": datetime.now().isoformat()
                 })
     except Exception as e:
         print("Order manager error:", e)
@@ -350,7 +350,7 @@ async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca
                 db.add(ev)
                 await db.commit()
                 await broadcast({
-                    "type": "log.event", "level": "ERROR", "component": "order_manager", "message": err_msg, "created_at": datetime.now(pytz.utc).isoformat()
+                    "type": "log.event", "level": "ERROR", "component": "order_manager", "message": err_msg, "created_at": datetime.now().isoformat()
                 })
         except:
             pass

@@ -17,7 +17,7 @@ async def auto_check_results_loop():
                 updated = result.get("updated", 0)
                 live_results = result.get("live_results", {})
 
-                now_str = datetime.now(timezone.utc).isoformat()
+                now_str = datetime.now().isoformat()
                 await broadcast({
                     "type": "signal.results_updated",
                     "updated": updated,

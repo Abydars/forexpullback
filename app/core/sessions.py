@@ -12,17 +12,17 @@ class Session:
     days_mask: int
     enabled: bool
 
-def any_active(sessions: list[Session], now_utc: datetime) -> bool:
-    return len(active_sessions(sessions, now_utc)) > 0
+def any_active(sessions: list[Session], now_dt: datetime) -> bool:
+    return len(active_sessions(sessions, now_dt)) > 0
 
-def active_sessions(sessions: list[Session], now_utc: datetime) -> list[Session]:
+def active_sessions(sessions: list[Session], now_dt: datetime) -> list[Session]:
     active = []
     for s in sessions:
         if not s.enabled:
             continue
             
         tz = pytz.timezone(s.timezone)
-        now_local = now_utc.astimezone(tz)
+        now_local = now_dt.astimezone(tz)
         current_time = now_local.strftime("%H:%M")
         day_bit = 1 << now_local.weekday()
         
@@ -44,9 +44,9 @@ def active_sessions(sessions: list[Session], now_utc: datetime) -> list[Session]
                     
     return active
 
-def get_session_start_utc(s: Session, now_utc: datetime) -> datetime:
+def get_session_start(s: Session, now_dt: datetime) -> datetime:
     tz = pytz.timezone(s.timezone)
-    now_local = now_utc.astimezone(tz)
+    now_local = now_dt.astimezone(tz)
     current_time = now_local.strftime("%H:%M")
     
     start_hour, start_minute = map(int, s.start_time.split(':'))

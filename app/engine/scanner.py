@@ -13,7 +13,7 @@ from app.strategy.scoring import calculate_score
 from app.core.config import get_config
 from app.db.session import AsyncSessionLocal
 from app.db.models import Signal, Session as SessionModel, Trade
-from app.core.sessions import active_sessions, any_active, Session, get_session_start_utc
+from app.core.sessions import active_sessions, any_active, Session, get_session_start
 from app.ws.manager import broadcast
 from sqlalchemy import select
 
@@ -47,12 +47,12 @@ async def scan_loop():
                 await asyncio.sleep(interval)
                 continue
             
-            now_utc = datetime.now(pytz.utc)
-            current_5m_slot = (now_utc.minute // 5) * 5
+            now_dt = datetime.now()
+            current_5m_slot = (now_dt.minute // 5) * 5
             
             # Calculate exactly how many seconds are left until the next 5-minute boundary
             seconds_in_5m = 300
-            current_seconds = (now_utc.minute % 5) * 60 + now_utc.second + (now_utc.microsecond / 1_000_000)
+            current_seconds = (now_dt.minute % 5) * 60 + now_dt.second + (now_dt.microsecond / 1_000_000)
             time_to_next = seconds_in_5m - current_seconds
             
             # Ensure we only scan exactly ONCE right after a 5-minute candle closes
@@ -78,7 +78,7 @@ async def scan_loop():
                                    end_time=s.end_time, timezone=s.tz,
                                    days_mask=s.days_mask, enabled=s.enabled) for s in session_models]
             
-            active_sess_list = active_sessions(sessions, now_utc)
+            active_sess_list = active_sessions(sessions, now_dt)
             is_active = len(active_sess_list) > 0
             new_active_count = len(active_sess_list)
             
@@ -86,12 +86,12 @@ async def scan_loop():
             if is_active and cfg.get("session_warmup_enabled", True):
                 most_recent_start = None
                 for s in active_sess_list:
-                    start_utc = get_session_start_utc(s, now_utc)
+                    start_utc = get_session_start(s, now_dt)
                     if not most_recent_start or start_utc > most_recent_start:
                         most_recent_start = start_utc
                 
                 if most_recent_start:
-                    minutes_active = (now_utc - most_recent_start).total_seconds() / 60.0
+                    minutes_active = (now_dt - most_recent_start).total_seconds() / 60.0
                     max_w = int(cfg.get("session_max_warmup_minutes", 15))
                     if 0 <= minutes_active < max_w:
                         session_warmup_state = {
@@ -115,7 +115,7 @@ async def scan_loop():
             
             # --- PRE-FETCH COOLDOWNS ---
             cooldown_mins = int(cfg.get("signal_cooldown_minutes", 30))
-            cutoff = now_utc - timedelta(minutes=cooldown_mins)
+            cutoff = now_dt - timedelta(minutes=cooldown_mins)
             
             recent_closed_set = set()
             recent_fired_set = set()
@@ -307,7 +307,7 @@ async def scan_loop():
                                 else:
                                     # Dynamic Threshold Logic
                                     base_threshold = int(cfg.get("signal_threshold", 65))
-                                    current_hour = now_utc.hour
+                                    current_hour = now_dt.hour
                                     # London/NY overlap is roughly 12:00 to 16:00 UTC
                                     if 12 <= current_hour <= 16:
                                         base_threshold -= 5 # Easier threshold during overlap
@@ -322,7 +322,7 @@ async def scan_loop():
                                         reason_full["msg"] = f"Zone Valid, Waiting for Trigger (Thresh: {base_threshold})"
                                         
                                         state_key = f"{resolved}_{bias}"
-                                        scanner_state[state_key] = {"time": now_utc, "status": "WATCHING"}
+                                        scanner_state[state_key] = {"time": now_dt, "status": "WATCHING"}
                                     else:
                                         score = calculate_score(htf['strength'], mtf_zone['quality'], ltf_trigger['strength'], True)
                                         
@@ -528,7 +528,7 @@ async def scan_loop():
                                         else:
                                             status = "WATCHING"
                                             reason_full["msg"] = f"Low Score ({score} < {base_threshold})"
-                                            scanner_state[state_key] = {"time": now_utc, "status": "WATCHING"}
+                                            scanner_state[state_key] = {"time": now_dt, "status": "WATCHING"}
                                             
                                         if is_dca_candidate and status != "DCA_SKIPPED":
                                             local_candidates.append({
@@ -550,7 +550,7 @@ async def scan_loop():
                 if status in ("SKIPPED", "DCA_SKIPPED"):
                     prev_status = scanner_state.get(state_key, {}).get("status")
                     if prev_status != status:
-                        scanner_state[state_key] = {"time": now_utc, "status": status}
+                        scanner_state[state_key] = {"time": now_dt, "status": status}
                         async with AsyncSessionLocal() as db:
                             sig = Signal(symbol=resolved, direction=bias, score=score, htf_bias=bias, 
                                         entry=ltf_trigger['entry'] if ltf_trigger else 0, 
@@ -571,7 +571,7 @@ async def scan_loop():
                                 "status": status,
                                 "reason": reason_full,
                                 "created_at": sig.created_at.isoformat(),
-                                "updated_at": datetime.now(pytz.utc).isoformat()
+                                "updated_at": datetime.now().isoformat()
                             })
                             await broadcast({"type": "signal.new", "signal": local_updates[-1]})
                 has_update = any(u.get("symbol") == generic and u.get("bias") == bias for u in local_updates)
@@ -583,7 +583,7 @@ async def scan_loop():
                         "score": score,
                         "status": status,
                         "reason": reason_full,
-                        "updated_at": datetime.now(pytz.utc).isoformat()
+                        "updated_at": datetime.now().isoformat()
                     })
                     
                 return local_candidates, local_updates
@@ -664,11 +664,11 @@ async def scan_loop():
                         else:
                             reason_full["msg"] = f"Executed! Rank 1 (Score: {score})"
                             
-                    scanner_state[state_key] = {"time": now_utc, "status": status}
+                    scanner_state[state_key] = {"time": now_dt, "status": status}
                     
                     updates_to_broadcast.append({
                         "symbol": generic, "resolved": res, "bias": bias, "score": score,
-                        "status": status, "reason": reason_full, "updated_at": datetime.now(pytz.utc).isoformat()
+                        "status": status, "reason": reason_full, "updated_at": datetime.now().isoformat()
                     })
                     
                     async with AsyncSessionLocal() as db:
@@ -700,7 +700,7 @@ async def scan_loop():
                         
                     prev_status = scanner_state.get(state_key, {}).get("status")
                     if prev_status != status:
-                        scanner_state[state_key] = {"time": now_utc, "status": status}
+                        scanner_state[state_key] = {"time": now_dt, "status": status}
                         async with AsyncSessionLocal() as db:
                             sig = Signal(symbol=res, direction=bias, score=score, htf_bias=bias, 
                                         entry=ltf_trigger['entry'], sl=ltf_trigger['sl'], tp=ltf_trigger['tp'],
@@ -720,7 +720,7 @@ async def scan_loop():
                     
                     updates_to_broadcast.append({
                         "symbol": generic, "resolved": res, "bias": bias, "score": score,
-                        "status": status, "reason": reason_full, "updated_at": datetime.now(pytz.utc).isoformat()
+                        "status": status, "reason": reason_full, "updated_at": datetime.now().isoformat()
                     })
 
             # Broadcast all states for UI

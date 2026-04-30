@@ -123,8 +123,8 @@ async def evaluate_smart_exit(p: dict, t, symbol: str, cfg: dict = None) -> str 
         return None
 
     opened_at = t.opened_at
-    if opened_at.tzinfo is None: opened_at = opened_at.replace(tzinfo=pytz.utc)
-    signal_age_seconds = (datetime.now(pytz.utc) - opened_at).total_seconds()
+    
+    signal_age_seconds = (datetime.now() - opened_at).total_seconds()
     min_age_mins = float((cfg or {}).get("smart_tp_min_age_minutes", 20.0))
     if signal_age_seconds < min_age_mins * 60:
         return None
@@ -202,7 +202,7 @@ async def monitor_loop():
                             from app.db.models import Event
                             db.add(Event(level="INFO", component="basket", message=msg))
                             await db.commit()
-                        await broadcast({"type": "log.event", "level": "INFO", "component": "basket", "message": msg, "created_at": datetime.now(pytz.utc).isoformat()})
+                        await broadcast({"type": "log.event", "level": "INFO", "component": "basket", "message": msg, "created_at": datetime.now().isoformat()})
                     else:
                         if total_unrealized_pnl > basket_state["peak_pnl"]:
                             basket_state["peak_pnl"] = total_unrealized_pnl
@@ -216,7 +216,7 @@ async def monitor_loop():
                             from app.db.models import Event
                             db.add(Event(level="INFO", component="basket", message=msg))
                             await db.commit()
-                        await broadcast({"type": "log.event", "level": "INFO", "component": "basket", "message": msg, "created_at": datetime.now(pytz.utc).isoformat()})
+                        await broadcast({"type": "log.event", "level": "INFO", "component": "basket", "message": msg, "created_at": datetime.now().isoformat()})
                     elif basket_state["peak_pnl"] - total_unrealized_pnl >= drawdown_usd:
                         # Close ALL bot positions using controlled concurrency
                         close_concurrency = int(cfg.get("close_all_concurrency", 2))
@@ -259,14 +259,14 @@ async def monitor_loop():
                             from app.db.models import Event
                             db.add(Event(level="INFO" if failed_count == 0 else "WARN", component="basket", message=log_msg))
                             await db.commit()
-                        await broadcast({"type": "log.event", "level": "INFO" if failed_count == 0 else "WARN", "component": "basket", "message": log_msg, "created_at": datetime.now(pytz.utc).isoformat()})
+                        await broadcast({"type": "log.event", "level": "INFO" if failed_count == 0 else "WARN", "component": "basket", "message": log_msg, "created_at": datetime.now().isoformat()})
 
                         msg = f"Basket trailing close: secured +${total_unrealized_pnl:.2f} minimum basket profit (Peak: +${basket_state['peak_pnl']:.2f})"
                         async with AsyncSessionLocal() as db:
                             from app.db.models import Event
                             db.add(Event(level="INFO", component="basket", message=msg))
                             await db.commit()
-                        await broadcast({"type": "log.event", "level": "INFO", "component": "basket", "message": msg, "created_at": datetime.now(pytz.utc).isoformat()})
+                        await broadcast({"type": "log.event", "level": "INFO", "component": "basket", "message": msg, "created_at": datetime.now().isoformat()})
                         basket_state["active"] = False
                         basket_state["peak_pnl"] = 0.0
             else:
@@ -296,7 +296,7 @@ async def monitor_loop():
                             t.pnl = exit_deal.profit
                             t.commission = exit_deal.commission
                             t.swap = exit_deal.swap
-                            t.closed_at = datetime.now(pytz.utc)
+                            t.closed_at = datetime.now()
                             retry_counts.pop(t.ticket, None)
                             _last_smart_tp_candle.pop(t.ticket, None)
                         else:
@@ -310,7 +310,7 @@ async def monitor_loop():
                             t.pnl = 0.0
                             t.commission = 0.0
                             t.swap = 0.0
-                            t.closed_at = datetime.now(pytz.utc)
+                            t.closed_at = datetime.now()
                             retry_counts.pop(t.ticket, None)
                             
                         
@@ -334,7 +334,7 @@ async def monitor_loop():
                                 from app.db.models import Event
                                 e = Event(level="INFO", component="smart_tp", message=f"Closed {t.ticket} ({t.symbol}): {exit_reason} at +${p['profit']:.2f}")
                                 db.add(e)
-                                await broadcast({"type": "log.event", "level": "INFO", "component": "smart_tp", "message": e.message, "created_at": datetime.now(pytz.utc).isoformat()})
+                                await broadcast({"type": "log.event", "level": "INFO", "component": "smart_tp", "message": e.message, "created_at": datetime.now().isoformat()})
                                 continue
                                 
                         current_dist = p['price_current'] - t.entry_price if p['type'] == mt5.ORDER_TYPE_BUY else t.entry_price - p['price_current']
