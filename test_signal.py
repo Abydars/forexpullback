@@ -38,15 +38,15 @@ for _, row in df.iterrows():
 
     # BUY logic
     if low <= SL and high >= TP:
-        print(f"AMBIGUOUS @ {t}")
+        print(f"AMBIGUOUS @ {t} | High: {high} >= TP: {TP} AND Low: {low} <= SL: {SL}")
         result = "SL HIT (conservative)"
         break
     elif low <= SL:
-        print(f"SL HIT @ {t}")
+        print(f"SL HIT @ {t} | Low: {low} <= SL: {SL}")
         result = "SL HIT"
         break
     elif high >= TP:
-        print(f"TP HIT @ {t}")
+        print(f"TP HIT @ {t} | High: {high} >= TP: {TP}")
         result = "TP HIT"
         break
 

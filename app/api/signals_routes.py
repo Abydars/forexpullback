@@ -85,7 +85,9 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
             # Filter candles that occurred AFTER the signal was created
             # df['time'] is already UTC tz-naive because pd.to_datetime(unit='s') returns naive UTC
             # s.created_at is also naive UTC
-            future_df = df[df['time'] >= s.created_at]
+            from datetime import timedelta
+            replay_start = s.created_at + timedelta(minutes=1)
+            future_df = df[df['time'] >= replay_start]
             
             if future_df.empty:
                 continue
