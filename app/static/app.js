@@ -254,7 +254,7 @@ function renderPositions() {
 
     let gCpPctVal = 0;
     if (g.current_price && g.avg_entry) {
-      gCpPctVal = g.direction === 'buy' ? (g.current_price - g.avg_entry) / g.avg_entry * 100 : (g.avg_entry - g.current_price) / g.avg_entry * 100;
+      gCpPctVal = ['buy', 'bullish'].includes((g.direction || '').toLowerCase()) ? (g.current_price - g.avg_entry) / g.avg_entry * 100 : (g.avg_entry - g.current_price) / g.avg_entry * 100;
     }
     const gCpPctStr = g.current_price && g.avg_entry ? ` <br><span class="text-[9px] ${gCpPctVal >= 0 ? 'text-emerald-400/70' : 'text-rose-400/70'} font-normal">(${gCpPctVal > 0 ? '+' : ''}${gCpPctVal.toFixed(2)}%)</span>` : '';
 
@@ -277,7 +277,7 @@ function renderPositions() {
           <span class="font-bold text-slate-200">${g.symbol}</span>
           ${g.count > 1 ? `<span class="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 text-[9px] font-bold tracking-widest border border-cyan-500/20">GROUP (${g.count})</span>` : ''}
         </td>
-        <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${g.direction === 'buy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${g.direction}</span></td>
+        <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${['buy', 'bullish'].includes((g.direction || '').toLowerCase()) ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${g.direction}</span></td>
         <td class="px-4 py-2.5 text-right font-mono">${g.total_lot.toFixed(2)}</td>
         <td class="px-4 py-2.5 text-right font-mono text-slate-400">${g.avg_entry.toFixed(5)}</td>
         <td class="px-4 py-2.5 text-right font-mono text-slate-400">${g.current_price ? g.current_price + gCpPctStr : '-'}</td>
@@ -301,7 +301,7 @@ function renderPositions() {
 
         let pCpPctVal = 0;
         if (p.current_price && p.entry_price) {
-          pCpPctVal = p.direction === 'buy' ? (p.current_price - p.entry_price) / p.entry_price * 100 : (p.entry_price - p.current_price) / p.entry_price * 100;
+          pCpPctVal = ['buy', 'bullish'].includes((p.direction || '').toLowerCase()) ? (p.current_price - p.entry_price) / p.entry_price * 100 : (p.entry_price - p.current_price) / p.entry_price * 100;
         }
         const pCpPctStr = p.current_price && p.entry_price ? ` <br><span class="text-[8px] ${pCpPctVal >= 0 ? 'text-emerald-400/60' : 'text-rose-400/60'} font-normal">(${pCpPctVal > 0 ? '+' : ''}${pCpPctVal.toFixed(2)}%)</span>` : '';
 
@@ -372,7 +372,7 @@ function renderTrades() {
               <span class="font-bold text-slate-200">${g.symbol}</span>
               ${g.count > 1 ? `<span class="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 text-[9px] font-bold tracking-widest border border-cyan-500/20">GROUP (${g.count})</span>` : ''}
             </td>
-            <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${g.direction === 'buy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${g.direction}</span></td>
+            <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${['buy', 'bullish'].includes((g.direction || '').toLowerCase()) ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${g.direction}</span></td>
             <td class="px-4 py-2.5 text-right font-mono">${g.total_lot.toFixed(2)}</td>
             <td class="px-4 py-2.5 text-right font-mono text-slate-400">${g.avg_entry.toFixed(5)}</td>
             <td class="px-4 py-2.5 text-right font-mono text-slate-400">${g.sl || '-'}</td>
@@ -390,7 +390,7 @@ function renderTrades() {
         <tr class="hover:bg-white/[0.02] transition-colors">
           <td class="px-4 py-2.5 font-mono text-slate-500 whitespace-nowrap">${formatLocalTime(t.opened_at)}</td>
           <td class="px-4 py-2.5 font-bold text-slate-200">${t.symbol}</td>
-          <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${t.direction === 'buy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${t.direction}</span></td>
+          <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${['buy', 'bullish'].includes((t.direction || '').toLowerCase()) ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${t.direction}</span></td>
           <td class="px-4 py-2.5 text-right font-mono">${t.lot}</td>
           <td class="px-4 py-2.5 text-right font-mono text-slate-400">${t.entry_price}</td>
           <td class="px-4 py-2.5 text-right font-mono text-slate-400">${t.sl || '-'}</td>
@@ -407,7 +407,7 @@ function renderTrades() {
 function renderSignals() {
   const tbody = document.getElementById('signals-body');
   if (!state.all_signals.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-slate-500 py-8 uppercase tracking-widest text-xs">NO SIGNALS</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-slate-500 py-8 uppercase tracking-widest text-xs">NO SIGNALS</td></tr>';
     return;
   }
   const getStatusBadge = (status) => {
@@ -439,7 +439,7 @@ function renderSignals() {
       <tr class="${isHighlight ? 'bg-emerald-500/5 hover:bg-emerald-500/10' : 'hover:bg-white/[0.02]'} transition-colors">
         <td class="px-4 py-2.5 font-mono text-slate-500 whitespace-nowrap">${formatLocalTime(s.created_at)}</td>
         <td class="px-4 py-2.5 font-bold text-slate-200">${s.symbol}</td>
-        <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${s.direction === 'buy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${s.direction}</span></td>
+        <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${['buy', 'bullish'].includes((s.direction || '').toLowerCase()) ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${s.direction}</span></td>
         <td class="px-4 py-2.5 text-right font-mono ${s.score > 0 ? 'text-cyan-400 font-bold' : 'text-slate-500'}">${s.score}</td>
         <td class="px-4 py-2.5">${getStatusBadge(s.status)}</td>
         <td class="px-4 py-2.5">${getResultBadge(s.result)}</td>
@@ -472,7 +472,6 @@ async function clearAllSignals() {
     state.all_signals = [];
     state.recent_signals = [];
     renderSignals();
-    renderRecentSignals();
   } catch (err) {
     alert(err.message);
   }
@@ -1191,3 +1190,7 @@ async function init() {
   renderScannerStatus();
 }
 init();
+
+// Ensure global scope exposure for inline HTML onclick handlers
+window.checkSignalResults = checkSignalResults;
+window.clearAllSignals = clearAllSignals;

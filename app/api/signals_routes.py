@@ -59,24 +59,31 @@ async def check_results():
                 continue
                 
             res = None
+            
+            is_buy = str(s.direction).lower() in ["buy", "bullish"]
+            is_sell = str(s.direction).lower() in ["sell", "bearish"]
+            
             for _, row in future_df.iterrows():
                 high = row['high']
                 low = row['low']
                 
-                if s.direction == "BUY":
+                if is_buy:
                     if low <= sl:
                         res = "SL HIT"
                         break
                     elif high >= tp:
                         res = "TP HIT"
                         break
-                else: # SELL
+                elif is_sell:
                     if high >= sl:
                         res = "SL HIT"
                         break
                     elif low <= tp:
                         res = "TP HIT"
                         break
+                else:
+                    res = "UNKNOWN DIR"
+                    break
             
             if res:
                 s.result = res
