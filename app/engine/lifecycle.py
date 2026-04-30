@@ -35,6 +35,12 @@ async def start_engine():
             await db.commit()
     except Exception:
         pass
+    try:
+        async with AsyncSessionLocal() as db:
+            await db.execute(text("ALTER TABLE signals ADD COLUMN ml_features JSON"))
+            await db.commit()
+    except Exception:
+        pass
     
     # Auto-connect MT5 to last saved account
     try:
