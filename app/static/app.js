@@ -768,8 +768,11 @@ function renderSignals() {
         if (d.hit_time_utc && d.server_now_utc && d.hit_time_utc > d.server_now_utc) {
           futureWarning = '<div class="text-[9px] font-bold text-rose-500 uppercase mt-0.5 bg-rose-500/10 px-1 inline-block rounded border border-rose-500/30">FUTURE CANDLE BUG</div>';
         }
-        
-        debugHtml = `<div class="text-[8px] text-slate-500 font-mono mt-1 whitespace-nowrap" title='${JSON.stringify(d).replace(/'/g, "&#39;")}'>${s.result.split(' ')[0]} @ ${hitTimeLocal} | UTC: ${hitTimeStr.replace('T', ' ').substring(0, 19)} | H:${h} L:${l} | effTP:${effTp}</div>${futureWarning}`;
+
+        const replayStart = d.replay_start_utc ? d.replay_start_utc.replace('T', ' ').substring(0, 19) : null;
+        const replayLine = replayStart ? `<div class="text-[8px] text-slate-600 font-mono whitespace-nowrap">signal replay from: ${replayStart} UTC</div>` : '';
+
+        debugHtml = `<div class="text-[8px] text-slate-500 font-mono mt-1 whitespace-nowrap" title='${JSON.stringify(d).replace(/'/g, "&#39;")}'>${s.result.split(' ')[0]} @ ${hitTimeLocal} | UTC: ${hitTimeStr.replace('T', ' ').substring(0, 19)} | H:${h} L:${l} | effTP:${effTp}</div>${replayLine}${futureWarning}`;
       }
       
       let badge = '';
