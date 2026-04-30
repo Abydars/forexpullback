@@ -10,3 +10,5 @@ pytz
 pydantic>=2
 pytest
 pytest-asyncio
+scikit-learn
+joblib
