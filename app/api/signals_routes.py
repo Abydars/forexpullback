@@ -52,6 +52,7 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
         # Group by symbol to avoid fetching rates multiple times
         symbols = list(set([s.symbol for s in signals]))
         rates_cache = {}
+        rates_cache_m5 = {}
         now_dt = datetime.now(timezone.utc).replace(tzinfo=None)
         
         for sym in symbols:
@@ -65,6 +66,11 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
             
             df = await mt5_client.get_rates(sym, mt5.TIMEFRAME_M1, count)
             rates_cache[sym] = df
+            
+            if smart_tp_enabled:
+                count_m5 = max(1000, int(mins_diff / 5) + 24)
+                df_m5 = await mt5_client.get_rates(sym, mt5.TIMEFRAME_M5, count_m5)
+                rates_cache_m5[sym] = df_m5
             
         for s in signals:
             df = rates_cache.get(s.symbol)
@@ -120,28 +126,30 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                     break
                     
                 if smart_tp_enabled:
-                    # idx is the integer index in the dataframe (if default range index)
-                    # wait, iterrows idx is the index label. If index is not sequential integers, this is bad!
-                    # Let's find integer index using get_loc
-                    int_idx = df.index.get_loc(idx)
-                    start_idx = max(0, int_idx - 14)
-                    candles = df.iloc[start_idx:int_idx+1]
-                    if len(candles) >= 15:
-                        signal_age_seconds = (row['time'] - s.created_at).total_seconds()
-                        from app.strategy.smart_tp import evaluate_smart_tp_from_candles
-                        direction = "buy" if is_buy else "sell"
-                        smart_tp_reason = evaluate_smart_tp_from_candles(
-                            direction=direction,
-                            entry=entry,
-                            sl=sl,
-                            tp=tp,
-                            candles=candles,
-                            signal_age_seconds=signal_age_seconds,
-                            cfg=cfg
-                        )
-                        if smart_tp_reason:
-                            res = "SMART TP HIT"
-                            break
+                    # An M5 candle closes at the end of the M1 candle where (minute + 1) is a multiple of 5.
+                    if (row['time'].minute + 1) % 5 == 0:
+                        m5_open_time = row['time'].replace(minute=(row['time'].minute // 5) * 5, second=0, microsecond=0)
+                        
+                        df_m5 = rates_cache_m5.get(s.symbol)
+                        if df_m5 is not None and not df_m5.empty:
+                            closed_m5 = df_m5[df_m5['time'] <= m5_open_time]
+                            if len(closed_m5) >= 15:
+                                candles = closed_m5.tail(15)
+                                signal_age_seconds = (row['time'] - s.created_at).total_seconds() + 60
+                                from app.strategy.smart_tp import evaluate_smart_tp_from_candles
+                                direction = "buy" if is_buy else "sell"
+                                smart_tp_reason = evaluate_smart_tp_from_candles(
+                                    direction=direction,
+                                    entry=entry,
+                                    sl=sl,
+                                    tp=tp,
+                                    candles=candles,
+                                    signal_age_seconds=signal_age_seconds,
+                                    cfg=cfg
+                                )
+                                if smart_tp_reason:
+                                    res = "SMART TP HIT"
+                                    break
             
             if res:
                 s.result = res
