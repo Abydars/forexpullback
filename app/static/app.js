@@ -1090,7 +1090,7 @@ function renderScannerStatus() {
   const tbody = document.getElementById('scan-status-body');
   
   const itemsMap = { ...state.scanner_status };
-  const configuredSymbols = state.config.symbols || [];
+  const configuredSymbols = (state.config.trade_symbols && state.config.trade_symbols.length > 0) ? state.config.trade_symbols : (state.config.symbols || []);
   
   configuredSymbols.forEach(sym => {
     if (!itemsMap[sym]) {

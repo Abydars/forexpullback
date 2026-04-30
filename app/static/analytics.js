@@ -128,6 +128,71 @@ function renderPanelHtml(title, tableHeaderHtml, tableBodyHtml, summaryHtml = ''
   `;
 }
 
+window.copyRecommendedConfig = function() {
+  const minSample = parseInt(document.getElementById('analytics-min-sample').value) || 5;
+  const signals = getFilteredSignalsForAnalytics();
+  
+  if (!signals.length) {
+    alert("No signals available to generate config.");
+    return;
+  }
+  
+  // 1. Find optimal threshold
+  const isFired = s => s.status === 'FIRED' || s.status === 'DCA_FIRED' || s.status === 'SIGNAL_ONLY';
+  const firedRes = signals.filter(s => isFired(s) && isResolvedSignal(s));
+  
+  const thresholds = [50, 55, 60, 65, 70, 75, 80];
+  let bestT = 65; // default fallback
+  let bestWR = 0;
+  
+  for (const t of thresholds) {
+    const above = firedRes.filter(s => getSignalScore(s) >= t);
+    const w = above.filter(s => isTpResult(s.result)).length;
+    const tot = above.length;
+    if (tot >= minSample) {
+      const wr = (w / tot) * 100;
+      if (wr >= 55 && wr > bestWR) {
+        bestT = t;
+        bestWR = wr;
+      }
+    }
+  }
+  
+  // 2. Find optimal trade symbols (WR >= 50%)
+  const bySym = buildGroupStats(signals, s => getSignalSymbol(s));
+  const recommendedTradeSymbols = [];
+  for (const [sym, g] of Object.entries(bySym)) {
+    if (g.resolved >= minSample && g.winRate >= 50) {
+      recommendedTradeSymbols.push(sym);
+    }
+  }
+  
+  // Also get a list of all symbols scanned to put in signal_symbols
+  const allSymbolsScanned = Object.keys(bySym);
+  
+  const recommendedConfig = {
+    signal_threshold: bestT,
+    trade_symbols: recommendedTradeSymbols.length ? recommendedTradeSymbols : ["XAUUSD"], // fallback if none
+    signal_symbols: allSymbolsScanned
+  };
+  
+  const jsonStr = JSON.stringify(recommendedConfig, null, 2);
+  
+  navigator.clipboard.writeText(jsonStr).then(() => {
+    const btn = document.getElementById('btn-recommended-config');
+    const oldText = btn.innerHTML;
+    btn.innerHTML = "✅ COPIED!";
+    btn.classList.add("bg-emerald-500", "text-black");
+    setTimeout(() => {
+      btn.innerHTML = oldText;
+      btn.classList.remove("bg-emerald-500", "text-black");
+    }, 2000);
+  }).catch(err => {
+    console.error("Failed to copy:", err);
+    alert("Failed to copy. Check console.");
+  });
+};
+
 function renderSmartRecommendations(signals, minSample) {
   const recs = [];
   
