@@ -427,10 +427,19 @@ function renderSignals() {
   const timeToStr = document.getElementById('signal-time-to')?.value;
   const tzStr = document.getElementById('signal-timezone')?.value || 'Asia/Karachi';
 
-  let displaySignals = state.all_signals;
+  const validSymbols = new Set();
+  state.symbols.forEach(st => {
+    if (st.status !== 'unresolved') {
+      if (st.generic) validSymbols.add(st.generic);
+      if (st.original) validSymbols.add(st.original);
+      if (st.resolved) validSymbols.add(st.resolved);
+    }
+  });
+
+  let displaySignals = state.all_signals.filter(s => validSymbols.has(s.symbol));
 
   if (dateFromStr || dateToStr || (timeFromStr && timeToStr)) {
-    displaySignals = state.all_signals.filter(s => {
+    displaySignals = displaySignals.filter(s => {
       const parts = getSignalLocalParts(s.created_at, tzStr);
       if (!parts) return true; // fallback
 
