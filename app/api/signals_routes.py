@@ -114,7 +114,7 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
     smart_tp_enabled = req.use_smart_tp and cfg.get("enable_smart_tp", True)
         
     async with AsyncSessionLocal() as db:
-        statuses = ["FIRED", "DCA_FIRED"]
+        statuses = ["FIRED", "DCA_FIRED", "SIGNAL_ONLY"]
         if req.include_skipped:
             statuses.extend(["SKIPPED", "DCA_SKIPPED"])
             

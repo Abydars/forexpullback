@@ -111,7 +111,15 @@ async def scan_loop():
                 
             scan_start_ms = time.time() * 1000
             
-            symbols = cfg.get("symbols", [])
+            signal_symbols = cfg.get("signal_symbols") or cfg.get("symbols", [])
+            trade_symbols = cfg.get("trade_symbols") or cfg.get("symbols", [])
+            trade_symbol_set = set(trade_symbols)
+            
+            def is_trade_allowed(generic, resolved):
+                return generic in trade_symbol_set or resolved in trade_symbol_set
+                
+            trade_symbols_to_scan = [s for s in signal_symbols if is_trade_allowed(s, s)]
+            insight_symbols_to_scan = [s for s in signal_symbols if not is_trade_allowed(s, s)]
             
             # --- PRE-FETCH COOLDOWNS ---
             cooldown_mins = int(cfg.get("signal_cooldown_minutes", 30))
@@ -178,7 +186,7 @@ async def scan_loop():
             candidates = []
             updates_to_broadcast = []
             
-            async def scan_symbol(generic):
+            async def scan_symbol(generic, is_insight_only=False):
                 local_candidates = []
                 local_updates = []
                 timings = {"scan_start": scan_start_ms, "symbol_scan_start": time.time() * 1000}
@@ -461,13 +469,18 @@ async def scan_loop():
                                                                 reason_full["skip_reason"] = "RISK"
                                                                 reason_full["msg"] = f"Skipped DCA: total risk cap exceeded ({total_risk_r:.2f} > {dca_max_total_risk_r})"
                                                             else:
-                                                                status = "DCA_FIRED"
-                                                                vol_txt = ""
-                                                                if "volume" in reason_full and reason_full["volume"]["status"] == "low":
-                                                                    vol_txt = " (but volume is low)"
-                                                                reason_full["msg"] = f"DCA added: fresh signal while price near SL{vol_txt}"
-                                                                is_dca_allowed = True
-                                                                is_dca_candidate = True
+                                                                if is_insight_only:
+                                                                    status = "SKIPPED"
+                                                                    reason_full["skip_reason"] = "NOT_TRADE_SYMBOL"
+                                                                    reason_full["msg"] = "Insight-only symbols cannot DCA"
+                                                                else:
+                                                                    status = "DCA_FIRED"
+                                                                    vol_txt = ""
+                                                                    if "volume" in reason_full and reason_full["volume"]["status"] == "low":
+                                                                        vol_txt = " (but volume is low)"
+                                                                    reason_full["msg"] = f"DCA added: fresh signal while price near SL{vol_txt}"
+                                                                    is_dca_allowed = True
+                                                                    is_dca_candidate = True
                                                             
                                                             ltf_trigger['is_dca'] = True
                                                             ltf_trigger['dca_index'] = dca_count + 1
@@ -505,26 +518,32 @@ async def scan_loop():
                                                         reason_full["msg"] = f"Blocked: max open positions ({max_corr}) for group '{my_group}' reached"
                                                 
                                                 if status not in ("SKIPPED", "SKIPPED"):
-                                                    status = "FIRED" # Temporary status
-                                                    vol_txt = ""
-                                                    if "volume" in reason_full and reason_full["volume"]["status"] == "low":
-                                                        vol_txt = " (but volume is low)"
-                                                    reason_full["msg"] = f"Candidate Accepted! Score: {score} >= {base_threshold}{vol_txt}"
-                                                
-                                                    local_candidates.append({
-                                                        "generic": generic,
-                                                        "resolved": resolved,
-                                                        "bias": bias,
-                                                        "score": score,
-                                                        "ltf_trigger": ltf_trigger,
-                                                        "reason_full": dict(reason_full),
-                                                        "cfg": cfg,
-                                                        "threshold": base_threshold,
-                                                        "state_key": state_key,
-                                                        "timings": dict(timings),
-                                                        "warmup_failed": warmup_failed,
-                                                        "warmup_reason": warmup_reason
-                                                    })
+                                                    if is_insight_only:
+                                                        status = "SIGNAL_ONLY"
+                                                        reason_full["skip_reason"] = "NOT_TRADE_SYMBOL"
+                                                        reason_full["scan_mode"] = "insight"
+                                                        reason_full["msg"] = f"Signal only: symbol is not enabled for live trading (Score: {score})"
+                                                    else:
+                                                        status = "FIRED" # Temporary status
+                                                        vol_txt = ""
+                                                        if "volume" in reason_full and reason_full["volume"]["status"] == "low":
+                                                            vol_txt = " (but volume is low)"
+                                                        reason_full["msg"] = f"Candidate Accepted! Score: {score} >= {base_threshold}{vol_txt}"
+                                                    
+                                                        local_candidates.append({
+                                                            "generic": generic,
+                                                            "resolved": resolved,
+                                                            "bias": bias,
+                                                            "score": score,
+                                                            "ltf_trigger": ltf_trigger,
+                                                            "reason_full": dict(reason_full),
+                                                            "cfg": cfg,
+                                                            "threshold": base_threshold,
+                                                            "state_key": state_key,
+                                                            "timings": dict(timings),
+                                                            "warmup_failed": warmup_failed,
+                                                            "warmup_reason": warmup_reason
+                                                        })
                                         else:
                                             status = "WATCHING"
                                             reason_full["msg"] = f"Low Score ({score} < {base_threshold})"
@@ -547,7 +566,7 @@ async def scan_loop():
                                                 "warmup_reason": warmup_reason
                                             })
 
-                if status in ("SKIPPED", "DCA_SKIPPED"):
+                if status in ("SKIPPED", "DCA_SKIPPED", "SIGNAL_ONLY"):
                     prev_status = scanner_state.get(state_key, {}).get("status")
                     if prev_status != status:
                         scanner_state[state_key] = {"time": now_dt, "status": status}
@@ -591,11 +610,11 @@ async def scan_loop():
             scan_concurrency = int(cfg.get("scan_concurrency", 5))
             sem = asyncio.Semaphore(scan_concurrency)
             
-            async def bounded_scan(generic):
+            async def bounded_scan(generic, is_insight=False):
                 async with sem:
-                    return await scan_symbol(generic)
+                    return await scan_symbol(generic, is_insight)
                     
-            scan_results = await asyncio.gather(*(bounded_scan(sym) for sym in symbols))
+            scan_results = await asyncio.gather(*(bounded_scan(sym, False) for sym in trade_symbols_to_scan))
             
             candidates = []
             updates_to_broadcast = []
@@ -727,6 +746,25 @@ async def scan_loop():
             for update in updates_to_broadcast:
                 latest_scan_results[update["symbol"]] = update
                 await broadcast({"type": "scan.update", "data": update})
+
+            # PHASE 2: Insight Scanning
+            if insight_symbols_to_scan:
+                max_insight = int(cfg.get("max_insight_symbols_per_scan", 50))
+                offset = scanner_state.get("insight_symbol_offset", 0)
+                
+                batch = insight_symbols_to_scan[offset:offset+max_insight]
+                offset = (offset + max_insight) % len(insight_symbols_to_scan)
+                scanner_state["insight_symbol_offset"] = offset
+                
+                insight_results = await asyncio.gather(*(bounded_scan(sym, True) for sym in batch))
+                
+                insight_updates = []
+                for _, u_list in insight_results:
+                    insight_updates.extend(u_list)
+                    
+                for update in insight_updates:
+                    latest_scan_results[update["symbol"]] = update
+                    await broadcast({"type": "scan.update", "data": update})
 
             await asyncio.sleep(interval)
         except Exception as e:

@@ -14,6 +14,16 @@ import math
 async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca_data=None, timings=None):
     if timings is None: timings = {}
     try:
+        trade_symbols = set(cfg.get("trade_symbols") or cfg.get("symbols", []))
+        # Since we don't pass 'generic' explicitly to send_order, we check 'resolved' and original generic form 'sig.symbol'
+        generic_from_sig = sig.symbol
+        if generic_from_sig not in trade_symbols and resolved not in trade_symbols:
+            async with AsyncSessionLocal() as db:
+                db.add(Event(level="WARN", component="OrderManager", message=f"Blocked order: {resolved} is not in trade_symbols"))
+                await db.commit()
+            print(f"Blocked order: {resolved} is not in trade_symbols")
+            return
+            
         magic = int(cfg.get("magic_number", 123456))
         positions = await mt5_client.get_positions()
         

@@ -736,6 +736,7 @@ function renderSignals() {
     else if (status === 'DCA_FIRED') color = 'bg-purple-500/20 text-purple-400 border-purple-500/30';
     else if (status === 'WATCHING') color = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
     else if (status === 'SKIPPED' || status === 'DCA_SKIPPED') color = 'bg-slate-500/10 text-slate-400 border-slate-500/20';
+    else if (status === 'SIGNAL_ONLY') color = 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20';
     return `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap border ${color}">${status}</span>`;
   };
 
@@ -911,11 +912,16 @@ function renderSignals() {
       if (skipReasonStr !== '-') skipReasonStr = `<span class="text-orange-400 font-bold uppercase tracking-widest text-[9px] border border-orange-500/30 bg-orange-500/10 px-1.5 py-0.5 rounded">${skipReasonStr}</span>`;
     }
 
+    const isInsight = s.status === 'SIGNAL_ONLY' || s.reason?.skip_reason === 'NOT_TRADE_SYMBOL' || s.reason?.scan_mode === 'insight';
+    const modeBadge = isInsight 
+      ? '<span class="px-1 py-[1px] ml-1 rounded text-[7px] font-bold tracking-widest uppercase bg-cyan-500/10 text-cyan-400 border border-cyan-500/20" title="Insight only, no live trading">INSIGHT</span>'
+      : '<span class="px-1 py-[1px] ml-1 rounded text-[7px] font-bold tracking-widest uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" title="Enabled for live trading">TRADE</span>';
+
     return `
       <tr class="${isHighlight ? 'bg-emerald-500/5 hover:bg-emerald-500/10' : 'hover:bg-white/[0.02]'} transition-colors">
         <td class="px-4 py-2.5"><input type="checkbox" onchange="toggleSignalSelection(${s.id}, this.checked)" ${isChecked ? 'checked' : ''} class="accent-rose-500"></td>
         <td class="px-4 py-2.5 font-mono text-slate-500 whitespace-nowrap">${formatLocalTime(s.created_at)}</td>
-        <td class="px-4 py-2.5 font-bold text-slate-200">${s.symbol}</td>
+        <td class="px-4 py-2.5 font-bold text-slate-200">${s.symbol}${modeBadge}</td>
         <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${['buy', 'bullish'].includes((s.direction || '').toLowerCase()) ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${s.direction}</span></td>
         <td class="px-4 py-2.5 text-right font-mono ${s.score > 0 ? 'text-cyan-400 font-bold' : 'text-slate-500'}">${s.score}</td>
         <td class="px-4 py-2.5">${getStatusBadge(s.status)}</td>
@@ -1117,6 +1123,7 @@ function renderScannerStatus() {
     else if (status === 'DCA_FIRED') color = 'bg-purple-500/20 text-purple-400 border-purple-500/30';
     else if (status === 'WATCHING') color = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
     else if (status === 'SKIPPED' || status === 'DCA_SKIPPED') color = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+    else if (status === 'SIGNAL_ONLY') color = 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20';
     else if (status === 'WAITING') color = 'bg-white/10 text-slate-300 border-white/20';
 
     return `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap border ${color}">${status}</span>`;
@@ -1129,10 +1136,15 @@ function renderScannerStatus() {
     const rawReason = esc(JSON.stringify(s.reason));
     const isHighlight = s.status === 'FIRED' || s.status === 'DCA_FIRED';
 
+    const isInsight = s.status === 'SIGNAL_ONLY' || s.reason?.skip_reason === 'NOT_TRADE_SYMBOL' || s.reason?.scan_mode === 'insight';
+    const modeBadge = isInsight 
+      ? '<span class="px-1 py-[1px] ml-1 rounded text-[7px] font-bold tracking-widest uppercase bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">INSIGHT</span>'
+      : '';
+
     return `
     <tr class="${isHighlight ? 'bg-emerald-500/5 hover:bg-emerald-500/10' : 'hover:bg-white/[0.02]'} transition-colors">
       <td class="px-4 py-2.5 flex items-center gap-2">
-        <span class="font-bold text-slate-200">${s.symbol}</span> 
+        <span class="font-bold text-slate-200">${s.symbol}${modeBadge}</span> 
         <span class="text-slate-500 font-mono text-[9px] border border-border_strong px-1 rounded">${s.resolved}</span>
       </td>
       <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${s.bias === 'bullish' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : s.bias === 'bearish' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-white/5 text-slate-400 border border-white/10'}">${s.bias || 'NONE'}</span></td>

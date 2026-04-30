@@ -11,7 +11,7 @@ function isSlResult(res) {
 }
 
 function isSkippedSignal(s) {
-  return s.status === 'SKIPPED' || s.status === 'DCA_SKIPPED';
+  return s.status === 'SKIPPED' || s.status === 'DCA_SKIPPED' || s.status === 'SIGNAL_ONLY';
 }
 
 function getSignalResult(s) {
@@ -221,7 +221,7 @@ function renderSymbolDirectionMatrix(signals, minSample) {
 
 function renderScoreThresholdOptimizer(signals, minSample) {
   const buckets = { "0-49": [], "50-59": [], "60-69": [], "70-79": [], "80-89": [], "90-100": [] };
-  const isFired = s => s.status === 'FIRED' || s.status === 'DCA_FIRED';
+  const isFired = s => s.status === 'FIRED' || s.status === 'DCA_FIRED' || s.status === 'SIGNAL_ONLY';
   
   signals.forEach(s => {
     if (!isResolvedSignal(s) || !isFired(s)) return;
