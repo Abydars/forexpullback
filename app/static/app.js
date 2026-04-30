@@ -436,7 +436,10 @@ function renderSignals() {
     }
   });
 
-  let displaySignals = state.all_signals.filter(s => validSymbols.has(s.symbol));
+  let displaySignals = state.all_signals;
+  if (validSymbols.size > 0) {
+    displaySignals = state.all_signals.filter(s => validSymbols.has(s.symbol));
+  }
 
   if (dateFromStr || dateToStr || (timeFromStr && timeToStr)) {
     displaySignals = displaySignals.filter(s => {
