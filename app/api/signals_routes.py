@@ -20,6 +20,14 @@ async def clear_signals():
     await broadcast({"type": "log.event", "level": "INFO", "component": "system", "message": "All signals cleared manually", "created_at": datetime.now(pytz.utc).isoformat()})
     return {"status": "ok"}
 
+@router.post("/signals/clear_results")
+async def clear_signal_results():
+    from sqlalchemy import update
+    async with AsyncSessionLocal() as db:
+        await db.execute(update(Signal).values(result=None))
+        await db.commit()
+    return {"status": "ok"}
+
 @router.post("/signals/check_results")
 async def check_results():
     if not mt5_client.is_connected():

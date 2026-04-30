@@ -465,6 +465,24 @@ async function checkSignalResults() {
   }
 }
 
+async function clearSignalResults() {
+  if (!confirm("Are you sure you want to clear all signal results?")) return;
+  const btn = document.getElementById('btn-clear-results');
+  btn.textContent = 'CLEARING...';
+  btn.disabled = true;
+  try {
+    await api('POST', '/api/signals/clear_results');
+    window.location.reload();
+  } catch (err) {
+    alert(err.message);
+  } finally {
+    if (btn) {
+      btn.textContent = 'CLEAR RESULTS';
+      btn.disabled = false;
+    }
+  }
+}
+
 async function clearAllSignals() {
   if (!confirm("Are you sure you want to delete ALL signals? This cannot be undone.")) return;
   try {
@@ -1193,4 +1211,5 @@ init();
 
 // Ensure global scope exposure for inline HTML onclick handlers
 window.checkSignalResults = checkSignalResults;
+window.clearSignalResults = clearSignalResults;
 window.clearAllSignals = clearAllSignals;
