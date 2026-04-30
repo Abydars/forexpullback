@@ -113,13 +113,30 @@ async def scan_loop():
             
             signal_symbols = cfg.get("signal_symbols") or cfg.get("symbols", [])
             trade_symbols = cfg.get("trade_symbols") or cfg.get("symbols", [])
-            trade_symbol_set = set(trade_symbols)
             
+            def normalize_symbol_name(s):
+                return str(s or "").upper().replace(".", "").replace("-", "").replace("_", "").strip()
+
+            def symbols_match(a, b):
+                na = normalize_symbol_name(a)
+                nb = normalize_symbol_name(b)
+                if not na or not nb: return False
+                if na == nb: return True
+                return na.startswith(nb) or nb.startswith(na)
+
             def is_trade_allowed(generic, resolved):
-                return generic in trade_symbol_set or resolved in trade_symbol_set
+                return any(
+                    symbols_match(generic, allowed) or symbols_match(resolved, allowed)
+                    for allowed in trade_symbols
+                )
                 
-            trade_symbols_to_scan = [s for s in signal_symbols if is_trade_allowed(s, s)]
-            insight_symbols_to_scan = [s for s in signal_symbols if not is_trade_allowed(s, s)]
+            trade_symbols_to_scan = list(dict.fromkeys(trade_symbols))
+
+            insight_symbols_to_scan = []
+            for s in signal_symbols:
+                if not any(symbols_match(s, t) for t in trade_symbols_to_scan):
+                    insight_symbols_to_scan.append(s)
+            insight_symbols_to_scan = list(dict.fromkeys(insight_symbols_to_scan))
             
             # --- PRE-FETCH COOLDOWNS ---
             cooldown_mins = int(cfg.get("signal_cooldown_minutes", 30))
@@ -614,6 +631,20 @@ async def scan_loop():
                 async with sem:
                     return await scan_symbol(generic, is_insight)
                     
+            max_insight = int(cfg.get("max_signal_symbols_per_scan", 50))
+            offset = int(scanner_state.get("insight_symbol_offset", 0))
+            if insight_symbols_to_scan:
+                insight_batch = insight_symbols_to_scan[offset:offset + max_insight]
+                if len(insight_batch) < max_insight and len(insight_symbols_to_scan) > max_insight:
+                    insight_batch += insight_symbols_to_scan[:max_insight - len(insight_batch)]
+                scanner_state["insight_symbol_offset"] = (offset + max_insight) % len(insight_symbols_to_scan)
+            else:
+                insight_batch = []
+                
+            print(f"Scanner symbols: trade={len(trade_symbols_to_scan)}, signal={len(signal_symbols)}, insight_batch={len(insight_batch)}")
+            if trade_symbols_to_scan:
+                print(f"Processing trade candidates only")
+                
             scan_results = await asyncio.gather(*(bounded_scan(sym, False) for sym in trade_symbols_to_scan))
             
             candidates = []
@@ -748,15 +779,9 @@ async def scan_loop():
                 await broadcast({"type": "scan.update", "data": update})
 
             # PHASE 2: Insight Scanning
-            if insight_symbols_to_scan:
-                max_insight = int(cfg.get("max_insight_symbols_per_scan", 50))
-                offset = scanner_state.get("insight_symbol_offset", 0)
-                
-                batch = insight_symbols_to_scan[offset:offset+max_insight]
-                offset = (offset + max_insight) % len(insight_symbols_to_scan)
-                scanner_state["insight_symbol_offset"] = offset
-                
-                insight_results = await asyncio.gather(*(bounded_scan(sym, True) for sym in batch))
+            if insight_batch:
+                print(f"Scanning insight-only symbols batch {len(insight_batch)} / {len(insight_symbols_to_scan)}")
+                insight_results = await asyncio.gather(*(bounded_scan(sym, True) for sym in insight_batch))
                 
                 insight_updates = []
                 for _, u_list in insight_results:

@@ -14,14 +14,26 @@ import math
 async def send_order(sig, resolved: str, bias: str, cfg: dict, is_dca=False, dca_data=None, timings=None):
     if timings is None: timings = {}
     try:
-        trade_symbols = set(cfg.get("trade_symbols") or cfg.get("symbols", []))
-        # Since we don't pass 'generic' explicitly to send_order, we check 'resolved' and original generic form 'sig.symbol'
+        trade_symbols = cfg.get("trade_symbols") or cfg.get("symbols", [])
+        
+        def normalize_symbol_name(s):
+            return str(s or "").upper().replace(".", "").replace("-", "").replace("_", "").strip()
+
+        def symbols_match(a, b):
+            na = normalize_symbol_name(a)
+            nb = normalize_symbol_name(b)
+            if not na or not nb: return False
+            if na == nb: return True
+            return na.startswith(nb) or nb.startswith(na)
+
         generic_from_sig = sig.symbol
-        if generic_from_sig not in trade_symbols and resolved not in trade_symbols:
+        is_trade_allowed = any(symbols_match(generic_from_sig, allowed) or symbols_match(resolved, allowed) for allowed in trade_symbols)
+
+        if not is_trade_allowed:
             async with AsyncSessionLocal() as db:
-                db.add(Event(level="WARN", component="OrderManager", message=f"Blocked order: {resolved} is not in trade_symbols"))
+                db.add(Event(level="WARN", component="OrderManager", message=f"Blocked order: {resolved} is not enabled in trade_symbols"))
                 await db.commit()
-            print(f"Blocked order: {resolved} is not in trade_symbols")
+            print(f"Blocked order: {resolved} is not enabled in trade_symbols")
             return
             
         magic = int(cfg.get("magic_number", 123456))
