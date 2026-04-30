@@ -58,6 +58,7 @@ class Signal(Base):
     tp: Mapped[float] = mapped_column(Float)
     reason: Mapped[dict] = mapped_column(JSON)
     status: Mapped[str] = mapped_column(String)
+    result: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
 
 class Trade(Base):

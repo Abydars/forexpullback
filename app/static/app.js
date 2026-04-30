@@ -419,6 +419,20 @@ function renderSignals() {
     return `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap border ${color}">${status}</span>`;
   };
 
+  const getResultBadge = (result) => {
+    if (!result) return '<span class="text-slate-600">-</span>';
+    if (result === 'TP HIT') return '<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">TP HIT</span>';
+    if (result === 'SL HIT') return '<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap bg-rose-500/10 text-rose-400 border border-rose-500/20">SL HIT</span>';
+    return `<span class="text-slate-400">${result}</span>`;
+  };
+
+  const firedSignals = state.all_signals.filter(s => s.status === 'FIRED' || s.status === 'DCA_FIRED');
+  const won = firedSignals.filter(s => s.result === 'TP HIT').length;
+  const lost = firedSignals.filter(s => s.result === 'SL HIT').length;
+  const winRate = (won + lost) > 0 ? ((won / (won + lost)) * 100).toFixed(1) : '0.0';
+  const winRateEl = document.getElementById('win-rate');
+  if (winRateEl) winRateEl.textContent = winRate;
+
   tbody.innerHTML = state.all_signals.map(s => {
     const isHighlight = s.status === 'FIRED' || s.status === 'DCA_FIRED';
     return `
@@ -428,10 +442,40 @@ function renderSignals() {
         <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${s.direction === 'buy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${s.direction}</span></td>
         <td class="px-4 py-2.5 text-right font-mono ${s.score > 0 ? 'text-cyan-400 font-bold' : 'text-slate-500'}">${s.score}</td>
         <td class="px-4 py-2.5">${getStatusBadge(s.status)}</td>
+        <td class="px-4 py-2.5">${getResultBadge(s.result)}</td>
         <td class="px-4 py-2.5 text-slate-300 w-full">${JSON.stringify(s.reason)}</td>
       </tr>
     `;
   }).join('');
+}
+
+async function checkSignalResults() {
+  const btn = document.getElementById('btn-check-results');
+  btn.textContent = 'CHECKING...';
+  btn.disabled = true;
+  try {
+    const res = await api('POST', '/api/signals/check_results');
+    alert(`Done! Updated ${res.updated} signals.`);
+    window.location.reload();
+  } catch (err) {
+    alert(err.message);
+  } finally {
+    btn.textContent = 'CHECK RESULTS';
+    btn.disabled = false;
+  }
+}
+
+async function clearAllSignals() {
+  if (!confirm("Are you sure you want to delete ALL signals? This cannot be undone.")) return;
+  try {
+    await api('DELETE', '/api/signals');
+    state.all_signals = [];
+    state.recent_signals = [];
+    renderSignals();
+    renderRecentSignals();
+  } catch (err) {
+    alert(err.message);
+  }
 }
 
 function renderLogs() {
@@ -644,6 +688,7 @@ async function loadConfig() {
 
     document.getElementById('c-atr_buffer_multiplier').value = cfg.atr_buffer_multiplier || 0.2;
     document.getElementById('c-use_liquidity_tp').checked = cfg.use_liquidity_tp !== false;
+    document.getElementById('c-enable_smart_tp').checked = cfg.enable_smart_tp !== false;
     document.getElementById('c-min_sl_atr_multiplier').value = cfg.min_sl_atr_multiplier || 0.8;
     document.getElementById('c-breakeven_trigger_r').value = cfg.breakeven_trigger_r || 1.0;
     document.getElementById('c-trailing').checked = cfg.trailing !== false;
@@ -877,6 +922,7 @@ function collectConfigInputs() {
     enable_latency_logs: document.getElementById('c-enable_latency_logs').checked,
     atr_buffer_multiplier: parseFloat(document.getElementById('c-atr_buffer_multiplier').value),
     use_liquidity_tp: document.getElementById('c-use_liquidity_tp').checked,
+    enable_smart_tp: document.getElementById('c-enable_smart_tp').checked,
     breakeven_trigger_r: parseFloat(document.getElementById('c-breakeven_trigger_r').value),
     trailing: document.getElementById('c-trailing').checked,
     enable_dca: document.getElementById('c-enable_dca').checked,
@@ -960,6 +1006,7 @@ function applyJsonText() {
       enable_latency_logs: 'c-enable_latency_logs',
       atr_buffer_multiplier: 'c-atr_buffer_multiplier',
       use_liquidity_tp: 'c-use_liquidity_tp',
+      enable_smart_tp: 'c-enable_smart_tp',
       breakeven_trigger_r: 'c-breakeven_trigger_r',
       trailing: 'c-trailing',
       enable_dca: 'c-enable_dca',

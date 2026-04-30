@@ -348,7 +348,9 @@ async def monitor_loop():
                     else:
                         p = pos_dict[t.ticket]
                         
-                        exit_reason = await evaluate_smart_exit(p, t, t.symbol)
+                        exit_reason = None
+                        if cfg.get("enable_smart_tp", True):
+                            exit_reason = await evaluate_smart_exit(p, t, t.symbol)
                         if exit_reason:
                             res = await mt5_client.position_close(t.ticket)
                             if res and res.get('retcode') == mt5.TRADE_RETCODE_DONE:
@@ -358,7 +360,6 @@ async def monitor_loop():
                                 await broadcast({"type": "log.event", "level": "INFO", "component": "smart_tp", "message": e.message, "created_at": datetime.now(pytz.utc).isoformat()})
                                 continue
                                 
-                        cfg = await get_config()
                         current_dist = p['price_current'] - t.entry_price if p['type'] == mt5.ORDER_TYPE_BUY else t.entry_price - p['price_current']
                         tp_dist = abs(t.tp - t.entry_price) if t.tp else 0
                         

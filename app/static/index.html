@@ -179,8 +179,15 @@
 
     <section class="tab-panel space-y-4" data-panel="signals">
       <div class="bg-panel border border-border_light rounded-sm overflow-hidden flex flex-col">
-        <div class="px-4 py-3 border-b border-border_light bg-white/[0.02]">
-          <span class="text-[10px] tracking-[0.15em] font-bold text-slate-400 uppercase">ALL SIGNALS</span>
+        <div class="px-4 py-3 border-b border-border_light bg-white/[0.02] flex justify-between items-center">
+          <div class="flex items-center gap-4">
+            <span class="text-[10px] tracking-[0.15em] font-bold text-slate-400 uppercase">ALL SIGNALS</span>
+            <span class="text-[10px] font-mono text-cyan_neon tracking-wider bg-cyan_neon/10 px-2 py-0.5 rounded border border-cyan_neon/30">WIN RATE: <span id="win-rate">0.0</span>%</span>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="checkSignalResults()" id="btn-check-results" class="px-3 py-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/20 hover:border-blue-500/40 rounded text-[9px] font-bold tracking-widest uppercase transition-colors shrink-0">CHECK RESULTS</button>
+            <button onclick="clearAllSignals()" class="px-3 py-1.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20 hover:border-rose-500/40 rounded text-[9px] font-bold tracking-widest uppercase transition-colors shrink-0">CLEAR SIGNALS</button>
+          </div>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-left whitespace-nowrap">
@@ -191,6 +198,7 @@
                 <th class="px-4 py-2.5 font-semibold">DIR</th>
                 <th class="px-4 py-2.5 font-semibold text-right">SCORE</th>
                 <th class="px-4 py-2.5 font-semibold">STATUS</th>
+                <th class="px-4 py-2.5 font-semibold">RESULT</th>
                 <th class="px-4 py-2.5 font-semibold w-full">REASON</th>
               </tr>
             </thead>
@@ -369,6 +377,7 @@
             
             <div class="flex flex-col gap-3 col-span-1 md:col-span-2">
                <label class="flex gap-3 items-center text-[9px] font-bold tracking-[0.1em] text-slate-300 uppercase cursor-pointer group w-fit"><input type="checkbox" id="c-use_liquidity_tp" checked class="w-4 h-4 accent-cyan_neon cursor-pointer border-border_strong bg-black/20 group-hover:border-cyan_neon transition-colors"> USE LIQUIDITY TP</label>
+               <label class="flex gap-3 items-center text-[9px] font-bold tracking-[0.1em] text-slate-300 uppercase cursor-pointer group w-fit"><input type="checkbox" id="c-enable_smart_tp" checked class="w-4 h-4 accent-cyan_neon cursor-pointer border-border_strong bg-black/20 group-hover:border-cyan_neon transition-colors"> ENABLE SMART TP (MOMENTUM EXIT)</label>
                <label class="flex gap-3 items-center text-[9px] font-bold tracking-[0.1em] text-slate-300 uppercase cursor-pointer group w-fit"><input type="checkbox" id="c-trailing" checked class="w-4 h-4 accent-cyan_neon cursor-pointer border-border_strong bg-black/20 group-hover:border-cyan_neon transition-colors"> ENABLE TRAILING STOP</label>
             </div>
             
