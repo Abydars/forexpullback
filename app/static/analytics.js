@@ -128,14 +128,8 @@ function renderPanelHtml(title, tableHeaderHtml, tableBodyHtml, summaryHtml = ''
   `;
 }
 
-window.copyRecommendedConfig = function() {
-  const minSample = parseInt(document.getElementById('analytics-min-sample').value) || 5;
-  const signals = getFilteredSignalsForAnalytics();
-  
-  if (!signals.length) {
-    alert("No signals available to generate config.");
-    return;
-  }
+function getRecommendedConfig(signals, minSample) {
+  if (!signals.length) return null;
   
   // 1. Find optimal threshold
   const isFired = s => s.status === 'FIRED' || s.status === 'DCA_FIRED' || s.status === 'SIGNAL_ONLY';
@@ -167,19 +161,21 @@ window.copyRecommendedConfig = function() {
     }
   }
   
-  // Also get a list of all symbols scanned to put in signal_symbols
   const allSymbolsScanned = Object.keys(bySym);
   
-  const recommendedConfig = {
+  return {
     signal_threshold: bestT,
-    trade_symbols: recommendedTradeSymbols.length ? recommendedTradeSymbols : ["XAUUSD"], // fallback if none
+    trade_symbols: recommendedTradeSymbols.length ? recommendedTradeSymbols : ["XAUUSD"],
     signal_symbols: allSymbolsScanned
   };
-  
-  const jsonStr = JSON.stringify(recommendedConfig, null, 2);
+}
+
+window.copyRecommendedJsonConfig = function() {
+  const jsonStr = document.getElementById('recommended-config-json-block').textContent;
+  if (!jsonStr) return;
   
   navigator.clipboard.writeText(jsonStr).then(() => {
-    const btn = document.getElementById('btn-recommended-config');
+    const btn = document.getElementById('btn-recommended-config-copy');
     const oldText = btn.innerHTML;
     btn.innerHTML = "✅ COPIED!";
     btn.classList.add("bg-emerald-500", "text-black");
@@ -192,6 +188,27 @@ window.copyRecommendedConfig = function() {
     alert("Failed to copy. Check console.");
   });
 };
+
+function renderRecommendedConfigPanel(signals, minSample) {
+  const config = getRecommendedConfig(signals, minSample);
+  if (!config) return "";
+  
+  const jsonStr = JSON.stringify(config, null, 2);
+  
+  const content = `
+    <div class="relative">
+      <pre id="recommended-config-json-block" class="text-[10px] text-emerald-400 font-mono bg-black/40 p-2 rounded max-h-[300px] overflow-y-auto w-full select-all border border-emerald-500/20">${jsonStr}</pre>
+      <button onclick="copyRecommendedJsonConfig()" id="btn-recommended-config-copy" class="absolute top-2 right-2 px-2 py-1 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/40 rounded text-[9px] font-bold tracking-widest uppercase transition-colors shrink-0 backdrop-blur-sm shadow-md">📋 COPY</button>
+    </div>
+  `;
+  
+  return renderPanelHtml(
+    "RECOMMENDED JSON CONFIG",
+    "",
+    `<tr><td class="px-2 py-2">${content}</td></tr>`,
+    "Generated based on historical signal performance filters (win rate >= 50%). Paste into Config tab to optimize live trading."
+  );
+}
 
 function renderSmartRecommendations(signals, minSample) {
   const recs = [];
@@ -628,7 +645,8 @@ window.renderSignalAnalytics = function(signals) {
     renderSkippedMissedWinAnalysis(signals, minSample),
     window.slBufferAnalysisData 
       ? renderSlBufferAnalysisActual(window.slBufferAnalysisData, minSample) 
-      : renderSlBufferAnalysisPlaceholder()
+      : renderSlBufferAnalysisPlaceholder(),
+    renderRecommendedConfigPanel(signals, minSample)
   ].join('');
 
   // We can render this vertically since the user allowed it and it matches the "analytics-panels" div.
