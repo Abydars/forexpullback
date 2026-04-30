@@ -419,15 +419,88 @@ function getSignalLocalParts(created_at, timezone) {
   }
 }
 
+function clearAllSignalFilters() {
+  const ids = [
+    'signal-status-filter', 'signal-symbol-filter', 'signal-direction-filter', 
+    'signal-result-filter', 'signal-trigger-filter', 'signal-zone-filter', 
+    'signal-volume-filter', 'signal-skip-filter', 'signal-score-min', 
+    'signal-score-max', 'signal-htf-min', 'signal-htf-max', 'signal-zonequal-min', 
+    'signal-zonequal-max', 'signal-date-from', 'signal-date-to', 
+    'signal-time-from', 'signal-time-to'
+  ];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  renderSignals();
+}
+
+window.setFilterAndRender = function(id, val) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.value = val;
+    renderSignals();
+  }
+};
+
 function renderSignals() {
   const tbody = document.getElementById('signals-body');
   
+  const getTriggerType = (s) => s.reason?.trigger?.trigger_type || "-";
+  const getZoneType = (s) => s.reason?.zone?.reason?.type || "-";
+  const getHTFStrength = (s) => s.reason?.htf?.strength;
+  const getZoneQuality = (s) => s.reason?.zone?.quality;
+  const getVolumeStatus = (s) => s.reason?.volume?.status || "-";
+  const getSkipReason = (s) => s.skip_reason || s.reason?.skip_reason || "-";
+
+  const populateSelect = (id, getter) => {
+    const select = document.getElementById(id);
+    if (!select) return;
+    const currentVal = select.value;
+    const opts = new Set();
+    state.all_signals.forEach(s => {
+      const v = getter(s);
+      if (v !== undefined && v !== null && v !== "-") opts.add(String(v));
+    });
+    const firstOption = select.options[0];
+    select.innerHTML = '';
+    select.appendChild(firstOption);
+    Array.from(opts).sort().forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o;
+      opt.textContent = o;
+      select.appendChild(opt);
+    });
+    if (opts.has(currentVal)) select.value = currentVal;
+  };
+
+  populateSelect('signal-symbol-filter', s => s.symbol);
+  populateSelect('signal-trigger-filter', getTriggerType);
+  populateSelect('signal-zone-filter', getZoneType);
+  populateSelect('signal-volume-filter', getVolumeStatus);
+  populateSelect('signal-skip-filter', getSkipReason);
+
   const dateFromStr = document.getElementById('signal-date-from')?.value;
   const dateToStr = document.getElementById('signal-date-to')?.value;
   const timeFromStr = document.getElementById('signal-time-from')?.value;
   const timeToStr = document.getElementById('signal-time-to')?.value;
   const tzStr = document.getElementById('signal-timezone')?.value || 'Asia/Karachi';
+  
   const statusFilter = document.getElementById('signal-status-filter')?.value;
+  const symbolFilter = document.getElementById('signal-symbol-filter')?.value;
+  const dirFilter = document.getElementById('signal-direction-filter')?.value;
+  const resultFilter = document.getElementById('signal-result-filter')?.value;
+  const triggerFilter = document.getElementById('signal-trigger-filter')?.value;
+  const zoneFilter = document.getElementById('signal-zone-filter')?.value;
+  const volumeFilter = document.getElementById('signal-volume-filter')?.value;
+  const skipFilter = document.getElementById('signal-skip-filter')?.value;
+  
+  const scoreMin = parseFloat(document.getElementById('signal-score-min')?.value);
+  const scoreMax = parseFloat(document.getElementById('signal-score-max')?.value);
+  const htfMin = parseFloat(document.getElementById('signal-htf-min')?.value);
+  const htfMax = parseFloat(document.getElementById('signal-htf-max')?.value);
+  const zqMin = parseFloat(document.getElementById('signal-zonequal-min')?.value);
+  const zqMax = parseFloat(document.getElementById('signal-zonequal-max')?.value);
 
   const validSymbols = new Set();
   state.symbols.forEach(st => {
@@ -465,13 +538,38 @@ function renderSignals() {
     });
   }
 
-  if (statusFilter) {
-    displaySignals = displaySignals.filter(s => {
-      if (statusFilter === 'FIRED') return s.status === 'FIRED' || s.status === 'DCA_FIRED';
-      if (statusFilter === 'SKIPPED') return s.status === 'SKIPPED' || s.status === 'DCA_SKIPPED';
+  displaySignals = displaySignals.filter(s => {
+      if (statusFilter === 'FIRED' && !(s.status === 'FIRED' || s.status === 'DCA_FIRED')) return false;
+      if (statusFilter === 'SKIPPED' && !(s.status === 'SKIPPED' || s.status === 'DCA_SKIPPED')) return false;
+      if (symbolFilter && s.symbol !== symbolFilter) return false;
+      if (dirFilter && (s.direction || '').toLowerCase() !== dirFilter) return false;
+      
+      if (resultFilter) {
+          if (resultFilter === 'IN PROGRESS') {
+              if (s.result) return false;
+          } else {
+              if (s.result !== resultFilter) return false;
+          }
+      }
+      
+      if (triggerFilter && getTriggerType(s) !== triggerFilter) return false;
+      if (zoneFilter && getZoneType(s) !== zoneFilter) return false;
+      if (volumeFilter && getVolumeStatus(s) !== volumeFilter) return false;
+      if (skipFilter && getSkipReason(s) !== skipFilter) return false;
+      
+      if (!isNaN(scoreMin) && s.score < scoreMin) return false;
+      if (!isNaN(scoreMax) && s.score > scoreMax) return false;
+      
+      const htf = getHTFStrength(s);
+      if (!isNaN(htfMin) && (htf === undefined || htf < htfMin)) return false;
+      if (!isNaN(htfMax) && (htf === undefined || htf > htfMax)) return false;
+      
+      const zq = getZoneQuality(s);
+      if (!isNaN(zqMin) && (zq === undefined || zq < zqMin)) return false;
+      if (!isNaN(zqMax) && (zq === undefined || zq > zqMax)) return false;
+      
       return true;
-    });
-  }
+  });
 
   if (!displaySignals.length) {
     tbody.innerHTML = '<tr><td colspan="16" class="text-center text-slate-500 py-8 uppercase tracking-widest text-xs">NO SIGNALS FOR SELECTED DATE/TIME RANGE</td></tr>';
@@ -593,9 +691,11 @@ function renderSignals() {
     if (trigger.trigger_type) triggerHtml = `${trigger.trigger_type}${trigger.pattern ? ' / ' + trigger.pattern : ''} (${trigger.strength || '-'})`;
     
     let zoneHtml = '-';
-    if (zone.reason && zone.reason.type) zoneHtml = `${zone.reason.type} (${zone.quality || '-'})`;
+    if (zone.reason && zone.reason.type) zoneHtml = `${zone.reason.type}`;
     
     const htfStr = htf.strength || '-';
+    const zqStr = zone.quality || '-';
+    const volumeStr = reason.volume?.status || '-';
 
     const decimals = getDecimals(s.symbol);
     const entryStr = s.entry ? s.entry.toFixed(decimals) : '-';
@@ -636,6 +736,8 @@ function renderSignals() {
         <td class="px-4 py-2.5 text-slate-300 font-mono text-[10px]">${triggerHtml}</td>
         <td class="px-4 py-2.5 text-slate-300 font-mono text-[10px]">${zoneHtml}</td>
         <td class="px-4 py-2.5 text-right font-mono text-slate-400 text-[10px]">${htfStr}</td>
+        <td class="px-4 py-2.5 text-right font-mono text-slate-400 text-[10px]">${zqStr}</td>
+        <td class="px-4 py-2.5 font-mono text-slate-400 text-[10px]">${volumeStr}</td>
         <td class="px-4 py-2.5 text-right font-mono text-slate-400">${entryStr}</td>
         <td class="px-4 py-2.5 text-right font-mono text-rose-400">${slStr}</td>
         <td class="px-4 py-2.5 text-right font-mono text-emerald-400">${tpStr}</td>
