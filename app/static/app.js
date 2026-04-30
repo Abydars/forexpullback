@@ -814,7 +814,7 @@ function renderSignals() {
     }
   });
   
-  const liveBiasTotal = won + lost + nearTp + nearSl + movingTp + movingSl;
+  const liveBiasTotal = won + lost + nearTp + nearSl + movingTp + movingSl + inProgress;
   const liveBiasRate = liveBiasTotal > 0 ? (((won + nearTp + movingTp) / liveBiasTotal) * 100).toFixed(1) : '0.0';
   
   const missedWinsRate = skippedCount > 0 ? ((missedWins / skippedCount) * 100).toFixed(1) : '0.0';
