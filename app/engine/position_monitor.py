@@ -129,8 +129,8 @@ async def evaluate_smart_exit(p: dict, t, symbol: str, cfg: dict = None) -> str 
     if signal_age_seconds < min_age_mins * 60:
         return None
         
-    df = await mt5_client.get_rates(symbol, mt5.TIMEFRAME_M5, 15)
-    if df.empty or len(df) < 15: return None
+    df = await mt5_client.get_rates(symbol, mt5.TIMEFRAME_M5, 16)
+    if df.empty or len(df) < 16: return None
     
     from app.strategy.smart_tp import evaluate_smart_tp_from_candles
     
