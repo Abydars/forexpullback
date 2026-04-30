@@ -11,6 +11,7 @@ from app.db.models import Signal
 from app.mt5_client.client import mt5_client
 from app.ws.manager import broadcast
 import MetaTrader5 as mt5
+import pandas as pd
 
 router = APIRouter(prefix="/api")
 
