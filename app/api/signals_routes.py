@@ -32,6 +32,7 @@ async def clear_signal_results():
 
 class CheckResultsRequest(BaseModel):
     use_smart_tp: bool = False
+    include_skipped: bool = False
 
 @router.post("/signals/check_results")
 async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
@@ -43,7 +44,11 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
     smart_tp_enabled = req.use_smart_tp and cfg.get("enable_smart_tp", True)
         
     async with AsyncSessionLocal() as db:
-        result = await db.execute(select(Signal).where(Signal.result == None, Signal.status.in_(["FIRED", "DCA_FIRED", "SKIPPED", "DCA_SKIPPED"])))
+        statuses = ["FIRED", "DCA_FIRED"]
+        if req.include_skipped:
+            statuses.extend(["SKIPPED", "DCA_SKIPPED"])
+            
+        result = await db.execute(select(Signal).where(Signal.result == None, Signal.status.in_(statuses)))
         signals = result.scalars().all()
         
         updated = 0

@@ -547,7 +547,7 @@ async def scan_loop():
                                                 "warmup_reason": warmup_reason
                                             })
 
-                if status in ("SKIPPED", "SKIPPED", "DCA_SKIPPED"):
+                if status in ("SKIPPED", "DCA_SKIPPED"):
                     prev_status = scanner_state.get(state_key, {}).get("status")
                     if prev_status != status:
                         scanner_state[state_key] = {"time": now_utc, "status": status}

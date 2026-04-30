@@ -539,6 +539,8 @@ function renderSignals() {
   const liveBiasTotal = won + lost + nearTp + nearSl + movingTp + movingSl;
   const liveBiasRate = liveBiasTotal > 0 ? (((won + nearTp + movingTp) / liveBiasTotal) * 100).toFixed(1) : '0.0';
   
+  const missedWinsRate = skippedCount > 0 ? ((missedWins / skippedCount) * 100).toFixed(1) : '0.0';
+  
   if (document.getElementById('win-rate')) document.getElementById('win-rate').textContent = winRate;
   if (document.getElementById('live-bias-rate')) document.getElementById('live-bias-rate').textContent = liveBiasRate;
   if (document.getElementById('stat-total')) document.getElementById('stat-total').textContent = displaySignals.length;
@@ -548,6 +550,11 @@ function renderSignals() {
   if (document.getElementById('stat-sl')) document.getElementById('stat-sl').textContent = lost;
   if (document.getElementById('stat-live')) document.getElementById('stat-live').textContent = nearTp + nearSl + movingTp + movingSl + inProgress;
   if (document.getElementById('stat-missed-wins')) document.getElementById('stat-missed-wins').textContent = missedWins;
+  if (document.getElementById('stat-missed-rate')) {
+    const rateEl = document.getElementById('stat-missed-rate');
+    rateEl.textContent = `(${missedWinsRate}%)`;
+    rateEl.style.display = skippedCount > 0 ? 'inline' : 'none';
+  }
 
   window.current_display_signal_ids = displaySignals.map(s => s.id);
   
@@ -635,8 +642,9 @@ async function checkSignalResults() {
   btn.textContent = 'CHECKING...';
   btn.disabled = true;
   const useSmartTp = document.getElementById('use-smart-tp-sim')?.checked || false;
+  const includeSkipped = document.getElementById('include-skipped-sim')?.checked || false;
   try {
-    const res = await api('POST', '/api/signals/check_results', { use_smart_tp: useSmartTp });
+    const res = await api('POST', '/api/signals/check_results', { use_smart_tp: useSmartTp, include_skipped: includeSkipped });
     alert(`Done! Updated ${res.updated} final signals.`);
     
     if (res.live_results) {
