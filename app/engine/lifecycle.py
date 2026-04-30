@@ -1,6 +1,7 @@
 import asyncio
 from app.engine.scanner import scan_loop
 from app.engine.position_monitor import monitor_loop
+from app.engine.result_checker import auto_check_results_loop
 
 _tasks = []
 
@@ -59,7 +60,8 @@ async def start_engine():
     
     _tasks = [
         asyncio.create_task(scan_loop()),
-        asyncio.create_task(monitor_loop())
+        asyncio.create_task(monitor_loop()),
+        asyncio.create_task(auto_check_results_loop())
     ]
 
 async def stop_engine():

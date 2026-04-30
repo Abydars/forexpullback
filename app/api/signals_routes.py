@@ -139,12 +139,13 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                 
                 if is_buy:
                     tp_effective = tp + (spread_price * tp_buffer_mult)
-                    if low <= sl:
+                    sl_effective = sl - (spread_price * sl_buffer_mult)
+                    if low <= sl_effective:
                         res = "SL HIT"
                         debug_info = {
                             "signal_id": s.id, "result": res, "hit_time_utc": row['time'].isoformat(),
                             "hit_candle_time": row['time'].isoformat(), "candle_high": high, "candle_low": low,
-                            "entry": entry, "sl": sl, "tp": tp, "effective_tp": tp_effective,
+                            "entry": entry, "sl": sl, "tp": tp, "effective_tp": tp_effective, "effective_sl": sl_effective,
                             "spread_price": spread_price, "replay_start_utc": replay_start.isoformat(),
                             "server_now_utc": now_dt.isoformat(), "direction": s.direction
                         }
@@ -154,7 +155,7 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                         debug_info = {
                             "signal_id": s.id, "result": res, "hit_time_utc": row['time'].isoformat(),
                             "hit_candle_time": row['time'].isoformat(), "candle_high": high, "candle_low": low,
-                            "entry": entry, "sl": sl, "tp": tp, "effective_tp": tp_effective,
+                            "entry": entry, "sl": sl, "tp": tp, "effective_tp": tp_effective, "effective_sl": sl_effective,
                             "spread_price": spread_price, "replay_start_utc": replay_start.isoformat(),
                             "server_now_utc": now_dt.isoformat(), "direction": s.direction
                         }
@@ -163,12 +164,13 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                         ignored_tp_touch_count += 1
                 elif is_sell:
                     tp_effective = tp - (spread_price * tp_buffer_mult)
-                    if high >= sl:
+                    sl_effective = sl + (spread_price * sl_buffer_mult)
+                    if high >= sl_effective:
                         res = "SL HIT"
                         debug_info = {
                             "signal_id": s.id, "result": res, "hit_time_utc": row['time'].isoformat(),
                             "hit_candle_time": row['time'].isoformat(), "candle_high": high, "candle_low": low,
-                            "entry": entry, "sl": sl, "tp": tp, "effective_tp": tp_effective,
+                            "entry": entry, "sl": sl, "tp": tp, "effective_tp": tp_effective, "effective_sl": sl_effective,
                             "spread_price": spread_price, "replay_start_utc": replay_start.isoformat(),
                             "server_now_utc": now_dt.isoformat(), "direction": s.direction
                         }
@@ -178,7 +180,7 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                         debug_info = {
                             "signal_id": s.id, "result": res, "hit_time_utc": row['time'].isoformat(),
                             "hit_candle_time": row['time'].isoformat(), "candle_high": high, "candle_low": low,
-                            "entry": entry, "sl": sl, "tp": tp, "effective_tp": tp_effective,
+                            "entry": entry, "sl": sl, "tp": tp, "effective_tp": tp_effective, "effective_sl": sl_effective,
                             "spread_price": spread_price, "replay_start_utc": replay_start.isoformat(),
                             "server_now_utc": now_dt.isoformat(), "direction": s.direction
                         }
