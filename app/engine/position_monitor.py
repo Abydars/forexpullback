@@ -125,7 +125,8 @@ async def evaluate_smart_exit(p: dict, t, symbol: str, cfg: dict = None) -> str 
     opened_at = t.opened_at
     if opened_at.tzinfo is None: opened_at = opened_at.replace(tzinfo=pytz.utc)
     signal_age_seconds = (datetime.now(pytz.utc) - opened_at).total_seconds()
-    if signal_age_seconds < 20 * 60:
+    min_age_mins = float((cfg or {}).get("smart_tp_min_age_minutes", 20.0))
+    if signal_age_seconds < min_age_mins * 60:
         return None
         
     df = await mt5_client.get_rates(symbol, mt5.TIMEFRAME_M5, 15)
