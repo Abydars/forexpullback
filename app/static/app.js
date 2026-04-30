@@ -1262,6 +1262,12 @@ async function loadConfig() {
     const cfg = await api('GET', '/api/config');
     state.config = cfg;
     document.getElementById('c-max_open_positions').value = cfg.max_open_positions || 5;
+    
+    const elSignal = document.getElementById('c-signal_symbols');
+    if (elSignal) elSignal.value = (cfg.signal_symbols || []).join(', ');
+    
+    const elTrade = document.getElementById('c-trade_symbols');
+    if (elTrade) elTrade.value = (cfg.trade_symbols || []).join(', ');
     document.getElementById('c-max_signals_per_scan').value = cfg.max_signals_per_scan || 1;
     document.getElementById('c-max_per_symbol').value = cfg.max_per_symbol || 1;
     document.getElementById('c-max_per_direction').value = cfg.max_per_direction || 3;
@@ -1493,7 +1499,10 @@ function addSessionRow(session) {
 }
 
 function collectConfigInputs() {
-  return {
+  const signalSymbolsRaw = document.getElementById('c-signal_symbols')?.value;
+  const tradeSymbolsRaw = document.getElementById('c-trade_symbols')?.value;
+  
+  const payload = {
     correlation_groups_enabled: document.getElementById('c-correlation_groups_enabled').checked,
     max_open_per_correlation_group: parseInt(document.getElementById('c-max_open_per_correlation_group').value),
     enabled_correlation_groups: state.enabled_correlation_groups || [],
@@ -1547,6 +1556,11 @@ function collectConfigInputs() {
     session_warmup_spread_multiplier: parseFloat(document.getElementById('c-session_warmup_spread_multiplier').value),
     session_warmup_volatility_multiplier: parseFloat(document.getElementById('c-session_warmup_volatility_multiplier').value)
   };
+  
+  if (signalSymbolsRaw) payload.signal_symbols = signalSymbolsRaw.split(',').map(s => s.trim()).filter(Boolean);
+  if (tradeSymbolsRaw) payload.trade_symbols = tradeSymbolsRaw.split(',').map(s => s.trim()).filter(Boolean);
+  
+  return payload;
 }
 
 async function syncSessions() {
@@ -1647,6 +1661,16 @@ function applyJsonText() {
       state.symbols = data.symbols.map(s => typeof s === 'string' ? { generic: s, resolved: null, status: 'pending' } : s);
       renderPredefinedSymbols();
       resolveAllSymbols();
+    }
+
+    if (Array.isArray(data.signal_symbols)) {
+      const el = document.getElementById('c-signal_symbols');
+      if (el) el.value = data.signal_symbols.join(', ');
+    }
+    
+    if (Array.isArray(data.trade_symbols)) {
+      const el = document.getElementById('c-trade_symbols');
+      if (el) el.value = data.trade_symbols.join(', ');
     }
 
     if (Array.isArray(data.enabled_correlation_groups)) {
