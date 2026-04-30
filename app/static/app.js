@@ -969,8 +969,9 @@ window.deleteSelectedSignals = async function() {
     state.all_signals = state.all_signals.filter(s => !state.selected_signal_ids.has(s.id));
     state.recent_signals = state.recent_signals.filter(s => !state.selected_signal_ids.has(s.id));
     ids.forEach(id => { delete state.signal_live_results[id]; });
+    try { localStorage.setItem('signal_live_results', JSON.stringify(state.signal_live_results)); } catch(e) {}
     state.selected_signal_ids.clear();
-    
+
     renderSignals();
   } catch (err) {
     alert(err.message);
@@ -992,8 +993,9 @@ window.checkSignalResults = async function() {
     
     if (res.live_results) {
       state.signal_live_results = { ...state.signal_live_results, ...res.live_results };
+      try { localStorage.setItem('signal_live_results', JSON.stringify(state.signal_live_results)); } catch(e) {}
     }
-    
+
     const initData = await api('GET', '/api/initial_data').catch(() => null);
     if (initData && initData.signals) {
       state.all_signals = initData.signals;
@@ -1015,6 +1017,7 @@ window.clearSignalResults = async function() {
   btn.disabled = true;
   try {
     await api('POST', '/api/signals/clear_results');
+    try { localStorage.removeItem('signal_live_results'); } catch(e) {}
     window.location.reload();
   } catch (err) {
     alert(err.message);
@@ -1032,6 +1035,8 @@ window.clearAllSignals = async function() {
     await api('DELETE', '/api/signals');
     state.all_signals = [];
     state.recent_signals = [];
+    state.signal_live_results = {};
+    try { localStorage.removeItem('signal_live_results'); } catch(e) {}
     renderSignals();
   } catch (err) {
     alert(err.message);
@@ -1743,6 +1748,11 @@ async function init() {
       if (initData.scanner_status) {
         state.scanner_status = initData.scanner_status;
       }
+
+      try {
+        const saved = localStorage.getItem('signal_live_results');
+        if (saved) state.signal_live_results = JSON.parse(saved);
+      } catch(e) { /* ignore parse errors */ }
 
       const todayStr = new Date().toISOString().split('T')[0];
       state.today_pnl = state.closed_trades
