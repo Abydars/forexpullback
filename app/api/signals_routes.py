@@ -66,8 +66,8 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
         now_dt = datetime.now(timezone.utc).replace(tzinfo=None)
         
         for sym in symbols:
-            info_cache[sym] = await mt5_client.get_symbol_info(sym)
-            tick_cache[sym] = await mt5_client.get_symbol_tick(sym)
+            info_cache[sym] = await asyncio.to_thread(mt5.symbol_info, sym)
+            tick_cache[sym] = await asyncio.to_thread(mt5.symbol_info_tick, sym)
             
             sym_signals = [s for s in signals if s.symbol == sym]
             oldest_dt = min([s.created_at for s in sym_signals])
