@@ -123,8 +123,9 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                 return 0.0
                 
             res = None
+            debug_info = {}
             ignored_tp_touch_count = 0
-            
+
             is_buy = str(s.direction).lower() in ["buy", "bullish"]
             is_sell = str(s.direction).lower() in ["sell", "bearish"]
             
@@ -136,7 +137,8 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                 
                 if is_buy:
                     tp_effective = tp + (spread_price * tp_buffer_mult)
-                    if low <= sl:
+                    sl_effective = sl - (spread_price * sl_buffer_mult)
+                    if low <= sl_effective:
                         res = "SL HIT"
                         debug_info = {
                             "signal_id": s.id, "result": res, "hit_time_utc": row['time'].isoformat(),
@@ -158,7 +160,8 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                         ignored_tp_touch_count += 1
                 elif is_sell:
                     tp_effective = tp - (spread_price * tp_buffer_mult)
-                    if high >= sl:
+                    sl_effective = sl + (spread_price * sl_buffer_mult)
+                    if high >= sl_effective:
                         res = "SL HIT"
                         debug_info = {
                             "signal_id": s.id, "result": res, "hit_time_utc": row['time'].isoformat(),
@@ -184,13 +187,15 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                     
                 if smart_tp_enabled:
                     # An M5 candle is fully closed exactly when the new M1 candle's minute is a multiple of 5
-                    if row['time'].minute % 5 == 0 and row['time'] > s.created_at:
+                    row_time_naive = row['time'].replace(tzinfo=None) if hasattr(row['time'], 'tzinfo') and row['time'].tzinfo is not None else row['time']
+                    created_at_naive = created_at.replace(tzinfo=None)
+                    if row['time'].minute % 5 == 0 and row_time_naive > created_at_naive:
                         df_m5 = rates_cache_m5.get(s.symbol)
                         if df_m5 is not None and not df_m5.empty:
                             closed_m5 = df_m5[df_m5['time'] < row['time']]
                             if len(closed_m5) >= 15:
                                 candles = closed_m5.tail(15)
-                                signal_age_seconds = (row['time'] - s.created_at).total_seconds()
+                                signal_age_seconds = (row_time_naive - created_at_naive).total_seconds()
                                 from app.strategy.smart_tp import evaluate_smart_tp_from_candles
                                 direction = "buy" if is_buy else "sell"
                                 smart_tp_reason = evaluate_smart_tp_from_candles(

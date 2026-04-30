@@ -54,27 +54,27 @@ def evaluate_smart_tp_from_candles(
     if is_buy:
         if tp and tp > entry:
             tp_dist = tp - entry
-            max_reached = max(last['high'], prev['high']) - entry
-            
+            max_reached = candles['high'].max() - entry
+
             if max_reached >= tp_dist * smart_tp_reach_pct:
                 if (last['close'] - entry) <= tp_dist * smart_tp_fallback_pct:
                     return f"Smart TP: Closed below {int(smart_tp_fallback_pct*100)}% after reaching {int(smart_tp_reach_pct*100)}%"
-                    
+
         # Momentum Reversal (Bearish)
         if last['close'] < last['open'] and last['close'] < prev['low']:
             move_size = abs(entry - last['close'])
             if move_size > (smart_tp_reversal_atr_mult * atr):
-                if is_strong or (prev['close'] < prev['open']): # Strong or 2-candle confirmation
+                if is_strong or (prev['close'] < prev['open']):  # Strong or 2-candle confirmation
                     return "Smart TP: Strong Bearish Reversal Detected"
     else:
         if tp and tp < entry:
             tp_dist = entry - tp
-            max_reached = entry - min(last['low'], prev['low'])
-            
+            max_reached = entry - candles['low'].min()
+
             if max_reached >= tp_dist * smart_tp_reach_pct:
                 if (entry - last['close']) <= tp_dist * smart_tp_fallback_pct:
-                    return f"Smart TP: Closed below {int(smart_tp_fallback_pct*100)}% after reaching {int(smart_tp_reach_pct*100)}%"
-                    
+                    return f"Smart TP: Closed above {int(smart_tp_fallback_pct*100)}% after reaching {int(smart_tp_reach_pct*100)}%"
+
         # Momentum Reversal (Bullish)
         if last['close'] > last['open'] and last['close'] > prev['high']:
             move_size = abs(last['close'] - entry)
