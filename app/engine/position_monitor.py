@@ -122,63 +122,32 @@ async def evaluate_smart_exit(p: dict, t, symbol: str) -> str | None:
     if p['profit'] <= 0:
         return None
         
-    # Minimum trade age (disable smart TP for first 20 mins ~ 4 candles)
     opened_at = t.opened_at
     if opened_at.tzinfo is None: opened_at = opened_at.replace(tzinfo=pytz.utc)
-    if (datetime.now(pytz.utc) - opened_at).total_seconds() < 20 * 60:
+    signal_age_seconds = (datetime.now(pytz.utc) - opened_at).total_seconds()
+    if signal_age_seconds < 20 * 60:
         return None
         
     df = await mt5_client.get_rates(symbol, mt5.TIMEFRAME_M5, 15)
     if df.empty or len(df) < 15: return None
     
-    # Calculate ATR for volatility filter
-    df_copy = df.copy()
-    df_copy['tr'] = df_copy['high'] - df_copy['low']
-    atr = df_copy['tr'].mean()
+    from app.strategy.smart_tp import evaluate_smart_tp_from_candles
     
-    last = df.iloc[-2]
-    prev = df.iloc[-3]
+    # In live monitoring, the last row in df is the CURRENT active candle,
+    # and iloc[-2] is the last CLOSED candle. `evaluate_smart_tp_from_candles` 
+    # expects the last row to be the closed candle we're evaluating.
+    # Therefore, we pass df.iloc[:-1] so that the last row in the subset is the last closed candle.
+    closed_candles = df.iloc[:-1]
     
-    entry = t.entry_price
-    tp = t.tp
-    
-    body_last = abs(last['close'] - last['open'])
-    range_last = last['high'] - last['low']
-    is_strong = body_last > (range_last * 0.4)
-    
-    if p['type'] == mt5.ORDER_TYPE_BUY:
-        if tp and tp > entry:
-            tp_dist = tp - entry
-            # Use closed candle prices instead of live tick for 80% -> 60% logic
-            max_reached = max(last['high'], prev['high']) - entry
-            
-            if max_reached >= tp_dist * 0.8:
-                if (last['close'] - entry) <= tp_dist * 0.6:
-                    return "Smart TP: Closed below 60% after reaching 80%"
-                    
-        # Momentum Reversal (Bearish)
-        if last['close'] < last['open'] and last['close'] < prev['low']:
-            move_size = entry - last['close'] if entry > last['close'] else last['close'] - entry
-            if move_size > (0.5 * atr):
-                if is_strong or (prev['close'] < prev['open']): # Strong or 2-candle confirmation
-                    return "Smart TP: Strong Bearish Reversal Detected"
-    else:
-        if tp and tp < entry:
-            tp_dist = entry - tp
-            max_reached = entry - min(last['low'], prev['low'])
-            
-            if max_reached >= tp_dist * 0.8:
-                if (entry - last['close']) <= tp_dist * 0.6:
-                    return "Smart TP: Closed below 60% after reaching 80%"
-                    
-        # Momentum Reversal (Bullish)
-        if last['close'] > last['open'] and last['close'] > prev['high']:
-            move_size = last['close'] - entry if last['close'] > entry else entry - last['close']
-            if move_size > (0.5 * atr):
-                if is_strong or (prev['close'] > prev['open']):
-                    return "Smart TP: Strong Bullish Reversal Detected"
-                
-    return None
+    direction = "buy" if p['type'] == mt5.ORDER_TYPE_BUY else "sell"
+    return evaluate_smart_tp_from_candles(
+        direction=direction,
+        entry=t.entry_price,
+        sl=t.sl,
+        tp=t.tp,
+        candles=closed_candles,
+        signal_age_seconds=signal_age_seconds
+    )
 
 basket_state = {"active": False, "peak_pnl": 0.0}
 

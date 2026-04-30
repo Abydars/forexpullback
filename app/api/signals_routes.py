@@ -28,8 +28,11 @@ async def clear_signal_results():
         await db.commit()
     return {"status": "ok"}
 
+class CheckResultsRequest(BaseModel):
+    use_smart_tp: bool = False
+
 @router.post("/signals/check_results")
-async def check_results():
+async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
     if not mt5_client.is_connected():
         raise HTTPException(status_code=400, detail="MT5 not connected")
         
@@ -72,7 +75,7 @@ async def check_results():
             is_buy = str(s.direction).lower() in ["buy", "bullish"]
             is_sell = str(s.direction).lower() in ["sell", "bearish"]
             
-            for _, row in future_df.iterrows():
+            for idx, row in future_df.iterrows():
                 high = row['high']
                 low = row['low']
                 
@@ -93,6 +96,29 @@ async def check_results():
                 else:
                     res = "UNKNOWN DIR"
                     break
+                    
+                if req.use_smart_tp:
+                    # idx is the integer index in the dataframe (if default range index)
+                    # wait, iterrows idx is the index label. If index is not sequential integers, this is bad!
+                    # Let's find integer index using get_loc
+                    int_idx = df.index.get_loc(idx)
+                    start_idx = max(0, int_idx - 14)
+                    candles = df.iloc[start_idx:int_idx+1]
+                    if len(candles) >= 15:
+                        signal_age_seconds = (row['time'] - s.created_at).total_seconds()
+                        from app.strategy.smart_tp import evaluate_smart_tp_from_candles
+                        direction = "buy" if is_buy else "sell"
+                        smart_tp_reason = evaluate_smart_tp_from_candles(
+                            direction=direction,
+                            entry=entry,
+                            sl=sl,
+                            tp=tp,
+                            candles=candles,
+                            signal_age_seconds=signal_age_seconds
+                        )
+                        if smart_tp_reason:
+                            res = "SMART TP HIT"
+                            break
             
             if res:
                 s.result = res

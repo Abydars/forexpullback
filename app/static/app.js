@@ -486,6 +486,7 @@ function renderSignals() {
 
   const getResultBadge = (s) => {
     if (s.result === 'TP HIT') return '<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">TP HIT</span>';
+    if (s.result === 'SMART TP HIT') return '<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">SMART TP HIT</span>';
     if (s.result === 'SL HIT') return '<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap bg-rose-500/10 text-rose-400 border border-rose-500/20">SL HIT</span>';
     if (s.result) return `<span class="text-slate-400">${s.result}</span>`;
     
@@ -507,7 +508,7 @@ function renderSignals() {
   };
 
   const firedSignals = displaySignals.filter(s => s.status === 'FIRED' || s.status === 'DCA_FIRED');
-  const won = firedSignals.filter(s => s.result === 'TP HIT').length;
+  const won = firedSignals.filter(s => s.result === 'TP HIT' || s.result === 'SMART TP HIT').length;
   const lost = firedSignals.filter(s => s.result === 'SL HIT').length;
   const winRate = (won + lost) > 0 ? ((won / (won + lost)) * 100).toFixed(1) : '0.0';
   
@@ -618,8 +619,9 @@ async function checkSignalResults() {
   const btn = document.getElementById('btn-check-results');
   btn.textContent = 'CHECKING...';
   btn.disabled = true;
+  const useSmartTp = document.getElementById('use-smart-tp-sim')?.checked || false;
   try {
-    const res = await api('POST', '/api/signals/check_results');
+    const res = await api('POST', '/api/signals/check_results', { use_smart_tp: useSmartTp });
     alert(`Done! Updated ${res.updated} final signals.`);
     
     if (res.live_results) {
