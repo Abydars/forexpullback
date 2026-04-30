@@ -299,6 +299,8 @@ async def scan_loop():
                                 is_strong_trigger = ltf_trigger and ltf_trigger['strength'] >= 80
                                 
                                 if (spread_points / atr_points) > 0.25:
+                                    status = "SKIPPED"
+                                    reason_full["skip_reason"] = "SPREAD"
                                     reason_full["msg"] = f"Spread too high relative to ATR (Spread={spread_points:.1f}, ATR={atr_points:.1f})"
                                 elif adx < 15 and not is_strong_trigger:
                                     reason_full["msg"] = f"Low Volatility (ADX={adx:.1f} < 15) and no strong trigger"
@@ -456,6 +458,7 @@ async def scan_loop():
                                                             
                                                             if total_risk_r > dca_max_total_risk_r:
                                                                 status = "DCA_SKIPPED"
+                                                                reason_full["skip_reason"] = "RISK"
                                                                 reason_full["msg"] = f"Skipped DCA: total risk cap exceeded ({total_risk_r:.2f} > {dca_max_total_risk_r})"
                                                             else:
                                                                 status = "DCA_FIRED"
@@ -473,35 +476,35 @@ async def scan_loop():
                                                             ltf_trigger['parent_ticket'] = base_trade.get('ticket')
                                             
                                             if not is_dca_allowed and status not in ("DCA_SKIPPED", "DCA_FIRED"):
-                                                status = "BLOCKED"
+                                                status = "SKIPPED"
                                                 reason_full["skip_reason"] = "MAX_POSITIONS"
                                                 reason_full["msg"] = "Blocked: position already open for this symbol"
                                                 
                                         elif has_recent_closed:
-                                            status = "BLOCKED"
-                                            reason_full["skip_reason"] = "COOLDOWN_ACTIVE"
+                                            status = "SKIPPED"
+                                            reason_full["skip_reason"] = "COOLDOWN"
                                             reason_full["msg"] = f"Blocked: recent trade exit cooldown ({cooldown_mins}m)"
                                         elif has_recent_fired:
-                                            status = "BLOCKED"
-                                            reason_full["skip_reason"] = "COOLDOWN_ACTIVE"
+                                            status = "SKIPPED"
+                                            reason_full["skip_reason"] = "COOLDOWN"
                                             reason_full["msg"] = f"Blocked: fired recently, waiting {cooldown_mins}m"
                                         elif score >= base_threshold:
                                             # POSITION LIMITS CHECK BEFORE CANDIDATE SELECTION
                                             dir_count = len([p for p in bot_positions if p.get('type') == ord_type])
                                             
                                             if len(bot_positions) >= max_open or sym_count >= max_symbol or dir_count >= max_dir:
-                                                status = "BLOCKED"
+                                                status = "SKIPPED"
                                                 reason_full["skip_reason"] = "MAX_POSITIONS"
                                                 reason_full["msg"] = "Blocked because position limit already reached"
                                             else:
                                                 my_group = generic_to_group.get(generic) or generic_to_group.get(resolved)
                                                 if correlation_groups_enabled and my_group and my_group in enabled_correlation_groups:
                                                     if group_open_counts[my_group] >= max_corr:
-                                                        status = "BLOCKED"
-                                                        reason_full["skip_reason"] = "CORRELATION_LIMIT"
+                                                        status = "SKIPPED"
+                                                        reason_full["skip_reason"] = "CORRELATION"
                                                         reason_full["msg"] = f"Blocked: max open positions ({max_corr}) for group '{my_group}' reached"
                                                 
-                                                if status not in ("BLOCKED", "SKIPPED"):
+                                                if status not in ("SKIPPED", "SKIPPED"):
                                                     status = "FIRED" # Temporary status
                                                     vol_txt = ""
                                                     if "volume" in reason_full and reason_full["volume"]["status"] == "low":
@@ -544,7 +547,7 @@ async def scan_loop():
                                                 "warmup_reason": warmup_reason
                                             })
 
-                if status in ("BLOCKED", "SKIPPED", "DCA_SKIPPED"):
+                if status in ("SKIPPED", "SKIPPED", "DCA_SKIPPED"):
                     prev_status = scanner_state.get(state_key, {}).get("status")
                     if prev_status != status:
                         scanner_state[state_key] = {"time": now_utc, "status": status}
@@ -619,7 +622,7 @@ async def scan_loop():
                 if correlation_groups_enabled and my_group and my_group in enabled_correlation_groups:
                     if my_group in groups_used_this_scan:
                         c["status"] = "SKIPPED"
-                        c["reason_full"]["skip_reason"] = "CORRELATION_LIMIT"
+                        c["reason_full"]["skip_reason"] = "CORRELATION"
                         c["reason_full"]["msg"] = f"Skipped: higher score candidate from group '{my_group}' selected"
                         continue
                     groups_used_this_scan.add(my_group)

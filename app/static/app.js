@@ -469,7 +469,6 @@ function renderSignals() {
     displaySignals = displaySignals.filter(s => {
       if (statusFilter === 'FIRED') return s.status === 'FIRED' || s.status === 'DCA_FIRED';
       if (statusFilter === 'SKIPPED') return s.status === 'SKIPPED' || s.status === 'DCA_SKIPPED';
-      if (statusFilter === 'BLOCKED') return s.status === 'BLOCKED';
       return true;
     });
   }
@@ -491,7 +490,6 @@ function renderSignals() {
     else if (status === 'DCA_FIRED') color = 'bg-purple-500/20 text-purple-400 border-purple-500/30';
     else if (status === 'WATCHING') color = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
     else if (status === 'SKIPPED' || status === 'DCA_SKIPPED') color = 'bg-slate-500/10 text-slate-400 border-slate-500/20';
-    else if (status === 'BLOCKED') color = 'bg-rose-500/10 text-rose-400 border-rose-500/20';
     return `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap border ${color}">${status}</span>`;
   };
 
@@ -520,12 +518,11 @@ function renderSignals() {
 
   const firedSignals = displaySignals.filter(s => s.status === 'FIRED' || s.status === 'DCA_FIRED');
   const skippedCount = displaySignals.filter(s => s.status === 'SKIPPED' || s.status === 'DCA_SKIPPED').length;
-  const blockedCount = displaySignals.filter(s => s.status === 'BLOCKED').length;
 
   const won = firedSignals.filter(s => s.result === 'TP HIT' || s.result === 'SMART TP HIT').length;
   const lost = firedSignals.filter(s => s.result === 'SL HIT').length;
   const winRate = (won + lost) > 0 ? ((won / (won + lost)) * 100).toFixed(1) : '0.0';
-  const missedWins = displaySignals.filter(s => (s.status === 'SKIPPED' || s.status === 'DCA_SKIPPED' || s.status === 'BLOCKED') && (s.result === 'TP HIT' || s.result === 'SMART TP HIT')).length;
+  const missedWins = displaySignals.filter(s => (s.status === 'SKIPPED' || s.status === 'DCA_SKIPPED') && (s.result === 'TP HIT' || s.result === 'SMART TP HIT')).length;
   
   let nearTp = 0, nearSl = 0, movingTp = 0, movingSl = 0, inProgress = 0;
   firedSignals.forEach(s => {
@@ -547,7 +544,6 @@ function renderSignals() {
   if (document.getElementById('stat-total')) document.getElementById('stat-total').textContent = displaySignals.length;
   if (document.getElementById('stat-fired')) document.getElementById('stat-fired').textContent = firedSignals.length;
   if (document.getElementById('stat-skipped')) document.getElementById('stat-skipped').textContent = skippedCount;
-  if (document.getElementById('stat-blocked')) document.getElementById('stat-blocked').textContent = blockedCount;
   if (document.getElementById('stat-tp')) document.getElementById('stat-tp').textContent = won;
   if (document.getElementById('stat-sl')) document.getElementById('stat-sl').textContent = lost;
   if (document.getElementById('stat-live')) document.getElementById('stat-live').textContent = nearTp + nearSl + movingTp + movingSl + inProgress;
