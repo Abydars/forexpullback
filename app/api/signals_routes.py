@@ -126,16 +126,14 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                     break
                     
                 if smart_tp_enabled:
-                    # An M5 candle closes at the end of the M1 candle where (minute + 1) is a multiple of 5.
-                    if (row['time'].minute + 1) % 5 == 0:
-                        m5_open_time = row['time'].replace(minute=(row['time'].minute // 5) * 5, second=0, microsecond=0)
-                        
+                    # An M5 candle is fully closed exactly when the new M1 candle's minute is a multiple of 5
+                    if row['time'].minute % 5 == 0 and row['time'] > s.created_at:
                         df_m5 = rates_cache_m5.get(s.symbol)
                         if df_m5 is not None and not df_m5.empty:
-                            closed_m5 = df_m5[df_m5['time'] <= m5_open_time]
+                            closed_m5 = df_m5[df_m5['time'] < row['time']]
                             if len(closed_m5) >= 15:
                                 candles = closed_m5.tail(15)
-                                signal_age_seconds = (row['time'] - s.created_at).total_seconds() + 60
+                                signal_age_seconds = (row['time'] - s.created_at).total_seconds()
                                 from app.strategy.smart_tp import evaluate_smart_tp_from_candles
                                 direction = "buy" if is_buy else "sell"
                                 smart_tp_reason = evaluate_smart_tp_from_candles(
