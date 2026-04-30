@@ -38,6 +38,7 @@ async def check_results():
         signals = result.scalars().all()
         
         updated = 0
+        live_results = {}
         
         # Group by symbol to avoid fetching rates multiple times
         symbols = list(set([s.symbol for s in signals]))
@@ -96,8 +97,43 @@ async def check_results():
             if res:
                 s.result = res
                 updated += 1
+            else:
+                # Live progress logic
+                current_price = future_df.iloc[-1]['close']
+                tp_distance = 0
+                sl_distance = 0
+                tp_progress = 0
+                sl_progress = 0
+                
+                if is_buy:
+                    tp_distance = tp - entry
+                    sl_distance = entry - sl
+                    if tp_distance > 0: tp_progress = (current_price - entry) / tp_distance
+                    if sl_distance > 0: sl_progress = (entry - current_price) / sl_distance
+                elif is_sell:
+                    tp_distance = entry - tp
+                    sl_distance = sl - entry
+                    if tp_distance > 0: tp_progress = (entry - current_price) / tp_distance
+                    if sl_distance > 0: sl_progress = (current_price - entry) / sl_distance
+                
+                status = "IN PROGRESS"
+                if tp_progress >= 0.75:
+                    status = "NEAR TP"
+                elif sl_progress >= 0.75:
+                    status = "NEAR SL"
+                elif tp_progress > sl_progress and tp_progress > 0:
+                    status = "MOVING TO TP"
+                elif sl_progress > tp_progress and sl_progress > 0:
+                    status = "MOVING TO SL"
+                
+                live_results[s.id] = {
+                    "live_result_status": status,
+                    "tp_progress": tp_progress,
+                    "sl_progress": sl_progress,
+                    "current_price": current_price
+                }
                 
         if updated > 0:
             await db.commit()
             
-    return {"status": "ok", "updated": updated}
+    return {"status": "ok", "updated": updated, "live_results": live_results}

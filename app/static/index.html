@@ -183,10 +183,12 @@
           <div class="flex items-center gap-4">
             <span class="text-[10px] tracking-[0.15em] font-bold text-slate-400 uppercase">ALL SIGNALS</span>
             <span class="text-[10px] font-mono text-cyan_neon tracking-wider bg-cyan_neon/10 px-2 py-0.5 rounded border border-cyan_neon/30">WIN RATE: <span id="win-rate">0.0</span>%</span>
+            <span class="text-[10px] font-mono text-purple-400 tracking-wider bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/30" title="Projected Bias including Near TP and Moving To TP">LIVE BIAS: <span id="live-bias-rate">0.0</span>%</span>
             <div class="flex gap-2 text-[10px] text-slate-400 font-mono tracking-widest bg-black/20 px-2 py-0.5 rounded border border-border_strong">
               <span>FIRED: <span id="stat-fired" class="text-slate-200">0</span></span>
               <span>TP: <span id="stat-tp" class="text-emerald-400">0</span></span>
               <span>SL: <span id="stat-sl" class="text-rose-400">0</span></span>
+              <span>LIVE: <span id="stat-live" class="text-amber-400">0</span></span>
             </div>
           </div>
           <div class="flex gap-2">
@@ -196,6 +198,14 @@
           </div>
         </div>
         <div class="px-4 py-2 border-b border-border_light bg-bg/50 flex gap-4 items-center overflow-x-auto whitespace-nowrap">
+          <div class="flex gap-2 items-center">
+            <label class="text-[9px] font-bold tracking-[0.1em] text-slate-400 uppercase">DATE FROM</label>
+            <input type="date" id="signal-date-from" onchange="renderSignals()" class="bg-black/20 border border-border_strong text-slate-200 text-[10px] px-2 py-1 rounded outline-none focus:border-cyan_neon transition-colors" style="color-scheme: dark;">
+          </div>
+          <div class="flex gap-2 items-center">
+            <label class="text-[9px] font-bold tracking-[0.1em] text-slate-400 uppercase">DATE TO</label>
+            <input type="date" id="signal-date-to" onchange="renderSignals()" class="bg-black/20 border border-border_strong text-slate-200 text-[10px] px-2 py-1 rounded outline-none focus:border-cyan_neon transition-colors" style="color-scheme: dark;">
+          </div>
           <div class="flex gap-2 items-center">
             <label class="text-[9px] font-bold tracking-[0.1em] text-slate-400 uppercase">TIME FROM</label>
             <input type="time" id="signal-time-from" onchange="renderSignals()" class="bg-black/20 border border-border_strong text-slate-200 text-[10px] px-2 py-1 rounded outline-none focus:border-cyan_neon transition-colors" style="color-scheme: dark;">
@@ -208,7 +218,7 @@
             <label class="text-[9px] font-bold tracking-[0.1em] text-slate-400 uppercase">TZ</label>
             <input type="text" id="signal-timezone" value="Asia/Karachi" onchange="renderSignals()" class="bg-black/20 border border-border_strong text-slate-200 text-[10px] px-2 py-1 rounded outline-none focus:border-cyan_neon transition-colors w-28" placeholder="e.g. UTC">
           </div>
-          <button onclick="document.getElementById('signal-time-from').value=''; document.getElementById('signal-time-to').value=''; renderSignals();" class="px-2 py-1 bg-white/5 text-slate-300 hover:bg-white/10 border border-white/10 rounded text-[9px] font-bold tracking-widest uppercase transition-colors">CLEAR FILTER</button>
+          <button onclick="document.getElementById('signal-date-from').value=''; document.getElementById('signal-date-to').value=''; document.getElementById('signal-time-from').value=''; document.getElementById('signal-time-to').value=''; renderSignals();" class="px-2 py-1 bg-white/5 text-slate-300 hover:bg-white/10 border border-white/10 rounded text-[9px] font-bold tracking-widest uppercase transition-colors">CLEAR FILTERS</button>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-left whitespace-nowrap">

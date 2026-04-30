@@ -20,6 +20,7 @@ const state = {
   closed_trades: [],
   recent_signals: [],
   all_signals: [],
+  signal_live_results: {},
   events: [],
   equity_series: [],
   config: {},
@@ -404,44 +405,60 @@ function renderTrades() {
   }
 }
 
+function getSignalLocalParts(created_at, timezone) {
+  try {
+    const d = new Date(created_at + 'Z');
+    const year = new Intl.DateTimeFormat('en-US', { timeZone: timezone, year: 'numeric' }).format(d);
+    const month = new Intl.DateTimeFormat('en-US', { timeZone: timezone, month: '2-digit' }).format(d);
+    const day = new Intl.DateTimeFormat('en-US', { timeZone: timezone, day: '2-digit' }).format(d);
+    const time = new Intl.DateTimeFormat('en-GB', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: false }).format(d);
+    return { date: `${year}-${month}-${day}`, time: time };
+  } catch (e) {
+    return null;
+  }
+}
+
 function renderSignals() {
   const tbody = document.getElementById('signals-body');
   
-  const fromStr = document.getElementById('signal-time-from')?.value;
-  const toStr = document.getElementById('signal-time-to')?.value;
+  const dateFromStr = document.getElementById('signal-date-from')?.value;
+  const dateToStr = document.getElementById('signal-date-to')?.value;
+  const timeFromStr = document.getElementById('signal-time-from')?.value;
+  const timeToStr = document.getElementById('signal-time-to')?.value;
   const tzStr = document.getElementById('signal-timezone')?.value || 'Asia/Karachi';
 
   let displaySignals = state.all_signals;
 
-  if (fromStr && toStr) {
-    try {
-      displaySignals = state.all_signals.filter(s => {
-        // Parse UTC timestamp properly
-        const d = new Date(s.created_at + 'Z'); 
-        const hm = new Intl.DateTimeFormat('en-GB', { 
-          timeZone: tzStr, 
-          hour: '2-digit', 
-          minute: '2-digit',
-          hour12: false
-        }).format(d);
-        
-        if (fromStr <= toStr) {
-          return hm >= fromStr && hm <= toStr;
+  if (dateFromStr || dateToStr || (timeFromStr && timeToStr)) {
+    displaySignals = state.all_signals.filter(s => {
+      const parts = getSignalLocalParts(s.created_at, tzStr);
+      if (!parts) return true; // fallback
+
+      let passDate = true;
+      if (dateFromStr && parts.date < dateFromStr) passDate = false;
+      if (dateToStr && parts.date > dateToStr) passDate = false;
+
+      let passTime = true;
+      if (timeFromStr && timeToStr) {
+        if (timeFromStr <= timeToStr) {
+          passTime = parts.time >= timeFromStr && parts.time <= timeToStr;
         } else {
-          return hm >= fromStr || hm <= toStr;
+          passTime = parts.time >= timeFromStr || parts.time <= timeToStr;
         }
-      });
-    } catch (e) {
-      console.error("Time filter error:", e);
-    }
+      }
+
+      return passDate && passTime;
+    });
   }
 
   if (!displaySignals.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-slate-500 py-8 uppercase tracking-widest text-xs">NO SIGNALS FOR SELECTED RANGE</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-slate-500 py-8 uppercase tracking-widest text-xs">NO SIGNALS FOR SELECTED DATE/TIME RANGE</td></tr>';
     if (document.getElementById('win-rate')) document.getElementById('win-rate').textContent = '0.0';
+    if (document.getElementById('live-bias-rate')) document.getElementById('live-bias-rate').textContent = '0.0';
     if (document.getElementById('stat-fired')) document.getElementById('stat-fired').textContent = '0';
     if (document.getElementById('stat-tp')) document.getElementById('stat-tp').textContent = '0';
     if (document.getElementById('stat-sl')) document.getElementById('stat-sl').textContent = '0';
+    if (document.getElementById('stat-live')) document.getElementById('stat-live').textContent = '0';
     return;
   }
 
@@ -454,11 +471,26 @@ function renderSignals() {
     return `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap border ${color}">${status}</span>`;
   };
 
-  const getResultBadge = (result) => {
-    if (!result) return '<span class="text-slate-600">-</span>';
-    if (result === 'TP HIT') return '<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">TP HIT</span>';
-    if (result === 'SL HIT') return '<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap bg-rose-500/10 text-rose-400 border border-rose-500/20">SL HIT</span>';
-    return `<span class="text-slate-400">${result}</span>`;
+  const getResultBadge = (s) => {
+    if (s.result === 'TP HIT') return '<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">TP HIT</span>';
+    if (s.result === 'SL HIT') return '<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap bg-rose-500/10 text-rose-400 border border-rose-500/20">SL HIT</span>';
+    if (s.result) return `<span class="text-slate-400">${s.result}</span>`;
+    
+    const lr = state.signal_live_results[s.id];
+    if (lr) {
+      let color = 'bg-white/5 text-slate-400 border-white/10';
+      if (lr.live_result_status === 'NEAR TP') color = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+      else if (lr.live_result_status === 'MOVING TO TP') color = 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40';
+      else if (lr.live_result_status === 'MOVING TO SL') color = 'bg-amber-500/20 text-amber-400 border-amber-500/40';
+      else if (lr.live_result_status === 'NEAR SL') color = 'bg-rose-500/20 text-rose-300 border-rose-500/40';
+      
+      const tpProg = Math.max(0, Math.min(100, Math.round(lr.tp_progress * 100)));
+      const slProg = Math.max(0, Math.min(100, Math.round(lr.sl_progress * 100)));
+      const progStr = `TP: ${tpProg}% | SL: ${slProg}%`;
+      return `<div class="flex flex-col gap-1 items-start"><span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap border text-center ${color}">${lr.live_result_status}</span><span class="text-[8px] font-mono text-slate-500 text-center">${progStr}</span></div>`;
+    }
+    
+    return '<span class="text-slate-600">-</span>';
   };
 
   const firedSignals = displaySignals.filter(s => s.status === 'FIRED' || s.status === 'DCA_FIRED');
@@ -466,10 +498,27 @@ function renderSignals() {
   const lost = firedSignals.filter(s => s.result === 'SL HIT').length;
   const winRate = (won + lost) > 0 ? ((won / (won + lost)) * 100).toFixed(1) : '0.0';
   
+  let nearTp = 0, nearSl = 0, movingTp = 0, movingSl = 0, inProgress = 0;
+  firedSignals.forEach(s => {
+    if (!s.result && state.signal_live_results[s.id]) {
+      const st = state.signal_live_results[s.id].live_result_status;
+      if (st === 'NEAR TP') nearTp++;
+      else if (st === 'NEAR SL') nearSl++;
+      else if (st === 'MOVING TO TP') movingTp++;
+      else if (st === 'MOVING TO SL') movingSl++;
+      else inProgress++;
+    }
+  });
+  
+  const liveBiasTotal = won + lost + nearTp + nearSl + movingTp + movingSl;
+  const liveBiasRate = liveBiasTotal > 0 ? (((won + nearTp + movingTp) / liveBiasTotal) * 100).toFixed(1) : '0.0';
+  
   if (document.getElementById('win-rate')) document.getElementById('win-rate').textContent = winRate;
+  if (document.getElementById('live-bias-rate')) document.getElementById('live-bias-rate').textContent = liveBiasRate;
   if (document.getElementById('stat-fired')) document.getElementById('stat-fired').textContent = firedSignals.length;
   if (document.getElementById('stat-tp')) document.getElementById('stat-tp').textContent = won;
   if (document.getElementById('stat-sl')) document.getElementById('stat-sl').textContent = lost;
+  if (document.getElementById('stat-live')) document.getElementById('stat-live').textContent = nearTp + nearSl + movingTp + movingSl + inProgress;
 
   tbody.innerHTML = displaySignals.map(s => {
     const isHighlight = s.status === 'FIRED' || s.status === 'DCA_FIRED';
@@ -480,7 +529,7 @@ function renderSignals() {
         <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${['buy', 'bullish'].includes((s.direction || '').toLowerCase()) ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${s.direction}</span></td>
         <td class="px-4 py-2.5 text-right font-mono ${s.score > 0 ? 'text-cyan-400 font-bold' : 'text-slate-500'}">${s.score}</td>
         <td class="px-4 py-2.5">${getStatusBadge(s.status)}</td>
-        <td class="px-4 py-2.5">${getResultBadge(s.result)}</td>
+        <td class="px-4 py-2.5">${getResultBadge(s)}</td>
         <td class="px-4 py-2.5 text-slate-300 w-full">${JSON.stringify(s.reason)}</td>
       </tr>
     `;
@@ -493,8 +542,18 @@ async function checkSignalResults() {
   btn.disabled = true;
   try {
     const res = await api('POST', '/api/signals/check_results');
-    alert(`Done! Updated ${res.updated} signals.`);
-    window.location.reload();
+    alert(`Done! Updated ${res.updated} final signals.`);
+    
+    if (res.live_results) {
+      state.signal_live_results = { ...state.signal_live_results, ...res.live_results };
+    }
+    
+    const initData = await api('GET', '/api/initial_data').catch(() => null);
+    if (initData && initData.signals) {
+      state.all_signals = initData.signals;
+    }
+    
+    renderSignals();
   } catch (err) {
     alert(err.message);
   } finally {
