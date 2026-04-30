@@ -81,6 +81,15 @@ function handleEvent(msg) {
     case 'log.event': state.events.unshift(msg); renderLogs(); break;
     case 'engine.status': state.engine_running = msg.state === 'active'; renderEngineBtn(); renderNotice(); break;
     case 'session.status': state.active_sessions_count = msg.active_count; renderTopbar(); renderNotice(); break;
+    case 'signal.results_updated':
+      if (msg.live_results) {
+        state.signal_live_results = { ...state.signal_live_results, ...msg.live_results };
+        try { localStorage.setItem('signal_live_results', JSON.stringify(state.signal_live_results)); } catch(e) {}
+      }
+      api('GET', '/api/initial_data').then(d => {
+        if (d && d.signals) { state.all_signals = d.signals; renderSignals(); }
+      }).catch(() => {});
+      break;
   }
 }
 
