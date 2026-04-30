@@ -179,16 +179,36 @@
 
     <section class="tab-panel space-y-4" data-panel="signals">
       <div class="bg-panel border border-border_light rounded-sm overflow-hidden flex flex-col">
-        <div class="px-4 py-3 border-b border-border_light bg-white/[0.02] flex justify-between items-center">
+        <div class="px-4 py-3 border-b border-border_light bg-white/[0.02] flex justify-between items-center flex-wrap gap-3">
           <div class="flex items-center gap-4">
             <span class="text-[10px] tracking-[0.15em] font-bold text-slate-400 uppercase">ALL SIGNALS</span>
             <span class="text-[10px] font-mono text-cyan_neon tracking-wider bg-cyan_neon/10 px-2 py-0.5 rounded border border-cyan_neon/30">WIN RATE: <span id="win-rate">0.0</span>%</span>
+            <div class="flex gap-2 text-[10px] text-slate-400 font-mono tracking-widest bg-black/20 px-2 py-0.5 rounded border border-border_strong">
+              <span>FIRED: <span id="stat-fired" class="text-slate-200">0</span></span>
+              <span>TP: <span id="stat-tp" class="text-emerald-400">0</span></span>
+              <span>SL: <span id="stat-sl" class="text-rose-400">0</span></span>
+            </div>
           </div>
           <div class="flex gap-2">
             <button onclick="checkSignalResults()" id="btn-check-results" class="px-3 py-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/20 hover:border-blue-500/40 rounded text-[9px] font-bold tracking-widest uppercase transition-colors shrink-0">CHECK RESULTS</button>
             <button onclick="clearSignalResults()" id="btn-clear-results" class="px-3 py-1.5 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-500/40 rounded text-[9px] font-bold tracking-widest uppercase transition-colors shrink-0">CLEAR RESULTS</button>
             <button onclick="clearAllSignals()" class="px-3 py-1.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20 hover:border-rose-500/40 rounded text-[9px] font-bold tracking-widest uppercase transition-colors shrink-0">CLEAR SIGNALS</button>
           </div>
+        </div>
+        <div class="px-4 py-2 border-b border-border_light bg-bg/50 flex gap-4 items-center overflow-x-auto whitespace-nowrap">
+          <div class="flex gap-2 items-center">
+            <label class="text-[9px] font-bold tracking-[0.1em] text-slate-400 uppercase">TIME FROM</label>
+            <input type="time" id="signal-time-from" onchange="renderSignals()" class="bg-black/20 border border-border_strong text-slate-200 text-[10px] px-2 py-1 rounded outline-none focus:border-cyan_neon transition-colors" style="color-scheme: dark;">
+          </div>
+          <div class="flex gap-2 items-center">
+            <label class="text-[9px] font-bold tracking-[0.1em] text-slate-400 uppercase">TIME TO</label>
+            <input type="time" id="signal-time-to" onchange="renderSignals()" class="bg-black/20 border border-border_strong text-slate-200 text-[10px] px-2 py-1 rounded outline-none focus:border-cyan_neon transition-colors" style="color-scheme: dark;">
+          </div>
+          <div class="flex gap-2 items-center">
+            <label class="text-[9px] font-bold tracking-[0.1em] text-slate-400 uppercase">TZ</label>
+            <input type="text" id="signal-timezone" value="Asia/Karachi" onchange="renderSignals()" class="bg-black/20 border border-border_strong text-slate-200 text-[10px] px-2 py-1 rounded outline-none focus:border-cyan_neon transition-colors w-28" placeholder="e.g. UTC">
+          </div>
+          <button onclick="document.getElementById('signal-time-from').value=''; document.getElementById('signal-time-to').value=''; renderSignals();" class="px-2 py-1 bg-white/5 text-slate-300 hover:bg-white/10 border border-white/10 rounded text-[9px] font-bold tracking-widest uppercase transition-colors">CLEAR FILTER</button>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-left whitespace-nowrap">

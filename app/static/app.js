@@ -406,10 +406,45 @@ function renderTrades() {
 
 function renderSignals() {
   const tbody = document.getElementById('signals-body');
-  if (!state.all_signals.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-slate-500 py-8 uppercase tracking-widest text-xs">NO SIGNALS</td></tr>';
+  
+  const fromStr = document.getElementById('signal-time-from')?.value;
+  const toStr = document.getElementById('signal-time-to')?.value;
+  const tzStr = document.getElementById('signal-timezone')?.value || 'Asia/Karachi';
+
+  let displaySignals = state.all_signals;
+
+  if (fromStr && toStr) {
+    try {
+      displaySignals = state.all_signals.filter(s => {
+        // Parse UTC timestamp properly
+        const d = new Date(s.created_at + 'Z'); 
+        const hm = new Intl.DateTimeFormat('en-GB', { 
+          timeZone: tzStr, 
+          hour: '2-digit', 
+          minute: '2-digit',
+          hour12: false
+        }).format(d);
+        
+        if (fromStr <= toStr) {
+          return hm >= fromStr && hm <= toStr;
+        } else {
+          return hm >= fromStr || hm <= toStr;
+        }
+      });
+    } catch (e) {
+      console.error("Time filter error:", e);
+    }
+  }
+
+  if (!displaySignals.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-slate-500 py-8 uppercase tracking-widest text-xs">NO SIGNALS FOR SELECTED RANGE</td></tr>';
+    if (document.getElementById('win-rate')) document.getElementById('win-rate').textContent = '0.0';
+    if (document.getElementById('stat-fired')) document.getElementById('stat-fired').textContent = '0';
+    if (document.getElementById('stat-tp')) document.getElementById('stat-tp').textContent = '0';
+    if (document.getElementById('stat-sl')) document.getElementById('stat-sl').textContent = '0';
     return;
   }
+
   const getStatusBadge = (status) => {
     let color = 'bg-white/5 text-slate-400 border-white/10';
     if (status === 'FIRED') color = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
@@ -426,14 +461,17 @@ function renderSignals() {
     return `<span class="text-slate-400">${result}</span>`;
   };
 
-  const firedSignals = state.all_signals.filter(s => s.status === 'FIRED' || s.status === 'DCA_FIRED');
+  const firedSignals = displaySignals.filter(s => s.status === 'FIRED' || s.status === 'DCA_FIRED');
   const won = firedSignals.filter(s => s.result === 'TP HIT').length;
   const lost = firedSignals.filter(s => s.result === 'SL HIT').length;
   const winRate = (won + lost) > 0 ? ((won / (won + lost)) * 100).toFixed(1) : '0.0';
-  const winRateEl = document.getElementById('win-rate');
-  if (winRateEl) winRateEl.textContent = winRate;
+  
+  if (document.getElementById('win-rate')) document.getElementById('win-rate').textContent = winRate;
+  if (document.getElementById('stat-fired')) document.getElementById('stat-fired').textContent = firedSignals.length;
+  if (document.getElementById('stat-tp')) document.getElementById('stat-tp').textContent = won;
+  if (document.getElementById('stat-sl')) document.getElementById('stat-sl').textContent = lost;
 
-  tbody.innerHTML = state.all_signals.map(s => {
+  tbody.innerHTML = displaySignals.map(s => {
     const isHighlight = s.status === 'FIRED' || s.status === 'DCA_FIRED';
     return `
       <tr class="${isHighlight ? 'bg-emerald-500/5 hover:bg-emerald-500/10' : 'hover:bg-white/[0.02]'} transition-colors">
