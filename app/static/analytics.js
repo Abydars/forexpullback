@@ -163,10 +163,51 @@ function getRecommendedConfig(signals, minSample) {
   
   const allSymbolsScanned = Object.keys(bySym);
   
+  // 3. Find optimal sessions (WR >= 55%)
+  const tz = document.getElementById('signal-timezone')?.value || 'UTC';
+  const getBlock = (s) => {
+    if (!s.created_at) return null;
+    try {
+      const d = new Date(s.created_at + "Z");
+      const hStr = new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: tz }).format(d);
+      const h = parseInt(hStr, 10);
+      if (isNaN(h)) return null;
+      const start = Math.floor(h / 2) * 2;
+      const end = (start + 2) % 24;
+      const pad = n => n.toString().padStart(2, '0');
+      return `${pad(start)}:00-${pad(end)}:00`;
+    } catch(e) { return null; }
+  };
+  
+  const timeStats = buildGroupStats(signals, getBlock);
+  const recommendedSessions = [];
+  for (const [block, g] of Object.entries(timeStats)) {
+    if (block && g.resolved >= minSample && g.winRate >= 55) {
+      const [start_time, end_time] = block.split('-');
+      recommendedSessions.push({
+        id: Date.now() + Math.random(),
+        name: `Optimum ${start_time}`,
+        start_time,
+        end_time,
+        timezone: tz,
+        days_mask: 127 // All days
+      });
+    }
+  }
+  
   return {
     signal_threshold: bestT,
     trade_symbols: recommendedTradeSymbols.length ? recommendedTradeSymbols : ["XAUUSD"],
-    signal_symbols: allSymbolsScanned
+    signal_symbols: allSymbolsScanned,
+    sessions: recommendedSessions.length ? recommendedSessions : [],
+    correlation_groups_enabled: true,
+    max_open_per_correlation_group: 1,
+    max_open_positions: 3,
+    max_per_symbol: 1,
+    max_per_direction: 2,
+    session_warmup_enabled: true,
+    session_min_warmup_minutes: 5,
+    session_max_warmup_minutes: 15
   };
 }
 
