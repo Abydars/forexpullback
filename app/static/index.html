@@ -208,6 +208,8 @@
               <span>INCLUDE SKIPPED</span>
             </label>
             <button onclick="checkSignalResults()" id="btn-check-results" class="px-3 py-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/20 hover:border-blue-500/40 rounded text-[9px] font-bold tracking-widest uppercase transition-colors shrink-0">CHECK RESULTS</button>
+            <button onclick="window.open('/api/signals/export-ml', '_blank')" class="px-3 py-1.5 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 border border-purple-500/20 hover:border-purple-500/40 rounded text-[9px] font-bold tracking-widest uppercase transition-colors shrink-0">🤖 EXPORT ML DATASET</button>
+            <button onclick="trainMLModel()" class="px-3 py-1.5 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 border border-indigo-500/20 hover:border-indigo-500/40 rounded text-[9px] font-bold tracking-widest uppercase transition-colors shrink-0">🧠 TRAIN ML MODEL</button>
             <button onclick="clearSignalResults()" id="btn-clear-results" class="px-3 py-1.5 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-500/40 rounded text-[9px] font-bold tracking-widest uppercase transition-colors shrink-0">CLEAR RESULTS</button>
             <button onclick="clearAllSignals()" class="px-3 py-1.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20 hover:border-rose-500/40 rounded text-[9px] font-bold tracking-widest uppercase transition-colors shrink-0">CLEAR SIGNALS</button>
           </div>

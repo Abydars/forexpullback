@@ -3,6 +3,14 @@ from app.engine.scanner import scan_loop
 from app.engine.position_monitor import monitor_loop
 from app.engine.result_checker import auto_check_results_loop
 
+from app.engine.ml_trainer import train_ml_model
+
+async def daily_ml_training_loop():
+    while True:
+        # Wait 12 hours before first training after boot
+        await asyncio.sleep(60 * 60 * 12)
+        await train_ml_model()
+
 _tasks = []
 
 async def start_engine():
@@ -61,7 +69,8 @@ async def start_engine():
     _tasks = [
         asyncio.create_task(scan_loop()),
         asyncio.create_task(monitor_loop()),
-        asyncio.create_task(auto_check_results_loop())
+        asyncio.create_task(auto_check_results_loop()),
+        asyncio.create_task(daily_ml_training_loop())
     ]
 
 async def stop_engine():

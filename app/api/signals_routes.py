@@ -23,6 +23,47 @@ async def clear_signals():
     await broadcast({"type": "log.event", "level": "INFO", "component": "system", "message": "All signals cleared manually", "created_at": datetime.now(pytz.utc).isoformat()})
     return {"status": "ok"}
 
+from fastapi.responses import StreamingResponse
+import io
+import csv
+
+@router.get("/signals/export-ml")
+async def export_ml_signals():
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(Signal).where(Signal.result.isnot(None)))
+        signals = result.scalars().all()
+    
+    if not signals:
+        raise HTTPException(status_code=404, detail="No resolved signals found")
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Define columns
+    base_cols = ["id", "symbol", "direction", "score", "status", "result"]
+    ml_feature_keys = set()
+    for s in signals:
+        if s.ml_features:
+            ml_feature_keys.update(s.ml_features.keys())
+    
+    ml_feature_keys = sorted(list(ml_feature_keys))
+    headers = base_cols + ml_feature_keys
+    writer.writerow(headers)
+    
+    for s in signals:
+        row = [s.id, s.symbol, s.direction, s.score, s.status, s.result]
+        features = s.ml_features or {}
+        for k in ml_feature_keys:
+            row.append(features.get(k, ""))
+        writer.writerow(row)
+        
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=ml_dataset_{int(datetime.now().timestamp())}.csv"}
+    )
+
 @router.post("/signals/clear_results")
 async def clear_signal_results():
     from sqlalchemy import update

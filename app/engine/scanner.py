@@ -287,6 +287,69 @@ async def scan_loop():
                                 timings["trigger_done"] = time.time() * 1000
                                 reason_full["trigger"] = ltf_trigger
                                 
+                                ml_features = None
+                                if ltf_trigger:
+                                    try:
+                                        # Compute simple RSI
+                                        delta_15m = df_15m['close'].diff()
+                                        gain_15m = delta_15m.where(delta_15m > 0, 0).rolling(14).mean()
+                                        loss_15m = (-delta_15m.where(delta_15m < 0, 0)).rolling(14).mean()
+                                        rsi_15m = 100 - (100 / (1 + (gain_15m / loss_15m.replace(0, 0.0001)))).iloc[-1]
+                                        
+                                        delta_5m = df_5m['close'].diff()
+                                        gain_5m = delta_5m.where(delta_5m > 0, 0).rolling(14).mean()
+                                        loss_5m = (-delta_5m.where(delta_5m < 0, 0)).rolling(14).mean()
+                                        rsi_5m = 100 - (100 / (1 + (gain_5m / loss_5m.replace(0, 0.0001)))).iloc[-1]
+                                        
+                                        # Candle Shapes (5m)
+                                        last_5m = df_5m.iloc[-2] # Last closed candle
+                                        body_size_5m = abs(last_5m['close'] - last_5m['open'])
+                                        upper_wick_5m = last_5m['high'] - max(last_5m['open'], last_5m['close'])
+                                        lower_wick_5m = min(last_5m['open'], last_5m['close']) - last_5m['low']
+                                        
+                                        # Moving average distance (15m)
+                                        ema50_15m = df_15m['close'].ewm(span=50, adjust=False).mean().iloc[-1]
+                                        dist_ema50_15m = (df_15m['close'].iloc[-1] - ema50_15m) / ema50_15m * 100
+                                        
+                                        # Volume
+                                        vol_5m_avg = df_5m['tick_volume'].iloc[-11:-1].mean()
+                                        vol_5m_ratio = last_5m['tick_volume'] / vol_5m_avg if vol_5m_avg > 0 else 1.0
+                                        
+                                        ml_features = {
+                                            "htf_trend": 1 if bias == "bullish" else -1,
+                                            "atr_15m": local_atr,
+                                            "spike_factor": spike_factor if 'spike_factor' in locals() else 1.0,
+                                            "mtf_zone_type": mtf_zone.get("type") if mtf_zone else "none",
+                                            "mtf_zone_strength": mtf_zone.get("strength") if mtf_zone else 0,
+                                            "trigger_type": ltf_trigger.get("type", "none"),
+                                            "trigger_strength": ltf_trigger.get("strength", 0),
+                                            "hour_of_day": now_dt.hour,
+                                            "day_of_week": now_dt.weekday(),
+                                            "spread_to_atr": spread_points / atr_points if atr_points > 0 else 0,
+                                            "adx_15m": float(adx),
+                                            "rsi_15m": float(rsi_15m),
+                                            "rsi_5m": float(rsi_5m),
+                                            "body_size_5m": float(body_size_5m),
+                                            "upper_wick_5m": float(upper_wick_5m),
+                                            "lower_wick_5m": float(lower_wick_5m),
+                                            "dist_ema50_15m": float(dist_ema50_15m),
+                                            "vol_5m_ratio": float(vol_5m_ratio)
+                                        }
+                                        # Clean any NaNs which can break JSON serialization
+                                        for k, v in ml_features.items():
+                                            if isinstance(v, float) and pd.isna(v):
+                                                ml_features[k] = 0.0
+                                                
+                                        from app.engine.ml_trainer import predict_ml_prob
+                                        ml_prob = predict_ml_prob(ml_features)
+                                        if ml_prob is not None:
+                                            reason_full["raw_score"] = score
+                                            reason_full["ml_prob"] = round(ml_prob, 1)
+                                            # Blend heuristic (40%) and ML prediction (60%)
+                                            score = int((score * 0.4) + (ml_prob * 0.6))
+                                    except Exception as e:
+                                        ml_features = {"error": str(e)}
+                                
                                 warmup_failed = False
                                 warmup_reason = ""
                                 if session_warmup_state:
@@ -561,7 +624,8 @@ async def scan_loop():
                                                             "state_key": state_key,
                                                             "timings": dict(timings),
                                                             "warmup_failed": warmup_failed,
-                                                            "warmup_reason": warmup_reason
+                                                            "warmup_reason": warmup_reason,
+                                                            "ml_features": ml_features
                                                         })
                                         else:
                                             status = "WATCHING"
@@ -582,7 +646,8 @@ async def scan_loop():
                                                 "is_dca": True,
                                                 "timings": dict(timings),
                                                 "warmup_failed": warmup_failed,
-                                                "warmup_reason": warmup_reason
+                                                "warmup_reason": warmup_reason,
+                                                "ml_features": ml_features
                                             })
 
                 if status in ("SKIPPED", "DCA_SKIPPED", "SIGNAL_ONLY"):
@@ -595,7 +660,8 @@ async def scan_loop():
                                         sl=ltf_trigger['sl'] if ltf_trigger else 0, 
                                         tp=ltf_trigger['tp'] if ltf_trigger else 0,
                                         reason=reason_full, status=status, 
-                                        skip_reason=reason_full.get("skip_reason"))
+                                        skip_reason=reason_full.get("skip_reason"),
+                                        ml_features=ml_features)
                             db.add(sig)
                             await db.commit()
                             await db.refresh(sig)
@@ -726,7 +792,8 @@ async def scan_loop():
                     async with AsyncSessionLocal() as db:
                         sig = Signal(symbol=res, direction=bias, score=score, htf_bias=bias, 
                                     entry=ltf_trigger['entry'], sl=ltf_trigger['sl'], tp=ltf_trigger['tp'],
-                                    reason=reason_full, status=status)
+                                    reason=reason_full, status=status,
+                                    ml_features=c.get("ml_features"))
                         db.add(sig)
                         await db.commit()
                         await db.refresh(sig)
@@ -757,7 +824,8 @@ async def scan_loop():
                             sig = Signal(symbol=res, direction=bias, score=score, htf_bias=bias, 
                                         entry=ltf_trigger['entry'], sl=ltf_trigger['sl'], tp=ltf_trigger['tp'],
                                         reason=reason_full, status=status,
-                                        skip_reason=reason_full.get("skip_reason"))
+                                        skip_reason=reason_full.get("skip_reason"),
+                                        ml_features=c.get("ml_features"))
                             db.add(sig)
                             await db.commit()
                             await db.refresh(sig)

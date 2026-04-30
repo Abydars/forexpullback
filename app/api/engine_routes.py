@@ -22,6 +22,13 @@ async def get_available_symbols():
     return {"symbols": syms}
 
 from app.core.config import get_config, update_config
+from app.engine.ml_trainer import train_ml_model
+from fastapi import BackgroundTasks
+
+@router.post("/engine/train-ml")
+async def trigger_ml_training(background_tasks: BackgroundTasks):
+    background_tasks.add_task(train_ml_model)
+    return {"status": "ok", "message": "ML training started in background. Check logs."}
 
 @router.post("/engine/start")
 async def start_e():

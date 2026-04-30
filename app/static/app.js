@@ -919,13 +919,15 @@ function renderSignals() {
       ? '<span class="px-1 py-[1px] ml-1 rounded text-[7px] font-bold tracking-widest uppercase bg-cyan-500/10 text-cyan-400 border border-cyan-500/20" title="Insight only, no live trading">INSIGHT</span>'
       : '<span class="px-1 py-[1px] ml-1 rounded text-[7px] font-bold tracking-widest uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" title="Enabled for live trading">TRADE</span>';
 
+    const mlBadge = (s.reason && s.reason.ml_prob !== undefined) ? `<br><span class="inline-block mt-1 px-1 rounded bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-[9px]">ML:${s.reason.ml_prob}%</span>` : '';
+
     return `
       <tr class="${isHighlight ? 'bg-emerald-500/5 hover:bg-emerald-500/10' : 'hover:bg-white/[0.02]'} transition-colors">
         <td class="px-4 py-2.5"><input type="checkbox" onchange="toggleSignalSelection(${s.id}, this.checked)" ${isChecked ? 'checked' : ''} class="accent-rose-500"></td>
         <td class="px-4 py-2.5 font-mono text-slate-500 whitespace-nowrap">${formatLocalTime(s.created_at)}</td>
         <td class="px-4 py-2.5 font-bold text-slate-200">${s.symbol}${modeBadge}</td>
         <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${['buy', 'bullish'].includes((s.direction || '').toLowerCase()) ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${s.direction}</span></td>
-        <td class="px-4 py-2.5 text-right font-mono ${s.score > 0 ? 'text-cyan-400 font-bold' : 'text-slate-500'}">${s.score}</td>
+        <td class="px-4 py-2.5 text-right font-mono ${s.score > 0 ? 'text-cyan-400 font-bold' : 'text-slate-500'}">${s.score}${mlBadge}</td>
         <td class="px-4 py-2.5">${getStatusBadge(s.status)}</td>
         <td class="px-4 py-2.5">${getResultBadge(s)}</td>
         <td class="px-4 py-2.5 text-slate-300 font-mono text-[10px]">${triggerHtml}</td>
@@ -1029,6 +1031,16 @@ window.checkSignalResults = async function() {
   } finally {
     btn.textContent = 'CHECK RESULTS';
     btn.disabled = false;
+  }
+}
+
+window.trainMLModel = async function() {
+  if (!confirm("Start training ML model in background? (This may take a few seconds and requires at least 50 resolved signals)")) return;
+  try {
+    const res = await api('POST', '/api/engine/train-ml');
+    alert(res.message || "Training started.");
+  } catch(err) {
+    alert("Error: " + err.message);
   }
 }
 
@@ -1143,6 +1155,8 @@ function renderScannerStatus() {
       ? '<span class="px-1 py-[1px] ml-1 rounded text-[7px] font-bold tracking-widest uppercase bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">INSIGHT</span>'
       : '';
 
+    const mlBadge = (s.reason && s.reason.ml_prob !== undefined) ? `<br><span class="inline-block mt-1 px-1 rounded bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-[9px]">ML:${s.reason.ml_prob}%</span>` : '';
+    
     return `
     <tr class="${isHighlight ? 'bg-emerald-500/5 hover:bg-emerald-500/10' : 'hover:bg-white/[0.02]'} transition-colors">
       <td class="px-4 py-2.5 flex items-center gap-2">
@@ -1150,7 +1164,7 @@ function renderScannerStatus() {
         <span class="text-slate-500 font-mono text-[9px] border border-border_strong px-1 rounded">${s.resolved}</span>
       </td>
       <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${s.bias === 'bullish' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : s.bias === 'bearish' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-white/5 text-slate-400 border border-white/10'}">${s.bias || 'NONE'}</span></td>
-      <td class="px-4 py-2.5 text-right font-mono ${s.score > 0 ? 'text-cyan-400 font-bold' : 'text-slate-500'}">${s.score}</td>
+      <td class="px-4 py-2.5 text-right font-mono ${s.score > 0 ? 'text-cyan-400 font-bold' : 'text-slate-500'}">${s.score}${mlBadge}</td>
       <td class="px-4 py-2.5">${getStatusBadge(s.status)}</td>
       <td class="px-4 py-2.5 text-slate-300" style="max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${rawReason}">
         ${esc(reasonText)}

@@ -60,6 +60,7 @@ class Signal(Base):
     status: Mapped[str] = mapped_column(String)
     skip_reason: Mapped[str | None] = mapped_column(String, nullable=True)
     result: Mapped[str | None] = mapped_column(String, nullable=True)
+    ml_features: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
 
 class Trade(Base):
