@@ -414,15 +414,11 @@ from app.db.session import AsyncSessionLocal
 from app.db.models import Signal
 from sqlalchemy import select
 from datetime import datetime
-from app.api.signals_routes import detect_signal_result, next_closed_m1_open_time
-from app.mt5_client.client import mt5_client
-from app.core.config import cfg
-import asyncio
-import MetaTrader5 as mt5
-import pandas as pd
-
 @router.get("/sl-buffer-analysis")
 async def analyze_sl_buffer():
+    from app.core.config import get_config
+    cfg = await get_config()
+    
     async with AsyncSessionLocal() as db:
         res = await db.execute(select(Signal).order_by(Signal.created_at.desc()).limit(1000))
         signals = res.scalars().all()
