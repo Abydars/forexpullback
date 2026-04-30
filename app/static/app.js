@@ -474,7 +474,7 @@ function renderSignals() {
   }
 
   if (!displaySignals.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-slate-500 py-8 uppercase tracking-widest text-xs">NO SIGNALS FOR SELECTED DATE/TIME RANGE</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="16" class="text-center text-slate-500 py-8 uppercase tracking-widest text-xs">NO SIGNALS FOR SELECTED DATE/TIME RANGE</td></tr>';
     if (document.getElementById('win-rate')) document.getElementById('win-rate').textContent = '0.0';
     if (document.getElementById('live-bias-rate')) document.getElementById('live-bias-rate').textContent = '0.0';
     if (document.getElementById('stat-fired')) document.getElementById('stat-fired').textContent = '0';
@@ -565,9 +565,58 @@ function renderSignals() {
   
   updateSelectedSignalsUI();
 
+  const getDecimals = (sym) => {
+    if (!sym) return 5;
+    sym = sym.toUpperCase();
+    if (sym.includes('JPY')) return 3;
+    if (sym.includes('XAU') || sym.includes('XAG') || sym.includes('US30') || sym.includes('NAS') || sym.includes('SPX') || sym.includes('WTI') || sym.includes('UK') || sym.includes('BRENT')) return 2;
+    return 5;
+  };
+
   tbody.innerHTML = displaySignals.map(s => {
     const isHighlight = s.status === 'FIRED' || s.status === 'DCA_FIRED';
     const isChecked = state.selected_signal_ids.has(s.id);
+    
+    const reason = s.reason || {};
+    const trigger = reason.trigger || {};
+    const htf = reason.htf || {};
+    const zone = reason.zone || {};
+
+    let triggerHtml = '-';
+    if (trigger.type) triggerHtml = `${trigger.type}${trigger.pattern ? ' / ' + trigger.pattern : ''} (${trigger.strength || '-'})`;
+    
+    let zoneHtml = '-';
+    if (zone.type) zoneHtml = `${zone.type} (${zone.quality || '-'})`;
+    
+    const htfStr = htf.strength || '-';
+
+    const decimals = getDecimals(s.symbol);
+    const entryStr = s.entry ? s.entry.toFixed(decimals) : '-';
+    const slStr = s.sl ? s.sl.toFixed(decimals) : '-';
+    const tpStr = s.tp ? s.tp.toFixed(decimals) : '-';
+
+    let rrStr = '-';
+    if (s.entry && s.sl && s.tp) {
+      const isBuy = ['buy', 'bullish'].includes((s.direction || '').toLowerCase());
+      const risk = isBuy ? s.entry - s.sl : s.sl - s.entry;
+      const reward = isBuy ? s.tp - s.entry : s.entry - s.tp;
+      if (risk > 0) rrStr = (reward / risk).toFixed(2);
+    }
+    
+    const rawSkip = s.skip_reason || reason.skip_reason;
+    let skipReasonStr = '-';
+    if (rawSkip) {
+      const map = {
+        'MAX_POSITIONS': 'Max positions',
+        'CORRELATION': 'Correlation',
+        'COOLDOWN': 'Cooldown',
+        'SPREAD': 'Spread',
+        'RISK': 'Risk'
+      };
+      skipReasonStr = map[rawSkip] || rawSkip;
+      if (skipReasonStr !== '-') skipReasonStr = `<span class="text-orange-400 font-bold uppercase tracking-widest text-[9px] border border-orange-500/30 bg-orange-500/10 px-1.5 py-0.5 rounded">${skipReasonStr}</span>`;
+    }
+
     return `
       <tr class="${isHighlight ? 'bg-emerald-500/5 hover:bg-emerald-500/10' : 'hover:bg-white/[0.02]'} transition-colors">
         <td class="px-4 py-2.5"><input type="checkbox" onchange="toggleSignalSelection(${s.id}, this.checked)" ${isChecked ? 'checked' : ''} class="accent-rose-500"></td>
@@ -577,7 +626,15 @@ function renderSignals() {
         <td class="px-4 py-2.5 text-right font-mono ${s.score > 0 ? 'text-cyan-400 font-bold' : 'text-slate-500'}">${s.score}</td>
         <td class="px-4 py-2.5">${getStatusBadge(s.status)}</td>
         <td class="px-4 py-2.5">${getResultBadge(s)}</td>
-        <td class="px-4 py-2.5 text-slate-300 w-full">${s.reason && s.reason.skip_reason ? `<span class="text-orange-400 font-bold uppercase tracking-widest text-[9px] border border-orange-500/30 bg-orange-500/10 px-1.5 py-0.5 rounded mr-2">${s.reason.skip_reason}</span>` : ''}${s.reason && s.reason.msg ? s.reason.msg : JSON.stringify(s.reason)}</td>
+        <td class="px-4 py-2.5 text-slate-300 font-mono text-[10px]">${triggerHtml}</td>
+        <td class="px-4 py-2.5 text-slate-300 font-mono text-[10px]">${zoneHtml}</td>
+        <td class="px-4 py-2.5 text-right font-mono text-slate-400 text-[10px]">${htfStr}</td>
+        <td class="px-4 py-2.5 text-right font-mono text-slate-400">${entryStr}</td>
+        <td class="px-4 py-2.5 text-right font-mono text-rose-400">${slStr}</td>
+        <td class="px-4 py-2.5 text-right font-mono text-emerald-400">${tpStr}</td>
+        <td class="px-4 py-2.5 text-right font-mono text-cyan-400">${rrStr}</td>
+        <td class="px-4 py-2.5">${skipReasonStr}</td>
+        <td class="px-4 py-2.5 text-slate-300 w-full font-mono text-[10px] truncate max-w-xs" title='${JSON.stringify(reason).replace(/'/g, "&#39;")}'>${reason && reason.msg ? reason.msg : JSON.stringify(reason)}</td>
       </tr>
     `;
   }).join('');
