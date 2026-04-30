@@ -58,9 +58,17 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
         symbols = list(set([s.symbol for s in signals]))
         rates_cache = {}
         rates_cache_m5 = {}
+        info_cache = {}
+        tick_cache = {}
+        
+        tp_buffer_mult = float(cfg.get("signal_result_tp_buffer_spread_mult", 1.5))
+        sl_buffer_mult = float(cfg.get("signal_result_sl_buffer_spread_mult", 0.0))
         now_dt = datetime.now(timezone.utc).replace(tzinfo=None)
         
         for sym in symbols:
+            info_cache[sym] = await mt5_client.get_symbol_info(sym)
+            tick_cache[sym] = await mt5_client.get_symbol_tick(sym)
+            
             sym_signals = [s for s in signals if s.symbol == sym]
             oldest_dt = min([s.created_at for s in sym_signals])
             
@@ -99,7 +107,20 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
             if not tp or not sl or not entry:
                 continue
                 
+            info = info_cache.get(s.symbol)
+            tick = tick_cache.get(s.symbol)
+            
+            def get_spread_price(sym, row, info_obj, tick_obj):
+                spread_val = row.get('spread')
+                if spread_val is not None and not pd.isna(spread_val):
+                    point = info_obj.point if info_obj else 0.00001
+                    return spread_val * point
+                if tick_obj and hasattr(tick_obj, 'ask') and hasattr(tick_obj, 'bid'):
+                    return tick_obj.ask - tick_obj.bid
+                return 0.0
+                
             res = None
+            ignored_tp_touch_count = 0
             
             is_buy = str(s.direction).lower() in ["buy", "bullish"]
             is_sell = str(s.direction).lower() in ["sell", "bearish"]
@@ -108,26 +129,28 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                 high = row['high']
                 low = row['low']
                 
+                spread_price = get_spread_price(s.symbol, row, info, tick)
+                
                 if is_buy:
-                    if low <= sl and high >= tp:
-                        res = "SL HIT" # Conservative choice for ambiguous
-                        break
-                    elif low <= sl:
+                    tp_effective = tp + (spread_price * tp_buffer_mult)
+                    if low <= sl:
                         res = "SL HIT"
+                        break
+                    elif high >= tp_effective:
+                        res = "TP HIT"
                         break
                     elif high >= tp:
-                        res = "TP HIT"
-                        break
+                        ignored_tp_touch_count += 1
                 elif is_sell:
-                    if high >= sl and low <= tp:
-                        res = "SL HIT" # Conservative choice for ambiguous
-                        break
-                    elif high >= sl:
+                    tp_effective = tp - (spread_price * tp_buffer_mult)
+                    if high >= sl:
                         res = "SL HIT"
                         break
-                    elif low <= tp:
+                    elif low <= tp_effective:
                         res = "TP HIT"
                         break
+                    elif low <= tp:
+                        ignored_tp_touch_count += 1
                 else:
                     res = "UNKNOWN DIR"
                     break
@@ -192,7 +215,8 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                     "live_result_status": status,
                     "tp_progress": tp_progress,
                     "sl_progress": sl_progress,
-                    "current_price": current_price
+                    "current_price": current_price,
+                    "ignored_tp_touch_count": ignored_tp_touch_count
                 }
                 
         if updated > 0:

@@ -510,7 +510,14 @@ function renderSignals() {
       const tpProg = Math.max(0, Math.min(100, Math.round(lr.tp_progress * 100)));
       const slProg = Math.max(0, Math.min(100, Math.round(lr.sl_progress * 100)));
       const progStr = `TP: ${tpProg}% | SL: ${slProg}%`;
-      return `<div class="flex flex-col gap-1 items-start"><span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap border text-center ${color}">${lr.live_result_status}</span><span class="text-[8px] font-mono text-slate-500 text-center">${progStr}</span></div>`;
+      
+      const ignoredCount = lr.ignored_tp_touch_count || 0;
+      let ignoredHtml = '';
+      if (ignoredCount > 0) {
+        ignoredHtml = `<div class="text-[9px] text-amber-500 font-bold mt-0.5 uppercase whitespace-nowrap" title="Raw TP touched ${ignoredCount} time(s) but ignored by buffer">TP touched (ignored)</div>`;
+      }
+      
+      return `<div class="flex flex-col gap-1 items-start"><span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap border text-center ${color}">${lr.live_result_status}</span><span class="text-[8px] font-mono text-slate-500 text-center">${progStr}</span>${ignoredHtml}</div>`;
     }
     
     return '<span class="text-slate-600">-</span>';
