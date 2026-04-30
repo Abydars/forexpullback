@@ -135,28 +135,44 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
         
         tp_buffer_mult = float(cfg.get("signal_result_tp_buffer_spread_mult", 1.5))
         sl_buffer_mult = float(cfg.get("signal_result_sl_buffer_spread_mult", 0.0))
-        now_dt = datetime.now(timezone.utc)
+        now_dt = datetime.now()
         
         for sym in symbols:
             info_cache[sym] = await asyncio.to_thread(mt5.symbol_info, sym)
             tick_cache[sym] = await asyncio.to_thread(mt5.symbol_info_tick, sym)
             
             sym_signals = [s for s in signals if s.symbol == sym]
-            oldest_dt_utc = min([s.created_at.replace(tzinfo=timezone.utc) if s.created_at.tzinfo is None else s.created_at for s in sym_signals])
+            oldest_dt = min([s.created_at.replace(tzinfo=None) for s in sym_signals])
             
             from datetime import timedelta
             
-            date_from = oldest_dt_utc - timedelta(minutes=2)
+            # Calculate offset between System Naive Time and Broker Naive Time
+            tick = tick_cache[sym]
+            offset_hours = 0
+            if tick and hasattr(tick, 'time'):
+                from datetime import datetime as dt_type
+                broker_naive = dt_type.utcfromtimestamp(tick.time)
+                offset = now_dt - broker_naive
+                offset_hours = round(offset.total_seconds() / 3600)
+            
+            offset_td = timedelta(hours=offset_hours)
+            
+            date_from = oldest_dt - timedelta(minutes=2)
             date_to = now_dt + timedelta(minutes=2)
             
-            df = await mt5_client.get_rates_range(sym, mt5.TIMEFRAME_M1, date_from, date_to)
+            broker_date_from = date_from - offset_td
+            broker_date_to = date_to - offset_td
+            
+            df = await mt5_client.get_rates_range(sym, mt5.TIMEFRAME_M1, broker_date_from, broker_date_to)
             if df is not None and not df.empty:
+                df['time'] = df['time'] + pd.Timedelta(hours=offset_hours)
                 df = df.sort_values("time").drop_duplicates("time").reset_index(drop=True)
             rates_cache[sym] = df
             
             if smart_tp_enabled:
-                df_m5 = await mt5_client.get_rates_range(sym, mt5.TIMEFRAME_M5, date_from, date_to)
+                df_m5 = await mt5_client.get_rates_range(sym, mt5.TIMEFRAME_M5, broker_date_from, broker_date_to)
                 if df_m5 is not None and not df_m5.empty:
+                    df_m5['time'] = df_m5['time'] + pd.Timedelta(hours=offset_hours)
                     df_m5 = df_m5.sort_values("time").drop_duplicates("time").reset_index(drop=True)
                 rates_cache_m5[sym] = df_m5
             
@@ -167,9 +183,7 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                 
             # Filter candles that occurred AFTER the signal was created
             from datetime import timedelta
-            created_at = s.created_at
-            if created_at.tzinfo is None:
-                created_at = created_at.replace(tzinfo=timezone.utc)
+            created_at = s.created_at.replace(tzinfo=None)
                 
             replay_start = next_closed_m1_open_time(created_at)
             future_df = df[df['time'] >= pd.Timestamp(replay_start)]
@@ -242,8 +256,8 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                                     "source": "MT5.copy_rates_range",
                                     "timeframe": "M1",
                                     "symbol": s.symbol,
-                                    "created_at_utc": created_at.isoformat(),
-                                    "replay_start_utc": replay_start.isoformat(),
+                                    "created_at": created_at.isoformat(),
+                                    "replay_start": replay_start.isoformat(),
                                     "hit_candle_time": row['time'].isoformat(),
                                     "candle_open": row.get("open"),
                                     "candle_high": high,
@@ -256,8 +270,8 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                                     "spread_price": spread_price,
                                     "direction": s.direction,
                                     "signal_id": s.id, "result": res, 
-                                    "hit_time_utc": row['time'].isoformat(),
-                                    "server_now_utc": now_dt.isoformat(),
+                                    "hit_time": row['time'].isoformat(),
+                                    "server_now": now_dt.isoformat(),
                                     "smart_tp_reason": smart_tp_reason
                                 }
                                 break
@@ -282,8 +296,8 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                         "source": "MT5.copy_rates_range",
                         "timeframe": "M1",
                         "symbol": s.symbol,
-                        "created_at_utc": created_at.isoformat(),
-                        "replay_start_utc": replay_start.isoformat(),
+                        "created_at": created_at.isoformat(),
+                        "replay_start": replay_start.isoformat(),
                         "hit_candle_time": row['time'].isoformat(),
                         "candle_open": row.get("open"),
                         "candle_high": high,
@@ -296,8 +310,8 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                         "spread_price": spread_price,
                         "direction": s.direction,
                         "signal_id": s.id, "result": res,
-                        "hit_time_utc": row['time'].isoformat(),
-                        "server_now_utc": now_dt.isoformat(),
+                        "hit_time": row['time'].isoformat(),
+                        "server_now": now_dt.isoformat(),
                         "both_touched": detection["both_touched"]
                     }
                     break

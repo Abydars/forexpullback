@@ -16,35 +16,47 @@ async def run_test():
     SL = 201.463
     TP = 198.304
     
-    # 07:25:03 PM PKT = 14:25:03 UTC
-    SIGNAL_TIME = datetime(2026, 4, 30, 14, 25, 3, tzinfo=timezone.utc)
+    # 07:25:03 PM PKT = 14:25:03 System UTC
+    SIGNAL_TIME = datetime(2026, 4, 30, 14, 25, 3)
     
     print(f"--- Testing {SYMBOL} {DIRECTION.upper()} ---")
-    print(f"Signal Time: {SIGNAL_TIME} UTC")
+    print(f"Signal Time: {SIGNAL_TIME} System Time")
     print(f"Entry: {ENTRY} | SL: {SL} | TP: {TP}")
 
     if not mt5.initialize():
         print("MT5 initialize failed")
         return
 
-    # Calculate exact date range (like check_results)
-    now_dt = datetime.now(timezone.utc)
+    # Calculate offset
+    tick = mt5.symbol_info_tick(SYMBOL)
+    offset_hours = 0
+    now_dt = datetime.now()
+    if tick and hasattr(tick, 'time'):
+        broker_naive = datetime.utcfromtimestamp(tick.time)
+        offset = now_dt - broker_naive
+        offset_hours = round(offset.total_seconds() / 3600)
+
+    offset_td = timedelta(hours=offset_hours)
+
     date_from = SIGNAL_TIME - timedelta(minutes=2)
     date_to = now_dt + timedelta(minutes=2)
+    
+    broker_date_from = date_from - offset_td
+    broker_date_to = date_to - offset_td
 
-    rates = mt5.copy_rates_range(SYMBOL, mt5.TIMEFRAME_M1, date_from, date_to)
+    rates = mt5.copy_rates_range(SYMBOL, mt5.TIMEFRAME_M1, broker_date_from, broker_date_to)
     if rates is None or len(rates) == 0:
         print("No candles fetched.")
         mt5.shutdown()
         return
 
     df = pd.DataFrame(rates)
-    df['time'] = pd.to_datetime(df['time'], unit='s', utc=True)
+    df['time'] = pd.to_datetime(df['time'], unit='s') + pd.Timedelta(hours=offset_hours)
     df = df.sort_values("time").drop_duplicates("time").reset_index(drop=True)
 
     # Calculate replay start
     replay_start = next_closed_m1_open_time(SIGNAL_TIME)
-    print(f"Replay Start Time: {replay_start} UTC")
+    print(f"Replay Start Time: {replay_start} System Time")
 
     future_df = df[df['time'] >= pd.Timestamp(replay_start)]
     

@@ -740,7 +740,8 @@ function renderSignals() {
 
   const formatUtcIsoToLocal = (isoString) => {
     if (!isoString) return "-";
-    const d = new Date(isoString);
+    // Add Z so browser interprets Server Naive UTC as UTC and translates to PKT locally
+    const d = new Date(isoString + "Z");
     return d.toLocaleString([], {
       month: "short",
       day: "numeric",
@@ -757,7 +758,7 @@ function renderSignals() {
     if (s.result) {
       if (lr && lr.debug) {
         const d = lr.debug;
-        const hitTimeStr = d.hit_time_utc || d.hit_time;
+        const hitTimeStr = d.hit_time || d.hit_time_utc;
         const hitTimeLocal = formatUtcIsoToLocal(hitTimeStr);
         const dec = getDecimals ? getDecimals(s.symbol) : 5;
         const effTp = d.effective_tp ? d.effective_tp.toFixed(dec) : '-';
@@ -765,14 +766,14 @@ function renderSignals() {
         const l = d.candle_low ? d.candle_low.toFixed(dec) : '-';
         
         let futureWarning = '';
-        if (d.hit_time_utc && d.server_now_utc && d.hit_time_utc > d.server_now_utc) {
+        if (d.hit_time && d.server_now && d.hit_time > d.server_now) {
           futureWarning = '<div class="text-[9px] font-bold text-rose-500 uppercase mt-0.5 bg-rose-500/10 px-1 inline-block rounded border border-rose-500/30">FUTURE CANDLE BUG</div>';
         }
 
-        const replayStart = d.replay_start_utc ? d.replay_start_utc.replace('T', ' ').substring(0, 19) : null;
-        const replayLine = replayStart ? `<div class="text-[8px] text-slate-600 font-mono whitespace-nowrap">signal replay from: ${replayStart} UTC</div>` : '';
+        const replayStart = (d.replay_start || d.replay_start_utc) ? (d.replay_start || d.replay_start_utc).replace('T', ' ').substring(0, 19) : null;
+        const replayLine = replayStart ? `<div class="text-[8px] text-slate-600 font-mono whitespace-nowrap">signal replay from: ${replayStart} Server</div>` : '';
 
-        debugHtml = `<div class="text-[8px] text-slate-500 font-mono mt-1 whitespace-nowrap" title='${JSON.stringify(d).replace(/'/g, "&#39;")}'>${s.result.split(' ')[0]} @ ${hitTimeLocal} | UTC: ${hitTimeStr.replace('T', ' ').substring(0, 19)} | H:${h} L:${l} | effTP:${effTp}</div>${replayLine}${futureWarning}`;
+        debugHtml = `<div class="text-[8px] text-slate-500 font-mono mt-1 whitespace-nowrap" title='${JSON.stringify(d).replace(/'/g, "&#39;")}'>${s.result.split(' ')[0]} @ ${hitTimeLocal} | Server: ${hitTimeStr.replace('T', ' ').substring(0, 19)} | H:${h} L:${l} | effTP:${effTp}</div>${replayLine}${futureWarning}`;
       }
       
       let badge = '';
