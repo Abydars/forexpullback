@@ -716,6 +716,7 @@ function renderSignals() {
       return true;
   });
 
+  window.displaySignals = displaySignals;
   renderSignalAnalytics(displaySignals);
 
   if (!displaySignals.length) {
