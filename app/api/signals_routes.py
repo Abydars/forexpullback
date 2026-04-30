@@ -129,6 +129,9 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
             is_sell = str(s.direction).lower() in ["sell", "bearish"]
             
             for idx, row in future_df.iterrows():
+                if row['time'] > now_dt:
+                    continue
+                
                 high = row['high']
                 low = row['low']
                 
@@ -142,7 +145,8 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                             "signal_id": s.id, "result": res, "hit_time_utc": row['time'].isoformat(),
                             "hit_candle_time": row['time'].isoformat(), "candle_high": high, "candle_low": low,
                             "entry": entry, "sl": sl, "tp": tp, "effective_tp": tp_effective,
-                            "spread_price": spread_price, "replay_start": replay_start.isoformat(), "direction": s.direction
+                            "spread_price": spread_price, "replay_start_utc": replay_start.isoformat(),
+                            "server_now_utc": now_dt.isoformat(), "direction": s.direction
                         }
                         break
                     elif high >= tp_effective:
@@ -151,7 +155,8 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                             "signal_id": s.id, "result": res, "hit_time_utc": row['time'].isoformat(),
                             "hit_candle_time": row['time'].isoformat(), "candle_high": high, "candle_low": low,
                             "entry": entry, "sl": sl, "tp": tp, "effective_tp": tp_effective,
-                            "spread_price": spread_price, "replay_start": replay_start.isoformat(), "direction": s.direction
+                            "spread_price": spread_price, "replay_start_utc": replay_start.isoformat(),
+                            "server_now_utc": now_dt.isoformat(), "direction": s.direction
                         }
                         break
                     elif high >= tp:
@@ -164,7 +169,8 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                             "signal_id": s.id, "result": res, "hit_time_utc": row['time'].isoformat(),
                             "hit_candle_time": row['time'].isoformat(), "candle_high": high, "candle_low": low,
                             "entry": entry, "sl": sl, "tp": tp, "effective_tp": tp_effective,
-                            "spread_price": spread_price, "replay_start": replay_start.isoformat(), "direction": s.direction
+                            "spread_price": spread_price, "replay_start_utc": replay_start.isoformat(),
+                            "server_now_utc": now_dt.isoformat(), "direction": s.direction
                         }
                         break
                     elif low <= tp_effective:
@@ -173,7 +179,8 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                             "signal_id": s.id, "result": res, "hit_time_utc": row['time'].isoformat(),
                             "hit_candle_time": row['time'].isoformat(), "candle_high": high, "candle_low": low,
                             "entry": entry, "sl": sl, "tp": tp, "effective_tp": tp_effective,
-                            "spread_price": spread_price, "replay_start": replay_start.isoformat(), "direction": s.direction
+                            "spread_price": spread_price, "replay_start_utc": replay_start.isoformat(),
+                            "server_now_utc": now_dt.isoformat(), "direction": s.direction
                         }
                         break
                     elif low <= tp:
@@ -184,13 +191,13 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                     
                 if smart_tp_enabled:
                     # An M5 candle is fully closed exactly when the new M1 candle's minute is a multiple of 5
-                    if row['time'].minute % 5 == 0 and row['time'] > s.created_at:
+                    if row['time'].minute % 5 == 0 and row['time'] > created_at:
                         df_m5 = rates_cache_m5.get(s.symbol)
                         if df_m5 is not None and not df_m5.empty:
                             closed_m5 = df_m5[df_m5['time'] < row['time']]
                             if len(closed_m5) >= 15:
                                 candles = closed_m5.tail(15)
-                                signal_age_seconds = (row['time'] - s.created_at).total_seconds()
+                                signal_age_seconds = (row['time'] - created_at).total_seconds()
                                 from app.strategy.smart_tp import evaluate_smart_tp_from_candles
                                 direction = "buy" if is_buy else "sell"
                                 smart_tp_reason = evaluate_smart_tp_from_candles(
@@ -208,7 +215,8 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                                         "signal_id": s.id, "result": res, "hit_time_utc": row['time'].isoformat(),
                                         "hit_candle_time": row['time'].isoformat(), "candle_high": high, "candle_low": low,
                                         "entry": entry, "sl": sl, "tp": tp, "effective_tp": tp_effective if 'tp_effective' in locals() else tp,
-                                        "spread_price": spread_price, "replay_start": replay_start.isoformat(), "direction": s.direction
+                                        "spread_price": spread_price, "replay_start_utc": replay_start.isoformat(),
+                                        "server_now_utc": now_dt.isoformat(), "direction": s.direction
                                     }
                                     break
             

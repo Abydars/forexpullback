@@ -591,6 +591,18 @@ function renderSignals() {
     return `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap border ${color}">${status}</span>`;
   };
 
+  const formatUtcIsoToLocal = (isoString) => {
+    if (!isoString) return "-";
+    const d = new Date(isoString);
+    return d.toLocaleString([], {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit"
+    });
+  };
+
   const getResultBadge = (s) => {
     let debugHtml = '';
     const lr = state.signal_live_results[s.id];
@@ -599,13 +611,18 @@ function renderSignals() {
       if (lr && lr.debug) {
         const d = lr.debug;
         const hitTimeStr = d.hit_time_utc || d.hit_time;
-        const hitTime = formatLocalTime(hitTimeStr);
+        const hitTimeLocal = formatUtcIsoToLocal(hitTimeStr);
         const dec = getDecimals ? getDecimals(s.symbol) : 5;
         const effTp = d.effective_tp ? d.effective_tp.toFixed(dec) : '-';
         const h = d.candle_high ? d.candle_high.toFixed(dec) : '-';
         const l = d.candle_low ? d.candle_low.toFixed(dec) : '-';
         
-        debugHtml = `<div class="text-[8px] text-slate-500 font-mono mt-1 whitespace-nowrap" title='${JSON.stringify(d).replace(/'/g, "&#39;")}'>${s.result.split(' ')[0]} @ ${hitTime} | H:${h} L:${l} | effTP:${effTp}</div>`;
+        let futureWarning = '';
+        if (d.hit_time_utc && d.server_now_utc && d.hit_time_utc > d.server_now_utc) {
+          futureWarning = '<div class="text-[9px] font-bold text-rose-500 uppercase mt-0.5 bg-rose-500/10 px-1 inline-block rounded border border-rose-500/30">FUTURE CANDLE BUG</div>';
+        }
+        
+        debugHtml = `<div class="text-[8px] text-slate-500 font-mono mt-1 whitespace-nowrap" title='${JSON.stringify(d).replace(/'/g, "&#39;")}'>${s.result.split(' ')[0]} @ ${hitTimeLocal} | UTC: ${hitTimeStr.replace('T', ' ').substring(0, 19)} | H:${h} L:${l} | effTP:${effTp}</div>${futureWarning}`;
       }
       
       let badge = '';
