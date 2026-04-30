@@ -984,6 +984,7 @@ async function resolveAllSymbols() {
       };
     });
     renderPredefinedSymbols();
+    renderSignals();
   } catch (err) { console.error(err); }
 }
 
@@ -1291,8 +1292,9 @@ async function init() {
     ]);
     Object.assign(state, status);
     state.config = cfg;
-    if (cfg && Object.keys(cfg).length) {
-      updateConfigUI(cfg);
+    if (cfg && Array.isArray(cfg.symbols)) {
+      state.symbols = cfg.symbols.map(s => ({ generic: s, original: s, resolved: null, status: 'pending' }));
+      resolveAllSymbols();
     }
 
     if (initData) {
