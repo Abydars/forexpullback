@@ -118,7 +118,7 @@ async def evaluate_exit_advice(p: dict) -> dict:
                         
     return res
 
-async def evaluate_smart_exit(p: dict, t, symbol: str) -> str | None:
+async def evaluate_smart_exit(p: dict, t, symbol: str, cfg: dict = None) -> str | None:
     if p['profit'] <= 0:
         return None
         
@@ -146,7 +146,8 @@ async def evaluate_smart_exit(p: dict, t, symbol: str) -> str | None:
         sl=t.sl,
         tp=t.tp,
         candles=closed_candles,
-        signal_age_seconds=signal_age_seconds
+        signal_age_seconds=signal_age_seconds,
+        cfg=cfg
     )
 
 basket_state = {"active": False, "peak_pnl": 0.0}
@@ -319,7 +320,7 @@ async def monitor_loop():
                         
                         exit_reason = None
                         if cfg.get("enable_smart_tp", True):
-                            exit_reason = await evaluate_smart_exit(p, t, t.symbol)
+                            exit_reason = await evaluate_smart_exit(p, t, t.symbol, cfg)
                         if exit_reason:
                             res = await mt5_client.position_close(t.ticket)
                             if res and res.get('retcode') == mt5.TRADE_RETCODE_DONE:

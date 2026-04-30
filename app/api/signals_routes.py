@@ -3,6 +3,8 @@ from sqlalchemy import select, delete
 from datetime import datetime, timezone
 import pytz
 import asyncio
+from pydantic import BaseModel
+from typing import List
 
 from app.db.session import AsyncSessionLocal
 from app.db.models import Signal
@@ -35,6 +37,10 @@ class CheckResultsRequest(BaseModel):
 async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
     if not mt5_client.is_connected():
         raise HTTPException(status_code=400, detail="MT5 not connected")
+        
+    from app.core.config import get_config
+    cfg = await get_config()
+    smart_tp_enabled = req.use_smart_tp and cfg.get("enable_smart_tp", True)
         
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(Signal).where(Signal.result == None, Signal.status.in_(["FIRED", "DCA_FIRED"])))
@@ -97,7 +103,7 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                     res = "UNKNOWN DIR"
                     break
                     
-                if req.use_smart_tp:
+                if smart_tp_enabled:
                     # idx is the integer index in the dataframe (if default range index)
                     # wait, iterrows idx is the index label. If index is not sequential integers, this is bad!
                     # Let's find integer index using get_loc
@@ -114,7 +120,8 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                             sl=sl,
                             tp=tp,
                             candles=candles,
-                            signal_age_seconds=signal_age_seconds
+                            signal_age_seconds=signal_age_seconds,
+                            cfg=cfg
                         )
                         if smart_tp_reason:
                             res = "SMART TP HIT"
@@ -163,9 +170,6 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
             await db.commit()
             
     return {"status": "ok", "updated": updated, "live_results": live_results}
-
-from pydantic import BaseModel
-from typing import List
 
 class BulkDeleteRequest(BaseModel):
     ids: List[int]
