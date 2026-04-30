@@ -161,7 +161,7 @@ function getRecommendedConfig(signals, minSample) {
     }
   }
   
-  const allSymbolsScanned = Object.keys(bySym);
+  // Removed signal_symbols to avoid overriding user's scan choices
   
   // 3. Find optimal sessions (WR >= 55%)
   const tz = document.getElementById('signal-timezone')?.value || 'UTC';
@@ -198,7 +198,6 @@ function getRecommendedConfig(signals, minSample) {
   return {
     signal_threshold: bestT,
     trade_symbols: recommendedTradeSymbols.length ? recommendedTradeSymbols : ["XAUUSD"],
-    signal_symbols: allSymbolsScanned,
     sessions: recommendedSessions.length ? recommendedSessions : [],
     correlation_groups_enabled: true,
     max_open_per_correlation_group: 1,
