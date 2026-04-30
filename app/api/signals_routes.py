@@ -52,8 +52,18 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
         # Group by symbol to avoid fetching rates multiple times
         symbols = list(set([s.symbol for s in signals]))
         rates_cache = {}
+        now_dt = datetime.now(timezone.utc).replace(tzinfo=None)
+        
         for sym in symbols:
-            df = await mt5_client.get_rates(sym, mt5.TIMEFRAME_M5, 1000) # Last ~3 days
+            sym_signals = [s for s in signals if s.symbol == sym]
+            oldest_dt = min([s.created_at for s in sym_signals])
+            
+            # Calculate approx minutes since the oldest signal. 
+            # We add a 120 min buffer for Smart TP lookback history
+            mins_diff = int((now_dt - oldest_dt).total_seconds() / 60)
+            count = max(3000, mins_diff + 120)
+            
+            df = await mt5_client.get_rates(sym, mt5.TIMEFRAME_M1, count)
             rates_cache[sym] = df
             
         for s in signals:
@@ -86,14 +96,20 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                 low = row['low']
                 
                 if is_buy:
-                    if low <= sl:
+                    if low <= sl and high >= tp:
+                        res = "SL HIT" # Conservative choice for ambiguous
+                        break
+                    elif low <= sl:
                         res = "SL HIT"
                         break
                     elif high >= tp:
                         res = "TP HIT"
                         break
                 elif is_sell:
-                    if high >= sl:
+                    if high >= sl and low <= tp:
+                        res = "SL HIT" # Conservative choice for ambiguous
+                        break
+                    elif high >= sl:
                         res = "SL HIT"
                         break
                     elif low <= tp:

@@ -50,6 +50,16 @@ class MT5Client:
             return df
         return await asyncio.to_thread(_rates)
 
+    async def get_rates_range(self, symbol, timeframe, date_from: datetime, date_to: datetime) -> pd.DataFrame:
+        def _rates():
+            rates = mt5.copy_rates_range(symbol, timeframe, date_from, date_to)
+            if rates is None:
+                return pd.DataFrame()
+            df = pd.DataFrame(rates)
+            df['time'] = pd.to_datetime(df['time'], unit='s')
+            return df
+        return await asyncio.to_thread(_rates)
+
     async def get_positions(self, symbol=None) -> list[dict]:
         def _pos():
             if symbol:
