@@ -11,7 +11,15 @@ async def start_engine():
     from app.db.models import MT5Account
     from app.mt5_client.client import mt5_client
     from app.db.crypto import decrypt_password
-    from sqlalchemy import select
+    from sqlalchemy import select, text
+    
+    # Auto-migrate DB
+    try:
+        async with AsyncSessionLocal() as db:
+            await db.execute(text("ALTER TABLE signals ADD COLUMN result VARCHAR"))
+            await db.commit()
+    except Exception:
+        pass
     
     # Auto-connect MT5 to last saved account
     try:
