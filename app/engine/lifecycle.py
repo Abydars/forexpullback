@@ -20,6 +20,12 @@ async def start_engine():
             await db.commit()
     except Exception:
         pass
+    try:
+        async with AsyncSessionLocal() as db:
+            await db.execute(text("ALTER TABLE signals ADD COLUMN skip_reason VARCHAR"))
+            await db.commit()
+    except Exception:
+        pass
     
     # Auto-connect MT5 to last saved account
     try:
@@ -34,7 +40,22 @@ async def start_engine():
     except Exception as e:
         print(f"MT5 Auto-connect failed: {e}")
 
-    state.engine_running = True
+    from app.core.config import get_config
+    cfg = await get_config()
+    state.engine_running = cfg.get("engine_running", False)
+    
+    from datetime import datetime
+    import pytz
+    from app.db.models import Event
+    msg = f"Engine restored as {'STARTED' if state.engine_running else 'STOPPED'} after restart"
+    print(msg)
+    try:
+        async with AsyncSessionLocal() as db:
+            ev = Event(level="INFO", component="system", message=msg)
+            db.add(ev)
+            await db.commit()
+    except Exception:
+        pass
     
     _tasks = [
         asyncio.create_task(scan_loop()),

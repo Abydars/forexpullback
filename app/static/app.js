@@ -427,6 +427,7 @@ function renderSignals() {
   const timeFromStr = document.getElementById('signal-time-from')?.value;
   const timeToStr = document.getElementById('signal-time-to')?.value;
   const tzStr = document.getElementById('signal-timezone')?.value || 'Asia/Karachi';
+  const statusFilter = document.getElementById('signal-status-filter')?.value;
 
   const validSymbols = new Set();
   state.symbols.forEach(st => {
@@ -464,6 +465,15 @@ function renderSignals() {
     });
   }
 
+  if (statusFilter) {
+    displaySignals = displaySignals.filter(s => {
+      if (statusFilter === 'FIRED') return s.status === 'FIRED' || s.status === 'DCA_FIRED';
+      if (statusFilter === 'SKIPPED') return s.status === 'SKIPPED' || s.status === 'DCA_SKIPPED';
+      if (statusFilter === 'BLOCKED') return s.status === 'BLOCKED';
+      return true;
+    });
+  }
+
   if (!displaySignals.length) {
     tbody.innerHTML = '<tr><td colspan="8" class="text-center text-slate-500 py-8 uppercase tracking-widest text-xs">NO SIGNALS FOR SELECTED DATE/TIME RANGE</td></tr>';
     if (document.getElementById('win-rate')) document.getElementById('win-rate').textContent = '0.0';
@@ -480,7 +490,8 @@ function renderSignals() {
     if (status === 'FIRED') color = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
     else if (status === 'DCA_FIRED') color = 'bg-purple-500/20 text-purple-400 border-purple-500/30';
     else if (status === 'WATCHING') color = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
-    else if (status === 'SKIPPED' || status === 'DCA_SKIPPED') color = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+    else if (status === 'SKIPPED' || status === 'DCA_SKIPPED') color = 'bg-slate-500/10 text-slate-400 border-slate-500/20';
+    else if (status === 'BLOCKED') color = 'bg-rose-500/10 text-rose-400 border-rose-500/20';
     return `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap border ${color}">${status}</span>`;
   };
 
@@ -508,9 +519,13 @@ function renderSignals() {
   };
 
   const firedSignals = displaySignals.filter(s => s.status === 'FIRED' || s.status === 'DCA_FIRED');
+  const skippedCount = displaySignals.filter(s => s.status === 'SKIPPED' || s.status === 'DCA_SKIPPED').length;
+  const blockedCount = displaySignals.filter(s => s.status === 'BLOCKED').length;
+
   const won = firedSignals.filter(s => s.result === 'TP HIT' || s.result === 'SMART TP HIT').length;
   const lost = firedSignals.filter(s => s.result === 'SL HIT').length;
   const winRate = (won + lost) > 0 ? ((won / (won + lost)) * 100).toFixed(1) : '0.0';
+  const missedWins = displaySignals.filter(s => (s.status === 'SKIPPED' || s.status === 'DCA_SKIPPED' || s.status === 'BLOCKED') && (s.result === 'TP HIT' || s.result === 'SMART TP HIT')).length;
   
   let nearTp = 0, nearSl = 0, movingTp = 0, movingSl = 0, inProgress = 0;
   firedSignals.forEach(s => {
@@ -529,10 +544,14 @@ function renderSignals() {
   
   if (document.getElementById('win-rate')) document.getElementById('win-rate').textContent = winRate;
   if (document.getElementById('live-bias-rate')) document.getElementById('live-bias-rate').textContent = liveBiasRate;
+  if (document.getElementById('stat-total')) document.getElementById('stat-total').textContent = displaySignals.length;
   if (document.getElementById('stat-fired')) document.getElementById('stat-fired').textContent = firedSignals.length;
+  if (document.getElementById('stat-skipped')) document.getElementById('stat-skipped').textContent = skippedCount;
+  if (document.getElementById('stat-blocked')) document.getElementById('stat-blocked').textContent = blockedCount;
   if (document.getElementById('stat-tp')) document.getElementById('stat-tp').textContent = won;
   if (document.getElementById('stat-sl')) document.getElementById('stat-sl').textContent = lost;
   if (document.getElementById('stat-live')) document.getElementById('stat-live').textContent = nearTp + nearSl + movingTp + movingSl + inProgress;
+  if (document.getElementById('stat-missed-wins')) document.getElementById('stat-missed-wins').textContent = missedWins;
 
   window.current_display_signal_ids = displaySignals.map(s => s.id);
   
@@ -566,7 +585,7 @@ function renderSignals() {
         <td class="px-4 py-2.5 text-right font-mono ${s.score > 0 ? 'text-cyan-400 font-bold' : 'text-slate-500'}">${s.score}</td>
         <td class="px-4 py-2.5">${getStatusBadge(s.status)}</td>
         <td class="px-4 py-2.5">${getResultBadge(s)}</td>
-        <td class="px-4 py-2.5 text-slate-300 w-full">${JSON.stringify(s.reason)}</td>
+        <td class="px-4 py-2.5 text-slate-300 w-full">${s.reason && s.reason.skip_reason ? `<span class="text-orange-400 font-bold uppercase tracking-widest text-[9px] border border-orange-500/30 bg-orange-500/10 px-1.5 py-0.5 rounded mr-2">${s.reason.skip_reason}</span>` : ''}${s.reason && s.reason.msg ? s.reason.msg : JSON.stringify(s.reason)}</td>
       </tr>
     `;
   }).join('');

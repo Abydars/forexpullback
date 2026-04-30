@@ -14,15 +14,23 @@ async def get_status():
         "active_sessions_count": getattr(state, "active_sessions_count", 0)
     }
 
+from app.core.config import get_config, update_config
+
 @router.post("/engine/start")
 async def start_e():
     state.engine_running = True
+    cfg = await get_config()
+    cfg["engine_running"] = True
+    await update_config(cfg)
     await broadcast({"type": "engine.status", "state": "active"})
     return {"status": "started"}
 
 @router.post("/engine/stop")
 async def stop_e():
     state.engine_running = False
+    cfg = await get_config()
+    cfg["engine_running"] = False
+    await update_config(cfg)
     await broadcast({"type": "engine.status", "state": "stopped"})
     return {"status": "stopped"}
 

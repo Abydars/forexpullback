@@ -473,30 +473,35 @@ async def scan_loop():
                                                             ltf_trigger['parent_ticket'] = base_trade.get('ticket')
                                             
                                             if not is_dca_allowed and status not in ("DCA_SKIPPED", "DCA_FIRED"):
-                                                status = "COOLDOWN"
-                                                reason_full["msg"] = "Skipped: position already open for this symbol"
+                                                status = "BLOCKED"
+                                                reason_full["skip_reason"] = "MAX_POSITIONS"
+                                                reason_full["msg"] = "Blocked: position already open for this symbol"
                                                 
                                         elif has_recent_closed:
-                                            status = "COOLDOWN"
-                                            reason_full["msg"] = f"Skipped: recent trade exit cooldown ({cooldown_mins}m)"
+                                            status = "BLOCKED"
+                                            reason_full["skip_reason"] = "COOLDOWN_ACTIVE"
+                                            reason_full["msg"] = f"Blocked: recent trade exit cooldown ({cooldown_mins}m)"
                                         elif has_recent_fired:
-                                            status = "COOLDOWN"
-                                            reason_full["msg"] = f"Fired recently, waiting {cooldown_mins}m"
+                                            status = "BLOCKED"
+                                            reason_full["skip_reason"] = "COOLDOWN_ACTIVE"
+                                            reason_full["msg"] = f"Blocked: fired recently, waiting {cooldown_mins}m"
                                         elif score >= base_threshold:
                                             # POSITION LIMITS CHECK BEFORE CANDIDATE SELECTION
                                             dir_count = len([p for p in bot_positions if p.get('type') == ord_type])
                                             
                                             if len(bot_positions) >= max_open or sym_count >= max_symbol or dir_count >= max_dir:
-                                                status = "SKIPPED"
-                                                reason_full["msg"] = "Skipped because position limit already reached"
+                                                status = "BLOCKED"
+                                                reason_full["skip_reason"] = "MAX_POSITIONS"
+                                                reason_full["msg"] = "Blocked because position limit already reached"
                                             else:
                                                 my_group = generic_to_group.get(generic) or generic_to_group.get(resolved)
                                                 if correlation_groups_enabled and my_group and my_group in enabled_correlation_groups:
                                                     if group_open_counts[my_group] >= max_corr:
-                                                        status = "SKIPPED"
-                                                        reason_full["msg"] = f"Skipped: max open positions ({max_corr}) for group '{my_group}' reached"
+                                                        status = "BLOCKED"
+                                                        reason_full["skip_reason"] = "CORRELATION_LIMIT"
+                                                        reason_full["msg"] = f"Blocked: max open positions ({max_corr}) for group '{my_group}' reached"
                                                 
-                                                if status != "SKIPPED":
+                                                if status not in ("BLOCKED", "SKIPPED"):
                                                     status = "FIRED" # Temporary status
                                                     vol_txt = ""
                                                     if "volume" in reason_full and reason_full["volume"]["status"] == "low":
@@ -539,7 +544,34 @@ async def scan_loop():
                                                 "warmup_reason": warmup_reason
                                             })
 
-                if status not in ("FIRED", "DCA_FIRED"):
+                if status in ("BLOCKED", "SKIPPED", "DCA_SKIPPED"):
+                    prev_status = scanner_state.get(state_key, {}).get("status")
+                    if prev_status != status:
+                        scanner_state[state_key] = {"time": now_utc, "status": status}
+                        async with AsyncSessionLocal() as db:
+                            sig = Signal(symbol=resolved, direction=bias, score=score, htf_bias=bias, 
+                                        entry=ltf_trigger['entry'] if ltf_trigger else 0, 
+                                        sl=ltf_trigger['sl'] if ltf_trigger else 0, 
+                                        tp=ltf_trigger['tp'] if ltf_trigger else 0,
+                                        reason=reason_full, status=status, 
+                                        skip_reason=reason_full.get("skip_reason"))
+                            db.add(sig)
+                            await db.commit()
+                            await db.refresh(sig)
+                            
+                            local_updates.append({
+                                "id": sig.id,
+                                "symbol": generic,
+                                "resolved": resolved,
+                                "bias": bias,
+                                "score": score,
+                                "status": status,
+                                "reason": reason_full,
+                                "created_at": sig.created_at.isoformat(),
+                                "updated_at": datetime.now(pytz.utc).isoformat()
+                            })
+                            await broadcast({"type": "signal.new", "signal": local_updates[-1]})
+                elif status not in ("FIRED", "DCA_FIRED", "WATCHING", "REJECTED"):
                     local_updates.append({
                         "symbol": generic,
                         "resolved": resolved,
@@ -587,6 +619,7 @@ async def scan_loop():
                 if correlation_groups_enabled and my_group and my_group in enabled_correlation_groups:
                     if my_group in groups_used_this_scan:
                         c["status"] = "SKIPPED"
+                        c["reason_full"]["skip_reason"] = "CORRELATION_LIMIT"
                         c["reason_full"]["msg"] = f"Skipped: higher score candidate from group '{my_group}' selected"
                         continue
                     groups_used_this_scan.add(my_group)
@@ -659,6 +692,27 @@ async def scan_loop():
                     status = c.get("status", "DCA_SKIPPED" if is_dca else "SKIPPED")
                     if not ("Skipped: higher score candidate from group" in c["reason_full"].get("msg", "")):
                         reason_full["msg"] = "Skipped because higher-ranked signal selected"
+                        reason_full["skip_reason"] = "LOWER_RANK"
+                        
+                    prev_status = scanner_state.get(state_key, {}).get("status")
+                    if prev_status != status:
+                        scanner_state[state_key] = {"time": now_utc, "status": status}
+                        async with AsyncSessionLocal() as db:
+                            sig = Signal(symbol=res, direction=bias, score=score, htf_bias=bias, 
+                                        entry=ltf_trigger['entry'], sl=ltf_trigger['sl'], tp=ltf_trigger['tp'],
+                                        reason=reason_full, status=status,
+                                        skip_reason=reason_full.get("skip_reason"))
+                            db.add(sig)
+                            await db.commit()
+                            await db.refresh(sig)
+                            
+                            await broadcast({
+                                "type": "signal.new",
+                                "signal": {
+                                    "id": sig.id, "symbol": generic, "direction": bias, "score": score,
+                                    "status": status, "reason": sig.reason, "created_at": sig.created_at.isoformat()
+                                }
+                            })
                     
                     updates_to_broadcast.append({
                         "symbol": generic, "resolved": res, "bias": bias, "score": score,
