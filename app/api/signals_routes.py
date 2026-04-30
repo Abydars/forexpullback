@@ -128,15 +128,48 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
             is_buy = str(s.direction).lower() in ["buy", "bullish"]
             is_sell = str(s.direction).lower() in ["sell", "bearish"]
             
+            from app.strategy.smart_tp import evaluate_smart_tp_from_candles
+
             for idx, row in future_df.iterrows():
                 if row['time'] > now_dt:
                     continue
-                
+
                 high = row['high']
                 low = row['low']
-                
+
                 spread_price = get_spread_price(s.symbol, row, info, tick)
-                
+
+                # Smart TP is evaluated BEFORE SL/TP so it can prevent a false SL result
+                # when momentum reversal conditions are already met at an M5 boundary.
+                if smart_tp_enabled and row['time'].minute % 5 == 0 and row['time'] > created_at:
+                    df_m5 = rates_cache_m5.get(s.symbol)
+                    if df_m5 is not None and not df_m5.empty:
+                        closed_m5 = df_m5[df_m5['time'] < row['time']]
+                        if len(closed_m5) >= 15:
+                            candles = closed_m5.tail(15)
+                            signal_age_seconds = (row['time'] - created_at).total_seconds()
+                            direction = "buy" if is_buy else "sell"
+                            smart_tp_reason = evaluate_smart_tp_from_candles(
+                                direction=direction,
+                                entry=entry,
+                                sl=sl,
+                                tp=tp,
+                                candles=candles,
+                                signal_age_seconds=signal_age_seconds,
+                                cfg=cfg
+                            )
+                            if smart_tp_reason:
+                                res = "SMART TP HIT"
+                                debug_info = {
+                                    "signal_id": s.id, "result": res, "hit_time_utc": row['time'].isoformat(),
+                                    "hit_candle_time": row['time'].isoformat(), "candle_high": high, "candle_low": low,
+                                    "entry": entry, "sl": sl, "tp": tp,
+                                    "spread_price": spread_price, "replay_start_utc": replay_start.isoformat(),
+                                    "server_now_utc": now_dt.isoformat(), "direction": s.direction,
+                                    "smart_tp_reason": smart_tp_reason
+                                }
+                                break
+
                 if is_buy:
                     tp_effective = tp + (spread_price * tp_buffer_mult)
                     sl_effective = sl - (spread_price * sl_buffer_mult)
@@ -190,37 +223,6 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                 else:
                     res = "UNKNOWN DIR"
                     break
-                    
-                if smart_tp_enabled:
-                    # An M5 candle is fully closed exactly when the new M1 candle's minute is a multiple of 5
-                    if row['time'].minute % 5 == 0 and row['time'] > created_at:
-                        df_m5 = rates_cache_m5.get(s.symbol)
-                        if df_m5 is not None and not df_m5.empty:
-                            closed_m5 = df_m5[df_m5['time'] < row['time']]
-                            if len(closed_m5) >= 15:
-                                candles = closed_m5.tail(15)
-                                signal_age_seconds = (row['time'] - created_at).total_seconds()
-                                from app.strategy.smart_tp import evaluate_smart_tp_from_candles
-                                direction = "buy" if is_buy else "sell"
-                                smart_tp_reason = evaluate_smart_tp_from_candles(
-                                    direction=direction,
-                                    entry=entry,
-                                    sl=sl,
-                                    tp=tp,
-                                    candles=candles,
-                                    signal_age_seconds=signal_age_seconds,
-                                    cfg=cfg
-                                )
-                                if smart_tp_reason:
-                                    res = "SMART TP HIT"
-                                    debug_info = {
-                                        "signal_id": s.id, "result": res, "hit_time_utc": row['time'].isoformat(),
-                                        "hit_candle_time": row['time'].isoformat(), "candle_high": high, "candle_low": low,
-                                        "entry": entry, "sl": sl, "tp": tp, "effective_tp": tp_effective if 'tp_effective' in locals() else tp,
-                                        "spread_price": spread_price, "replay_start_utc": replay_start.isoformat(),
-                                        "server_now_utc": now_dt.isoformat(), "direction": s.direction
-                                    }
-                                    break
             
             if res:
                 s.result = res
