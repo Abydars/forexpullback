@@ -443,6 +443,142 @@ window.setFilterAndRender = function(id, val) {
   }
 };
 
+function renderSignalAnalytics(signals) {
+  const el = document.getElementById("analytics-panels");
+  if (!el) return;
+
+  const minSample = Number(document.getElementById("signal-min-sample")?.value || 5);
+
+  const groups = {
+    symbol: {}, time: {}, trigger: {}, zone: {}, volume: {}, direction: {}, skip: {}
+  };
+
+  signals.forEach(s => {
+    const symbol = s.symbol || 'UNKNOWN';
+    const direction = (s.direction || 'UNKNOWN').toUpperCase();
+    const trigger = s.reason?.trigger?.trigger_type || "-";
+    const zone = s.reason?.zone?.reason?.type || "-";
+    const volume = s.reason?.volume?.status || "-";
+    const skip = s.skip_reason || s.reason?.skip_reason || "-";
+
+    let timeKey = 'UNKNOWN';
+    if (s.created_at) {
+      const tz = document.getElementById('signal-timezone')?.value || 'UTC';
+      try {
+        const d = new Date(s.created_at);
+        const options = { hour: '2-digit', hour12: false, timeZone: tz };
+        const formatter = new Intl.DateTimeFormat('en-US', options);
+        timeKey = formatter.format(d) + ':00';
+      } catch (e) {
+         timeKey = 'UNKNOWN';
+      }
+    }
+
+    const keys = { symbol, time: timeKey, trigger, zone, volume, direction, skip };
+
+    const isFired = s.status === 'FIRED' || s.status === 'DCA_FIRED';
+    const isSkipped = s.status === 'SKIPPED' || s.status === 'DCA_SKIPPED';
+    const isWin = s.result === 'TP HIT' || s.result === 'SMART TP HIT';
+    const isLoss = s.result === 'SL HIT';
+
+    for (const [gName, gKey] of Object.entries(keys)) {
+      if (!groups[gName][gKey]) {
+        groups[gName][gKey] = {
+          total: 0, fired: 0, skipped: 0, wins: 0, losses: 0, missedWins: 0, missedLosses: 0, scoreSum: 0
+        };
+      }
+      const g = groups[gName][gKey];
+      g.total++;
+      if (s.score) g.scoreSum += s.score;
+      
+      if (isFired) {
+        g.fired++;
+        if (isWin) g.wins++;
+        if (isLoss) g.losses++;
+      } else if (isSkipped) {
+        g.skipped++;
+        if (isWin) g.missedWins++;
+        if (isLoss) g.missedLosses++;
+      }
+    }
+  });
+
+  const generateTable = (groupObj, title, filterId) => {
+    let rows = Object.entries(groupObj).map(([key, data]) => {
+      const winRate = (data.wins + data.losses) > 0 ? (data.wins / (data.wins + data.losses)) * 100 : 0;
+      const missedRate = (data.missedWins + data.missedLosses) > 0 ? (data.missedWins / (data.missedWins + data.missedLosses)) * 100 : 0;
+      const avgScore = data.total > 0 ? data.scoreSum / data.total : 0;
+      return { key, ...data, winRate, missedRate, avgScore };
+    });
+
+    rows = rows.filter(r => r.total >= minSample);
+    rows.sort((a, b) => b.winRate - a.winRate || b.total - a.total);
+    rows = rows.slice(0, 8);
+
+    if (rows.length === 0) return '';
+
+    let tableRows = rows.map(r => {
+      let valToSet = r.key;
+      if (filterId === 'signal-direction-filter') valToSet = r.key.toLowerCase();
+      
+      let clickAction = '';
+      if (filterId === 'time-bucket') {
+        clickAction = `onclick="
+          const from = document.getElementById('signal-time-from');
+          const to = document.getElementById('signal-time-to');
+          if(from && to) {
+            from.value = '${r.key}';
+            let nextHour = parseInt('${r.key}'.split(':')[0]) + 1;
+            to.value = (nextHour < 10 ? '0' + nextHour : nextHour) + ':00';
+            renderSignals();
+          }
+        "`;
+      } else if (filterId) {
+        const safeVal = valToSet.replace(/"/g, '&quot;').replace(/'/g, "\\'");
+        clickAction = `onclick="setFilterAndRender('${filterId}', '${safeVal}')"`;
+      }
+      
+      return `
+        <tr class="hover:bg-white/[0.05] transition-colors cursor-pointer" ${clickAction}>
+          <td class="px-2 py-1.5 font-bold text-slate-300 text-[9px] max-w-[100px] truncate" title="${r.key.replace(/"/g, '&quot;')}">${r.key}</td>
+          <td class="px-2 py-1.5 text-right font-mono text-[9px] text-slate-400">${r.total}</td>
+          <td class="px-2 py-1.5 text-right font-mono text-[9px] text-emerald-400">${r.winRate.toFixed(1)}%</td>
+          <td class="px-2 py-1.5 text-right font-mono text-[9px] text-slate-500 border-l border-white/5">${r.missedRate.toFixed(1)}%</td>
+        </tr>
+      `;
+    }).join('');
+
+    return `
+      <div class="flex-shrink-0 bg-black/20 border border-border_light rounded p-2 min-w-[240px]">
+        <div class="text-[9px] font-bold tracking-widest text-slate-400 mb-2 uppercase border-b border-white/5 pb-1">${title}</div>
+        <table class="w-full text-left">
+          <thead>
+            <tr class="text-[8px] tracking-widest text-slate-500 uppercase">
+              <th class="px-2 py-1 font-normal">Key</th>
+              <th class="px-2 py-1 font-normal text-right">Tot</th>
+              <th class="px-2 py-1 font-normal text-right">Win%</th>
+              <th class="px-2 py-1 font-normal text-right border-l border-white/5">Miss%</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows}
+          </tbody>
+        </table>
+      </div>
+    `;
+  };
+
+  el.innerHTML = [
+    generateTable(groups.symbol, 'BY SYMBOL', 'signal-symbol-filter'),
+    generateTable(groups.direction, 'BY DIRECTION', 'signal-direction-filter'),
+    generateTable(groups.time, 'BY TIME', 'time-bucket'),
+    generateTable(groups.trigger, 'BY TRIGGER', 'signal-trigger-filter'),
+    generateTable(groups.zone, 'BY ZONE', 'signal-zone-filter'),
+    generateTable(groups.volume, 'BY VOLUME', 'signal-volume-filter'),
+    generateTable(groups.skip, 'BY SKIP REASON', 'signal-skip-filter')
+  ].join('');
+}
+
 function renderSignals() {
   const tbody = document.getElementById('signals-body');
   
@@ -570,6 +706,8 @@ function renderSignals() {
       
       return true;
   });
+
+  renderSignalAnalytics(displaySignals);
 
   if (!displaySignals.length) {
     tbody.innerHTML = '<tr><td colspan="16" class="text-center text-slate-500 py-8 uppercase tracking-widest text-xs">NO SIGNALS FOR SELECTED DATE/TIME RANGE</td></tr>';
