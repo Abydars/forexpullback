@@ -136,9 +136,21 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                     tp_effective = tp + (spread_price * tp_buffer_mult)
                     if low <= sl:
                         res = "SL HIT"
+                        debug_info = {
+                            "signal_id": s.id, "result": res, "hit_time": row['time'].isoformat(),
+                            "hit_candle_time": row['time'].isoformat(), "candle_high": high, "candle_low": low,
+                            "entry": entry, "sl": sl, "tp": tp, "effective_tp": tp_effective,
+                            "spread_price": spread_price, "replay_start": replay_start.isoformat(), "direction": s.direction
+                        }
                         break
                     elif high >= tp_effective:
                         res = "TP HIT"
+                        debug_info = {
+                            "signal_id": s.id, "result": res, "hit_time": row['time'].isoformat(),
+                            "hit_candle_time": row['time'].isoformat(), "candle_high": high, "candle_low": low,
+                            "entry": entry, "sl": sl, "tp": tp, "effective_tp": tp_effective,
+                            "spread_price": spread_price, "replay_start": replay_start.isoformat(), "direction": s.direction
+                        }
                         break
                     elif high >= tp:
                         ignored_tp_touch_count += 1
@@ -146,9 +158,21 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                     tp_effective = tp - (spread_price * tp_buffer_mult)
                     if high >= sl:
                         res = "SL HIT"
+                        debug_info = {
+                            "signal_id": s.id, "result": res, "hit_time": row['time'].isoformat(),
+                            "hit_candle_time": row['time'].isoformat(), "candle_high": high, "candle_low": low,
+                            "entry": entry, "sl": sl, "tp": tp, "effective_tp": tp_effective,
+                            "spread_price": spread_price, "replay_start": replay_start.isoformat(), "direction": s.direction
+                        }
                         break
                     elif low <= tp_effective:
                         res = "TP HIT"
+                        debug_info = {
+                            "signal_id": s.id, "result": res, "hit_time": row['time'].isoformat(),
+                            "hit_candle_time": row['time'].isoformat(), "candle_high": high, "candle_low": low,
+                            "entry": entry, "sl": sl, "tp": tp, "effective_tp": tp_effective,
+                            "spread_price": spread_price, "replay_start": replay_start.isoformat(), "direction": s.direction
+                        }
                         break
                     elif low <= tp:
                         ignored_tp_touch_count += 1
@@ -178,11 +202,21 @@ async def check_results(req: CheckResultsRequest = CheckResultsRequest()):
                                 )
                                 if smart_tp_reason:
                                     res = "SMART TP HIT"
+                                    debug_info = {
+                                        "signal_id": s.id, "result": res, "hit_time": row['time'].isoformat(),
+                                        "hit_candle_time": row['time'].isoformat(), "candle_high": high, "candle_low": low,
+                                        "entry": entry, "sl": sl, "tp": tp, "effective_tp": tp_effective if 'tp_effective' in locals() else tp,
+                                        "spread_price": spread_price, "replay_start": replay_start.isoformat(), "direction": s.direction
+                                    }
                                     break
             
             if res:
                 s.result = res
                 updated += 1
+                live_results[s.id] = {
+                    "live_result_status": res,
+                    "debug": debug_info
+                }
             else:
                 # Live progress logic
                 current_price = future_df.iloc[-1]['close']

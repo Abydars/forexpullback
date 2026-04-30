@@ -592,12 +592,29 @@ function renderSignals() {
   };
 
   const getResultBadge = (s) => {
-    if (s.result === 'TP HIT') return '<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">TP HIT</span>';
-    if (s.result === 'SMART TP HIT') return '<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">SMART TP HIT</span>';
-    if (s.result === 'SL HIT') return '<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap bg-rose-500/10 text-rose-400 border border-rose-500/20">SL HIT</span>';
-    if (s.result) return `<span class="text-slate-400">${s.result}</span>`;
-    
+    let debugHtml = '';
     const lr = state.signal_live_results[s.id];
+    
+    if (s.result) {
+      if (lr && lr.debug) {
+        const d = lr.debug;
+        const hitTime = formatLocalTime(d.hit_time);
+        const dec = getDecimals ? getDecimals(s.symbol) : 5;
+        const effTp = d.effective_tp ? d.effective_tp.toFixed(dec) : '-';
+        const h = d.candle_high ? d.candle_high.toFixed(dec) : '-';
+        const l = d.candle_low ? d.candle_low.toFixed(dec) : '-';
+        
+        debugHtml = `<div class="text-[8px] text-slate-500 font-mono mt-1 whitespace-nowrap" title='${JSON.stringify(d).replace(/'/g, "&#39;")}'>${s.result.split(' ')[0]} @ ${hitTime} | H:${h} L:${l} | effTP:${effTp}</div>`;
+      }
+      
+      let badge = '';
+      if (s.result === 'TP HIT') badge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">TP HIT</span>';
+      else if (s.result === 'SMART TP HIT') badge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">SMART TP HIT</span>';
+      else if (s.result === 'SL HIT') badge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest whitespace-nowrap bg-rose-500/10 text-rose-400 border border-rose-500/20">SL HIT</span>';
+      else badge = `<span class="text-slate-400">${s.result}</span>`;
+      
+      return `<div class="flex flex-col items-start gap-0.5">${badge}${debugHtml}</div>`;
+    }
     if (lr) {
       let color = 'bg-white/5 text-slate-400 border-white/10';
       if (lr.live_result_status === 'NEAR TP') color = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
