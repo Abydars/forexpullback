@@ -61,7 +61,7 @@ async def get_initial_data():
             "signals": [
                 {"id": s.id, "symbol": s.symbol, "direction": s.direction, "score": s.score, 
                  "status": s.status, "reason": s.reason, "created_at": s.created_at.isoformat(),
-                 "result": s.result} for s in signals
+                 "result": s.result, "entry": s.entry, "sl": s.sl, "tp": s.tp, "skip_reason": s.skip_reason} for s in signals
             ],
             "events": [
                 {"level": e.level, "component": e.component, "message": e.message, "created_at": e.created_at.isoformat()} for e in events

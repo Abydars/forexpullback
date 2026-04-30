@@ -583,10 +583,10 @@ function renderSignals() {
     const zone = reason.zone || {};
 
     let triggerHtml = '-';
-    if (trigger.type) triggerHtml = `${trigger.type}${trigger.pattern ? ' / ' + trigger.pattern : ''} (${trigger.strength || '-'})`;
+    if (trigger.trigger_type) triggerHtml = `${trigger.trigger_type}${trigger.pattern ? ' / ' + trigger.pattern : ''} (${trigger.strength || '-'})`;
     
     let zoneHtml = '-';
-    if (zone.type) zoneHtml = `${zone.type} (${zone.quality || '-'})`;
+    if (zone.reason && zone.reason.type) zoneHtml = `${zone.reason.type} (${zone.quality || '-'})`;
     
     const htfStr = htf.strength || '-';
 
