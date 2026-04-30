@@ -192,6 +192,8 @@
             </div>
           </div>
           <div class="flex gap-2">
+            <span class="text-[10px] font-mono text-rose-400 tracking-wider bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/30 self-center" style="display: none;" id="signals-selected-count">SELECTED: 0</span>
+            <button onclick="deleteSelectedSignals()" id="btn-delete-selected" style="display: none;" class="px-3 py-1.5 bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 border border-rose-500/40 rounded text-[9px] font-bold tracking-widest uppercase transition-colors shrink-0">DELETE SELECTED</button>
             <button onclick="checkSignalResults()" id="btn-check-results" class="px-3 py-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/20 hover:border-blue-500/40 rounded text-[9px] font-bold tracking-widest uppercase transition-colors shrink-0">CHECK RESULTS</button>
             <button onclick="clearSignalResults()" id="btn-clear-results" class="px-3 py-1.5 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-500/40 rounded text-[9px] font-bold tracking-widest uppercase transition-colors shrink-0">CLEAR RESULTS</button>
             <button onclick="clearAllSignals()" class="px-3 py-1.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20 hover:border-rose-500/40 rounded text-[9px] font-bold tracking-widest uppercase transition-colors shrink-0">CLEAR SIGNALS</button>
@@ -224,6 +226,7 @@
           <table class="w-full text-left whitespace-nowrap">
             <thead>
               <tr class="bg-bg text-[10px] tracking-[0.1em] text-slate-500 uppercase border-b border-border_light">
+                <th class="px-4 py-2.5 font-semibold w-8"><input type="checkbox" id="signals-select-all" onchange="toggleAllSignals(this.checked)" class="accent-rose-500"></th>
                 <th class="px-4 py-2.5 font-semibold">TIME</th>
                 <th class="px-4 py-2.5 font-semibold">SYMBOL</th>
                 <th class="px-4 py-2.5 font-semibold">DIR</th>
@@ -546,6 +549,6 @@
     </form>
   </dialog>
 
-  <script src="/static/app.js?v=21"></script>
+  <script src="/static/app.js?v=22"></script>
 </body>
 </html>

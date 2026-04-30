@@ -21,6 +21,7 @@ const state = {
   recent_signals: [],
   all_signals: [],
   signal_live_results: {},
+  selected_signal_ids: new Set(),
   events: [],
   equity_series: [],
   config: {},
@@ -464,7 +465,7 @@ function renderSignals() {
   }
 
   if (!displaySignals.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-slate-500 py-8 uppercase tracking-widest text-xs">NO SIGNALS FOR SELECTED DATE/TIME RANGE</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-slate-500 py-8 uppercase tracking-widest text-xs">NO SIGNALS FOR SELECTED DATE/TIME RANGE</td></tr>';
     if (document.getElementById('win-rate')) document.getElementById('win-rate').textContent = '0.0';
     if (document.getElementById('live-bias-rate')) document.getElementById('live-bias-rate').textContent = '0.0';
     if (document.getElementById('stat-fired')) document.getElementById('stat-fired').textContent = '0';
@@ -532,10 +533,32 @@ function renderSignals() {
   if (document.getElementById('stat-sl')) document.getElementById('stat-sl').textContent = lost;
   if (document.getElementById('stat-live')) document.getElementById('stat-live').textContent = nearTp + nearSl + movingTp + movingSl + inProgress;
 
+  window.current_display_signal_ids = displaySignals.map(s => s.id);
+  
+  if (document.getElementById('signals-select-all')) {
+    const allChecked = window.current_display_signal_ids.length > 0 && window.current_display_signal_ids.every(id => state.selected_signal_ids.has(id));
+    document.getElementById('signals-select-all').checked = allChecked;
+  }
+  
+  const selectedCountEl = document.getElementById('signals-selected-count');
+  const deleteBtnEl = document.getElementById('btn-delete-selected');
+  if (selectedCountEl && deleteBtnEl) {
+    if (state.selected_signal_ids.size > 0) {
+      selectedCountEl.textContent = `SELECTED: ${state.selected_signal_ids.size}`;
+      selectedCountEl.style.display = 'block';
+      deleteBtnEl.style.display = 'block';
+    } else {
+      selectedCountEl.style.display = 'none';
+      deleteBtnEl.style.display = 'none';
+    }
+  }
+
   tbody.innerHTML = displaySignals.map(s => {
     const isHighlight = s.status === 'FIRED' || s.status === 'DCA_FIRED';
+    const isChecked = state.selected_signal_ids.has(s.id);
     return `
       <tr class="${isHighlight ? 'bg-emerald-500/5 hover:bg-emerald-500/10' : 'hover:bg-white/[0.02]'} transition-colors">
+        <td class="px-4 py-2.5"><input type="checkbox" onchange="toggleSignalSelection(${s.id}, this.checked)" ${isChecked ? 'checked' : ''} class="accent-rose-500"></td>
         <td class="px-4 py-2.5 font-mono text-slate-500 whitespace-nowrap">${formatLocalTime(s.created_at)}</td>
         <td class="px-4 py-2.5 font-bold text-slate-200">${s.symbol}</td>
         <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase ${['buy', 'bullish'].includes((s.direction || '').toLowerCase()) ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">${s.direction}</span></td>
@@ -546,6 +569,49 @@ function renderSignals() {
       </tr>
     `;
   }).join('');
+}
+
+function toggleSignalSelection(id, checked) {
+  if (checked) state.selected_signal_ids.add(id);
+  else state.selected_signal_ids.delete(id);
+  renderSignals();
+}
+
+function toggleAllSignals(checked) {
+  if (!window.current_display_signal_ids) return;
+  if (checked) {
+    window.current_display_signal_ids.forEach(id => state.selected_signal_ids.add(id));
+  } else {
+    window.current_display_signal_ids.forEach(id => state.selected_signal_ids.delete(id));
+  }
+  renderSignals();
+}
+
+async function deleteSelectedSignals() {
+  if (state.selected_signal_ids.size === 0) return;
+  if (!confirm(`Delete ${state.selected_signal_ids.size} selected signals? This cannot be undone.`)) return;
+  
+  const ids = Array.from(state.selected_signal_ids);
+  const btn = document.getElementById('btn-delete-selected');
+  btn.textContent = 'DELETING...';
+  btn.disabled = true;
+  
+  try {
+    const res = await api('POST', '/api/signals/delete_bulk', { ids });
+    
+    // Remove from frontend state
+    state.all_signals = state.all_signals.filter(s => !state.selected_signal_ids.has(s.id));
+    state.recent_signals = state.recent_signals.filter(s => !state.selected_signal_ids.has(s.id));
+    ids.forEach(id => { delete state.signal_live_results[id]; });
+    state.selected_signal_ids.clear();
+    
+    renderSignals();
+  } catch (err) {
+    alert(err.message);
+  } finally {
+    btn.textContent = 'DELETE SELECTED';
+    btn.disabled = false;
+  }
 }
 
 async function checkSignalResults() {

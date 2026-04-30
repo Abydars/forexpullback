@@ -137,3 +137,33 @@ async def check_results():
             await db.commit()
             
     return {"status": "ok", "updated": updated, "live_results": live_results}
+
+from pydantic import BaseModel
+from typing import List
+
+class BulkDeleteRequest(BaseModel):
+    ids: List[int]
+
+@router.post("/signals/delete_bulk")
+async def delete_bulk_signals(req: BulkDeleteRequest):
+    if not req.ids:
+        return {"status": "ok", "deleted": 0}
+        
+    from app.db.session import AsyncSessionLocal
+    from app.db.models import Signal, Event
+    from sqlalchemy import delete
+    
+    async with AsyncSessionLocal() as db:
+        stmt = delete(Signal).where(Signal.id.in_(req.ids))
+        res = await db.execute(stmt)
+        deleted_count = res.rowcount
+        
+        if deleted_count > 0:
+            db.add(Event(
+                level="info",
+                component="System",
+                message=f"Deleted {deleted_count} selected signals."
+            ))
+            await db.commit()
+            
+    return {"status": "ok", "deleted": deleted_count}
