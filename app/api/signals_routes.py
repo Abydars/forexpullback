@@ -414,7 +414,7 @@ from app.db.session import AsyncSessionLocal
 from app.db.models import Signal
 from sqlalchemy import select
 from datetime import datetime
-@router.get("/sl-buffer-analysis")
+@router.get("/signals/sl-buffer-analysis")
 async def analyze_sl_buffer():
     from app.core.config import get_config
     cfg = await get_config()
