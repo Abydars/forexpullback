@@ -27,6 +27,8 @@ const state = {
   config: {},
   sessions: [],
   symbols: [],
+  signal_symbols: [],
+  trade_symbols: [],
   scanner_status: {},
   exit_advice: {},
 };
@@ -1263,11 +1265,8 @@ async function loadConfig() {
     state.config = cfg;
     document.getElementById('c-max_open_positions').value = cfg.max_open_positions || 5;
     
-    const elSignal = document.getElementById('c-signal_symbols');
-    if (elSignal) elSignal.value = (cfg.signal_symbols || []).join(', ');
-    
-    const elTrade = document.getElementById('c-trade_symbols');
-    if (elTrade) elTrade.value = (cfg.trade_symbols || []).join(', ');
+    state.signal_symbols = cfg.signal_symbols || [];
+    state.trade_symbols = cfg.trade_symbols || [];
     document.getElementById('c-max_signals_per_scan').value = cfg.max_signals_per_scan || 1;
     document.getElementById('c-max_per_symbol').value = cfg.max_per_symbol || 1;
     document.getElementById('c-max_per_direction').value = cfg.max_per_direction || 3;
@@ -1365,36 +1364,48 @@ function renderPredefinedSymbols() {
   const customSyms = state.symbols.map(s => s.original || s.generic).filter(s => !PREDEFINED_SYMBOLS.includes(s));
   const displayList = [...PREDEFINED_SYMBOLS, ...customSyms];
 
-  document.getElementById('sym-checkboxes').innerHTML = displayList.map(sym => {
-    const obj = state.symbols.find(s => (s.original === sym) || (s.generic === sym));
-    const isChecked = !!obj;
-    
-    const displayName = (obj && obj.original && obj.generic && obj.original !== obj.generic) 
-      ? `${obj.original} &rarr; <span class="text-cyan-400">${obj.generic}</span>` 
-      : sym;
+  const createGrid = (type, list, containerId) => {
+    document.getElementById(containerId).innerHTML = displayList.map(sym => {
+      const obj = state.symbols.find(s => (s.original === sym) || (s.generic === sym));
+      const isChecked = list.includes(sym);
+      
+      const displayName = (obj && obj.original && obj.generic && obj.original !== obj.generic) 
+        ? `${obj.original} &rarr; <span class="text-cyan-400">${obj.generic}</span>` 
+        : sym;
 
-    const statusLabel = obj && obj.status === 'resolved' 
-      ? ` <span class="text-emerald-500 text-[9px] whitespace-nowrap">(✓)</span>` 
-      : (obj && obj.status === 'unresolved' 
-        ? ` <span class="text-rose-500 text-[9px] cursor-help" title="${obj.error_reason || 'Unknown error'}">(✗ ${obj.error_reason ? 'ERR' : 'FAIL'})</span>` 
-        : '');
+      const statusLabel = obj && obj.status === 'resolved' 
+        ? ` <span class="text-emerald-500 text-[9px] whitespace-nowrap">(✓)</span>` 
+        : (obj && obj.status === 'unresolved' 
+          ? ` <span class="text-rose-500 text-[9px] cursor-help" title="${obj.error_reason || 'Unknown error'}">(✗ ${obj.error_reason ? 'ERR' : 'FAIL'})</span>` 
+          : '');
 
-    return `
-      <label class="flex items-center gap-2 text-[10px] font-bold tracking-[0.1em] text-slate-300 cursor-pointer p-2 border border-border_light bg-black/10 hover:bg-white/5 rounded transition-colors group">
-        <input type="checkbox" value="${sym}" class="sym-cb w-4 h-4 accent-cyan_neon cursor-pointer shrink-0" ${isChecked ? 'checked' : ''} onchange="toggleSymbol('${sym}', this.checked)">
-        <span class="truncate">${displayName}${statusLabel}</span>
-      </label>
-    `;
-  }).join('');
+      return `
+        <label class="flex items-center gap-2 text-[10px] font-bold tracking-[0.1em] text-slate-300 cursor-pointer p-2 border border-border_light bg-black/10 hover:bg-white/5 rounded transition-colors group">
+          <input type="checkbox" value="${sym}" class="sym-cb w-4 h-4 accent-cyan_neon cursor-pointer shrink-0" ${isChecked ? 'checked' : ''} onchange="toggleSymbol('${sym}', this.checked, '${type}')">
+          <span class="truncate">${displayName}${statusLabel}</span>
+        </label>
+      `;
+    }).join('');
+  };
+
+  createGrid('signal', state.signal_symbols, 'signal-sym-checkboxes');
+  createGrid('trade', state.trade_symbols, 'trade-sym-checkboxes');
 }
 
-function toggleSymbol(sym, isChecked) {
+function toggleSymbol(sym, isChecked, type) {
+  const list = type === 'signal' ? state.signal_symbols : state.trade_symbols;
   if (isChecked) {
+    if (!list.includes(sym)) list.push(sym);
     if (!state.symbols.find(s => s.original === sym || s.generic === sym)) {
       state.symbols.push({ generic: sym, original: sym, resolved: null, status: 'pending' });
     }
   } else {
-    state.symbols = state.symbols.filter(s => s.original !== sym && s.generic !== sym);
+    const idx = list.indexOf(sym);
+    if (idx > -1) list.splice(idx, 1);
+    
+    if (!state.signal_symbols.includes(sym) && !state.trade_symbols.includes(sym)) {
+      state.symbols = state.symbols.filter(s => s.original !== sym && s.generic !== sym);
+    }
   }
   renderCorrelationGroups();
 }
@@ -1499,9 +1510,6 @@ function addSessionRow(session) {
 }
 
 function collectConfigInputs() {
-  const signalSymbolsRaw = document.getElementById('c-signal_symbols')?.value;
-  const tradeSymbolsRaw = document.getElementById('c-trade_symbols')?.value;
-  
   const payload = {
     correlation_groups_enabled: document.getElementById('c-correlation_groups_enabled').checked,
     max_open_per_correlation_group: parseInt(document.getElementById('c-max_open_per_correlation_group').value),
@@ -1557,8 +1565,8 @@ function collectConfigInputs() {
     session_warmup_volatility_multiplier: parseFloat(document.getElementById('c-session_warmup_volatility_multiplier').value)
   };
   
-  if (signalSymbolsRaw) payload.signal_symbols = signalSymbolsRaw.split(',').map(s => s.trim()).filter(Boolean);
-  if (tradeSymbolsRaw) payload.trade_symbols = tradeSymbolsRaw.split(',').map(s => s.trim()).filter(Boolean);
+  if (state.signal_symbols.length > 0) payload.signal_symbols = state.signal_symbols;
+  if (state.trade_symbols.length > 0) payload.trade_symbols = state.trade_symbols;
   
   return payload;
 }
@@ -1657,21 +1665,20 @@ function applyJsonText() {
       }
     }
 
-    if (Array.isArray(data.symbols)) {
-      state.symbols = data.symbols.map(s => typeof s === 'string' ? { generic: s, resolved: null, status: 'pending' } : s);
-      renderPredefinedSymbols();
-      resolveAllSymbols();
-    }
-
     if (Array.isArray(data.signal_symbols)) {
-      const el = document.getElementById('c-signal_symbols');
-      if (el) el.value = data.signal_symbols.join(', ');
+      state.signal_symbols = data.signal_symbols;
     }
     
     if (Array.isArray(data.trade_symbols)) {
-      const el = document.getElementById('c-trade_symbols');
-      if (el) el.value = data.trade_symbols.join(', ');
+      state.trade_symbols = data.trade_symbols;
     }
+
+    if (Array.isArray(data.symbols)) {
+      state.symbols = data.symbols.map(s => typeof s === 'string' ? { generic: s, resolved: null, status: 'pending' } : s);
+    }
+    
+    renderPredefinedSymbols();
+    resolveAllSymbols();
 
     if (Array.isArray(data.enabled_correlation_groups)) {
       state.enabled_correlation_groups = data.enabled_correlation_groups;

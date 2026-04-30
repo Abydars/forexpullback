@@ -456,15 +456,14 @@
               <button type="button" class="px-5 py-2.5 border border-border_strong text-slate-300 text-[9px] font-bold tracking-[0.1em] uppercase hover:bg-white/5 transition-colors rounded" onclick="resolveAllSymbols()">VERIFY SYMBOLS ON BROKER</button>
             </div>
 
-            <div class="flex flex-col md:flex-row gap-4 w-full">
-              <label class="flex flex-col gap-1 text-[9px] font-bold tracking-[0.1em] text-cyan-400 uppercase w-full">SIGNAL / INSIGHT SYMBOLS (COMMA SEPARATED) <textarea id="c-signal_symbols" rows="3" class="bg-black/20 border border-border_strong text-slate-200 text-[10px] p-2.5 rounded outline-none focus:border-cyan_neon transition-colors" placeholder="e.g. EURUSD, GBPUSD, USDJPY (Leave empty to use predefined symbols below)"></textarea><span class="text-slate-500 font-normal">Scanned for analytics but will not open live trades.</span></label>
-              
-              <label class="flex flex-col gap-1 text-[9px] font-bold tracking-[0.1em] text-emerald-400 uppercase w-full">LIVE TRADING SYMBOLS (COMMA SEPARATED) <textarea id="c-trade_symbols" rows="3" class="bg-black/20 border border-border_strong text-slate-200 text-[10px] p-2.5 rounded outline-none focus:border-cyan_neon transition-colors" placeholder="e.g. XAUUSD, BTCUSD (Leave empty to use predefined symbols below)"></textarea><span class="text-slate-500 font-normal">Only these are allowed to open actual trades.</span></label>
-            </div>
-            
             <div class="space-y-3">
-              <div class="text-[9px] font-bold tracking-[0.1em] text-cyan_neon uppercase border-b border-border_light pb-2">PREDEFINED SYMBOLS</div>
-              <div id="sym-checkboxes" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+              <div class="text-[9px] font-bold tracking-[0.1em] text-cyan_neon uppercase border-b border-border_light pb-2">SIGNAL / INSIGHT SYMBOLS <span class="text-slate-500 lowercase font-normal">(Scanned for analytics but will not open live trades)</span></div>
+              <div id="signal-sym-checkboxes" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+            </div>
+
+            <div class="space-y-3 pt-4">
+              <div class="text-[9px] font-bold tracking-[0.1em] text-emerald-400 uppercase border-b border-border_light pb-2">LIVE TRADING SYMBOLS <span class="text-slate-500 lowercase font-normal">(Allowed to open actual trades)</span></div>
+              <div id="trade-sym-checkboxes" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
             </div>
 
             <div class="space-y-3 pt-4">
