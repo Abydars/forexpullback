@@ -43,7 +43,7 @@ async def scan_loop():
             interval = cfg.get("scan_interval_seconds", 10)
             
             from app.core.state import state
-            if not state.engine_running or not mt5_client.is_connected():
+            if not mt5_client.is_connected():
                 await asyncio.sleep(interval)
                 continue
             
@@ -612,7 +612,10 @@ async def scan_loop():
                     status = "DCA_FIRED" if is_dca else "FIRED"
                     
                     execute_entry = True
-                    if not is_active and not is_dca:
+                    if not state.engine_running:
+                        execute_entry = False
+                        reason_full["msg"] = f"Signal Fired! (Score: {score}) - ENTRY BLOCKED (ENGINE STOPPED)"
+                    elif not is_active and not is_dca:
                         execute_entry = False
                         reason_full["msg"] = f"Signal Fired! (Score: {score}) - ENTRY BLOCKED (SESSION OFF)"
                     elif c.get("warmup_failed") and not is_dca:
