@@ -641,8 +641,8 @@ async function checkSignalResults() {
   const btn = document.getElementById('btn-check-results');
   btn.textContent = 'CHECKING...';
   btn.disabled = true;
-  const useSmartTp = document.getElementById('use-smart-tp-sim')?.checked || false;
-  const includeSkipped = document.getElementById('include-skipped-sim')?.checked || false;
+  const useSmartTp = document.getElementById('signal-use-smart-tp')?.checked || false;
+  const includeSkipped = document.getElementById('signal-include-skipped')?.checked || false;
   try {
     const res = await api('POST', '/api/signals/check_results', { use_smart_tp: useSmartTp, include_skipped: includeSkipped });
     alert(`Done! Updated ${res.updated} final signals.`);
