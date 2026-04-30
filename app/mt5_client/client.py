@@ -40,6 +40,14 @@ class MT5Client:
             raise Exception("Failed to get account info")
         return acc
 
+    async def get_all_symbols(self) -> list[str]:
+        def _symbols():
+            syms = mt5.symbols_get()
+            if not syms:
+                return []
+            return [s.name for s in syms]
+        return await asyncio.to_thread(_symbols)
+
     async def get_rates(self, symbol, timeframe, count) -> pd.DataFrame:
         def _rates():
             rates = mt5.copy_rates_from_pos(symbol, timeframe, 0, count)

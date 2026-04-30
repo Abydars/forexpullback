@@ -1341,7 +1341,7 @@ function openConfigModal() { loadConfig(); document.getElementById('config-modal
 function closeConfigModal() { document.getElementById('config-modal').close(); }
 
 // Predefined Symbols and Groups
-const PREDEFINED_SYMBOLS = [
+let PREDEFINED_SYMBOLS = [
   "US30", "US500", "USTEC", "XAUUSD", "XAGUSD", "USDJPY", "EURJPY", "GBPJPY",
   "EURUSD", "GBPUSD", "AUDUSD", "NZDUSD", "USDCAD", "USDCHF", "USOIL", "UKOIL",
   "EURAUD", "EURCAD", "EURGBP", "EURCHF", "EURNZD", "GBPAUD", "GBPCAD", "GBPCHF",
@@ -1359,6 +1359,24 @@ const CORRELATION_GROUPS = {
   "gbp_crosses": ["GBPAUD", "GBPCAD", "GBPCHF", "GBPNZD"],
   "minor_crosses": ["AUDCAD", "AUDCHF", "AUDNZD", "CADCHF", "NZDCAD", "NZDCHF"]
 };
+
+async function fetchBrokerSymbols() {
+  try {
+    const res = await api('GET', '/api/symbols/available');
+    if (res && res.symbols && res.symbols.length > 0) {
+      // Keep only major forex, metals, and some indices to avoid 1000s of obscure stocks
+      const majorKeywords = ["USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "NZD", "XAU", "XAG", "US30", "US500", "USTEC", "OIL"];
+      const filtered = res.symbols.filter(s => majorKeywords.some(k => s.toUpperCase().includes(k)));
+      
+      // If we got good symbols, use them (deduplicated)
+      if (filtered.length > 0) {
+        PREDEFINED_SYMBOLS = Array.from(new Set([...PREDEFINED_SYMBOLS, ...filtered])).sort();
+      }
+    }
+  } catch (e) {
+    console.error("Failed to fetch broker symbols", e);
+  }
+}
 
 function renderPredefinedSymbols() {
   const customSyms = state.symbols.map(s => s.original || s.generic).filter(s => !PREDEFINED_SYMBOLS.includes(s));
@@ -1412,17 +1430,21 @@ function toggleSymbol(sym, isChecked, type) {
 
 function renderCorrelationGroups() {
   const enabledGrp = new Set(state.enabled_correlation_groups || []);
-  const enabledSet = new Set();
-  state.symbols.forEach(s => {
-    enabledSet.add(s.generic);
-    if(s.original) enabledSet.add(s.original);
-  });
+  
+  const normalizeSymbolName = (s) => (s || "").toUpperCase().replace(/[.\-_]/g, "").trim();
+  const symbolsMatch = (a, b) => {
+    const na = normalizeSymbolName(a);
+    const nb = normalizeSymbolName(b);
+    if (!na || !nb) return false;
+    if (na === nb) return true;
+    return na.startsWith(nb) || nb.startsWith(na);
+  };
 
   document.getElementById('corr-groups-list').innerHTML = Object.entries(CORRELATION_GROUPS).map(([group, syms]) => {
     const isChecked = enabledGrp.has(group);
 
     const symsHtml = syms.map(s => {
-      const isActive = enabledSet.has(s) || state.symbols.some(st => st.original === s || st.generic === s);
+      const isActive = state.symbols.some(st => symbolsMatch(st.original, s) || symbolsMatch(st.generic, s));
       const colorClass = isActive ? "text-cyan_neon bg-cyan_neon/10 border border-cyan_neon/30" : "text-slate-600 bg-black/20 border border-transparent";
       return `<span class="px-1.5 py-0.5 rounded ${colorClass}">${s}</span>`;
     }).join('');

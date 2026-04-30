@@ -454,6 +454,7 @@
           <div class="m-panel space-y-6" data-mpanel="symbols">
             <div class="flex gap-4">
               <button type="button" class="px-5 py-2.5 border border-border_strong text-slate-300 text-[9px] font-bold tracking-[0.1em] uppercase hover:bg-white/5 transition-colors rounded" onclick="resolveAllSymbols()">VERIFY SYMBOLS ON BROKER</button>
+              <button type="button" class="px-5 py-2.5 border border-border_strong text-slate-300 text-[9px] font-bold tracking-[0.1em] uppercase hover:bg-white/5 transition-colors rounded" onclick="fetchBrokerSymbols().then(renderPredefinedSymbols)">FETCH BROKER SYMBOLS</button>
             </div>
 
             <div class="space-y-3">

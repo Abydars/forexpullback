@@ -14,6 +14,13 @@ async def get_status():
         "active_sessions_count": getattr(state, "active_sessions_count", 0)
     }
 
+@router.get("/symbols/available")
+async def get_available_symbols():
+    if not mt5_client.is_connected():
+        return {"symbols": []}
+    syms = await mt5_client.get_all_symbols()
+    return {"symbols": syms}
+
 from app.core.config import get_config, update_config
 
 @router.post("/engine/start")

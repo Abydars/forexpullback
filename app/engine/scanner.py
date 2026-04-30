@@ -188,15 +188,17 @@ async def scan_loop():
                 "minor_crosses": ["AUDCAD", "AUDCHF", "AUDNZD", "CADCHF", "NZDCAD", "NZDCHF"]
             }
             
-            generic_to_group = {}
-            for g, syms in CORRELATION_GROUPS.items():
-                for s in syms:
-                    generic_to_group[s] = g
+            def get_correlation_group(sym_name):
+                if not sym_name: return None
+                for g, syms in CORRELATION_GROUPS.items():
+                    if any(symbols_match(sym_name, s) for s in syms):
+                        return g
+                return None
             
             group_open_counts = {g: 0 for g in CORRELATION_GROUPS}
             if correlation_groups_enabled:
                 for p in bot_positions:
-                    grp = generic_to_group.get(p['symbol'])
+                    grp = get_correlation_group(p['symbol'])
                     if grp:
                         group_open_counts[grp] += 1
                 
@@ -527,7 +529,7 @@ async def scan_loop():
                                                 reason_full["skip_reason"] = "MAX_POSITIONS"
                                                 reason_full["msg"] = "Blocked because position limit already reached"
                                             else:
-                                                my_group = generic_to_group.get(generic) or generic_to_group.get(resolved)
+                                                my_group = get_correlation_group(generic) or get_correlation_group(resolved)
                                                 if correlation_groups_enabled and my_group and my_group in enabled_correlation_groups:
                                                     if group_open_counts[my_group] >= max_corr:
                                                         status = "SKIPPED"
@@ -669,7 +671,7 @@ async def scan_loop():
             for c in normal_candidates:
                 if len(selected_normal) >= max_signals_per_scan:
                     break
-                my_group = generic_to_group.get(c["generic"]) or generic_to_group.get(c["resolved"])
+                my_group = get_correlation_group(c["generic"]) or get_correlation_group(c["resolved"])
                 if correlation_groups_enabled and my_group and my_group in enabled_correlation_groups:
                     if my_group in groups_used_this_scan:
                         c["status"] = "SKIPPED"
